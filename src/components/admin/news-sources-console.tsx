@@ -1,0 +1,669 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { StatusBadge } from "@/components/status-badge";
+
+type Health = "healthy" | "warning" | "failed" | "paused";
+
+type SourceView = {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  description: string | null;
+  category: string | null;
+  priority: number;
+  active: boolean;
+  fetchIntervalMinutes: number;
+  maxItemsPerFetch: number;
+  lastSuccessAt: string | null;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  errorCount: number;
+  totalFetched: number;
+  totalAccepted: number;
+  totalDuplicates: number;
+  health: Health;
+};
+
+type RunView = {
+  id: string;
+  sourceId: string | null;
+  status: string;
+  startedAt: string;
+  itemsFound: number;
+  itemsCreated: number;
+  duplicates: number;
+  errors: number;
+  errorMessage: string | null;
+};
+
+type TestResult = {
+  ok: boolean;
+  elapsedMs?: number;
+  feedTitle?: string;
+  itemCount?: number;
+  skipped?: number;
+  sample?: Array<{ title: string; url: string; publishedAt: string | null }>;
+  message?: string;
+  detail?: string | null;
+};
+
+type FormState = {
+  id: string | null; // null = create
+  name: string;
+  type: "rss" | "api";
+  url: string;
+  description: string;
+  category: string;
+  priority: number;
+  active: boolean;
+  fetchIntervalMinutes: number;
+  maxItemsPerFetch: number;
+};
+
+const HEALTH_LABEL: Record<Health, string> = {
+  healthy: "سالم",
+  warning: "هشدار",
+  failed: "خطا",
+  paused: "غیرفعال",
+};
+
+const HEALTH_TONE: Record<Health, "success" | "warning" | "danger" | "muted"> = {
+  healthy: "success",
+  warning: "warning",
+  failed: "danger",
+  paused: "muted",
+};
+
+const emptyForm = (): FormState => ({
+  id: null,
+  name: "",
+  type: "rss",
+  url: "",
+  description: "",
+  category: "",
+  priority: 3,
+  active: true,
+  fetchIntervalMinutes: 60,
+  maxItemsPerFetch: 50,
+});
+
+function formatTime(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString("fa-IR");
+}
+
+export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
+  const [sources, setSources] = useState<SourceView[]>([]);
+  const [runs, setRuns] = useState<RunView[]>([]);
+  const [summary, setSummary] = useState({ total: 0, active: 0, healthy: 0, warning: 0, failed: 0 });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [pageMessage, setPageMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const [form, setForm] = useState<FormState | null>(null);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  const [fetchReports, setFetchReports] = useState<Record<string, string>>({});
+
+  // Manual RSS/XML import (for geo-blocked Iranian hosts)
+  const [importOpen, setImportOpen] = useState(false);
+  const [importXml, setImportXml] = useState("");
+  const [importSourceId, setImportSourceId] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [importResult, setImportResult] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const headers = useCallback((): Record<string, string> => {
+    const base: Record<string, string> = { "Content-Type": "application/json" };
+    if (adminKey) base["x-admin-key"] = adminKey;
+    return base;
+  }, [adminKey]);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/news-sources", { headers: headers(), cache: "no-store" });
+      const data = (await res.json()) as {
+        success: boolean;
+        sources?: SourceView[];
+        runs?: RunView[];
+        summary?: typeof summary;
+        message?: string;
+      };
+      if (data.success) {
+        setSources(data.sources ?? []);
+        setRuns(data.runs ?? []);
+        setSummary(data.summary ?? summary);
+      } else {
+        setPageMessage({ kind: "err", text: data.message ?? "بارگذاری منابع ناموفق بود." });
+      }
+    } catch {
+      setPageMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });
+    } finally {
+      setLoading(false);
+    }
+  }, [headers, summary]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function withBusy(key: string, fn: () => Promise<void>) {
+    setBusy(key);
+    try {
+      await fn();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSubmit() {
+    if (!form) return;
+    await withBusy("form", async () => {
+      setFormErrors([]);
+      const body = {
+        name: form.name,
+        type: form.type,
+        url: form.url,
+        description: form.description || null,
+        category: form.category || null,
+        priority: form.priority,
+        active: form.active,
+        fetchIntervalMinutes: form.fetchIntervalMinutes,
+        maxItemsPerFetch: form.maxItemsPerFetch,
+      };
+      const res = await fetch(form.id ? `/api/admin/news-sources/${form.id}` : "/api/admin/news-sources", {
+        method: form.id ? "PATCH" : "POST",
+        headers: headers(),
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json()) as { success: boolean; errors?: string[]; message?: string };
+      if (data.success) {
+        setForm(null);
+        setPageMessage({ kind: "ok", text: form.id ? "منبع به‌روزرسانی شد." : "منبع جدید ثبت شد." });
+        await load();
+      } else {
+        setFormErrors(data.errors ?? [data.message ?? "ذخیره منبع ناموفق بود."]);
+      }
+    });
+  }
+
+  async function handleTest(source: SourceView) {
+    await withBusy(`test-${source.id}`, async () => {
+      try {
+        const res = await fetch(`/api/admin/news-sources/${source.id}/test`, { method: "POST", headers: headers(), body: "{}" });
+        const data = (await res.json()) as { success: boolean; test?: TestResult };
+        if (data.test) setTestResults((prev) => ({ ...prev, [source.id]: data.test as TestResult }));
+      } catch {
+        setTestResults((prev) => ({ ...prev, [source.id]: { ok: false, message: "خطای ارتباط با سرور." } }));
+      }
+    });
+  }
+
+  async function handleFetch(source: SourceView) {
+    await withBusy(`fetch-${source.id}`, async () => {
+      try {
+        const res = await fetch(`/api/admin/news-sources/${source.id}/fetch`, { method: "POST", headers: headers(), body: "{}" });
+        const data = (await res.json()) as {
+          success: boolean;
+          report?: { itemsFound: number; itemsCreated: number; duplicates: number; skipped: number };
+          failure?: { message: string };
+          message?: string;
+        };
+        const text = data.report
+          ? `موارد یافت‌شده: ${data.report.itemsFound} · جدید: ${data.report.itemsCreated} · تکراری: ${data.report.duplicates} · خطا: ${data.report.skipped}`
+          : (data.failure?.message ?? data.message ?? "دریافت ناموفق بود.");
+        setFetchReports((prev) => ({ ...prev, [source.id]: text }));
+        await load();
+      } catch {
+        setFetchReports((prev) => ({ ...prev, [source.id]: "خطای ارتباط با سرور." }));
+      }
+    });
+  }
+
+  async function handleToggle(source: SourceView) {
+    await withBusy(`toggle-${source.id}`, async () => {
+      await fetch(`/api/admin/news-sources/${source.id}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ active: !source.active }),
+      });
+      await load();
+    });
+  }
+
+  async function handleDelete(source: SourceView) {
+    if (!window.confirm(`منبع «${source.name}» حذف شود؟ اخبار ثبت‌شده حفظ می‌شوند.`)) return;
+    await withBusy(`delete-${source.id}`, async () => {
+      await fetch(`/api/admin/news-sources/${source.id}`, { method: "DELETE", headers: headers() });
+      setPageMessage({ kind: "ok", text: "منبع حذف شد." });
+      await load();
+    });
+  }
+
+  async function handleImport() {
+    if (importBusy || !importXml.trim()) return;
+    setImportBusy(true);
+    setImportResult(null);
+    try {
+      const res = await fetch("/api/admin/news-import", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ xml: importXml, sourceId: importSourceId || undefined }),
+      });
+      const data = (await res.json()) as {
+        success: boolean;
+        message?: string;
+        itemsFound?: number;
+        itemsCreated?: number;
+        duplicates?: number;
+      };
+      setImportResult(
+        data.success
+          ? { kind: "ok", text: `ورود انجام شد — یافت: ${data.itemsFound} · جدید: ${data.itemsCreated} · تکراری: ${data.duplicates}` }
+          : { kind: "err", text: data.message ?? "ورود ناموفق بود." },
+      );
+      if (data.success) {
+        setImportXml("");
+        await load();
+      }
+    } catch {
+      setImportResult({ kind: "err", text: "خطای ارتباط با سرور." });
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function handleRunDue() {
+    await withBusy("run-due", async () => {
+      try {
+        const res = await fetch("/api/admin/news-sources/run-due", { method: "POST", headers: headers(), body: "{}" });
+        const data = (await res.json()) as { success: boolean; considered?: number; fetched?: number; results?: Array<{ sourceName: string; status: string; detail?: string }>; message?: string };
+        const detail = (data.results ?? []).map((r) => `${r.sourceName}: ${r.status}${r.detail ? ` (${r.detail})` : ""}`).join(" | ");
+        setPageMessage(
+          data.success
+            ? { kind: "ok", text: `بررسی ${data.considered ?? 0} منبع فعال — ${data.fetched ?? 0} دریافت شد. ${detail}` }
+            : { kind: "err", text: data.message ?? "اجرای دریافت زمان‌بندی‌شده ناموفق بود." },
+        );
+        await load();
+      } catch {
+        setPageMessage({ kind: "err", text: "خطای ارتباط با سرور." });
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <header className="border-b border-slate-200/80 pb-6">
+        <p className="mb-2 text-sm font-medium text-blue-600">مرکز مدیریت اخبار</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">منابع خبری</h1>
+        <p className="mt-2 text-sm text-slate-500">افزودن، تست، فعال/غیرفعال کردن و دریافت دستی منابع RSS</p>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard label="کل منابع" value={summary.total} />
+        <StatCard label="فعال" value={summary.active} />
+        <StatCard label="سالم" value={summary.healthy} tone="success" />
+        <StatCard label="هشدار" value={summary.warning} tone="warning" />
+        <StatCard label="خطا" value={summary.failed} tone="danger" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+          onClick={() => {
+            setForm(emptyForm());
+            setFormErrors([]);
+          }}
+          type="button"
+        >
+          + افزودن منبع جدید
+        </button>
+        <button
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          disabled={busy === "run-due"}
+          onClick={handleRunDue}
+          type="button"
+        >
+          {busy === "run-due" ? "در حال دریافت..." : "دریافت منابع رسید (Due)"}
+        </button>
+        <button
+          className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+          onClick={() => setImportOpen((v) => !v)}
+          type="button"
+        >
+          ورود دستی RSS (برای منابعی که سرور به آن‌ها دسترسی ندارد)
+        </button>
+      </div>
+
+      {importOpen ? (
+        <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4">
+          <p className="text-xs leading-5 text-violet-900">
+            اگر منبعی (مثل سایت‌های ایرانی میزبانی‌شده در داخل) از سرور شما قابل‌دسترس نیست: فایل RSS را با مرورگر یا
+            <code className="mx-1 rounded bg-white px-1 font-mono text-[10px]" dir="ltr">curl</code>
+            دریافت کنید، کل محتوای XML را اینجا Paste کنید و وارد نمایید. دقیقاً همان مسیر پردازش (نجارسازی،
+            کانونیکال، ضدتکراری، ذخیره) اجرا می‌شود و هیچ ارسالی انجام نمی‌گیرد.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[240px_1fr]">
+            <select
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              onChange={(e) => setImportSourceId(e.target.value)}
+              value={importSourceId}
+            >
+              <option value="">بدون اتصال به منبع (ورود مستقل)</option>
+              {sources.map((s) => (
+                <option key={s.id} value={s.id}>
+                  اتصال به: {s.name}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="min-h-28 rounded-lg border border-slate-200 bg-white p-3 font-mono text-xs"
+              dir="ltr"
+              onChange={(e) => setImportXml(e.target.value)}
+              placeholder="<rss> … کل XML فید را اینجا بچسبانید … </rss>"
+              value={importXml}
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+              disabled={importBusy || !importXml.trim()}
+              onClick={handleImport}
+              type="button"
+            >
+              {importBusy ? "در حال ورود..." : "ورود به پایگاه داده"}
+            </button>
+            {importResult ? (
+              <span className={`text-xs font-bold ${importResult.kind === "ok" ? "text-emerald-700" : "text-rose-700"}`}>
+                {importResult.text}
+              </span>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {pageMessage ? (
+        <p
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            pageMessage.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"
+          }`}
+        >
+          {pageMessage.text}
+        </p>
+      ) : null}
+
+      {form ? (
+        <section className="rounded-2xl border border-blue-200 bg-blue-50/30 p-5">
+          <h2 className="text-sm font-bold text-slate-900">{form.id ? "ویرایش منبع" : "منبع جدید"}</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <FieldInput label="نام منبع" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">نوع</label>
+              <select
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                onChange={(e) => setForm({ ...form, type: e.target.value === "api" ? "api" : "rss" })}
+                value={form.type}
+              >
+                <option value="rss">RSS</option>
+                <option value="api">API (به‌زودی)</option>
+              </select>
+            </div>
+            <FieldInput label="آدرس فید (URL)" value={form.url} onChange={(v) => setForm({ ...form, url: v })} dir="ltr" />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">اولویت (۱=بالاترین)</label>
+              <select
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
+                value={form.priority}
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <FieldInput label="دسته پیش‌فرض (اختیاری)" value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+            <FieldInput label="فاصله دریافت (دقیقه)" value={String(form.fetchIntervalMinutes)} onChange={(v) => setForm({ ...form, fetchIntervalMinutes: Number(v) || 30 })} type="number" />
+            <FieldInput label="حداکثر آیتم هر دریافت" value={String(form.maxItemsPerFetch)} onChange={(v) => setForm({ ...form, maxItemsPerFetch: Number(v) || 50 })} type="number" />
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-slate-500">توضیحات</label>
+              <input
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                value={form.description}
+              />
+            </div>
+            <label className="flex items-center gap-2 self-end pb-2 text-sm">
+              <input checked={form.active} className="h-4 w-4 accent-blue-600" onChange={(e) => setForm({ ...form, active: e.target.checked })} type="checkbox" />
+              فعال
+            </label>
+          </div>
+
+          {formErrors.length > 0 ? (
+            <ul className="mt-3 space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+              {formErrors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          <div className="mt-4 flex gap-2">
+            <button className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50" disabled={busy === "form"} onClick={handleSubmit} type="button">
+              {busy === "form" ? "در حال ذخیره..." : "ذخیره"}
+            </button>
+            <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50" onClick={() => setForm(null)} type="button">
+              انصراف
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {loading ? (
+        <p className="text-sm text-slate-400">در حال بارگذاری...</p>
+      ) : sources.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-10 text-center text-sm text-slate-500">
+          هنوز منبعی ثبت نشده است. روی «افزودن منبع جدید» بزنید.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <table className="w-full min-w-[900px] text-right text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-xs text-slate-500">
+                <th className="p-3 font-medium">منبع</th>
+                <th className="p-3 font-medium">سلامت</th>
+                <th className="p-3 font-medium">اولویت</th>
+                <th className="p-3 font-medium">آمار (یافته/پذیرفته/تکراری)</th>
+                <th className="p-3 font-medium">آخرین تلاش / موفق</th>
+                <th className="p-3 font-medium">عملیات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.map((source) => (
+                <tr className="border-b border-slate-50 align-top last:border-0" key={source.id}>
+                  <td className="p-3">
+                    <p className="font-bold text-slate-900">{source.name}</p>
+                    <p className="mt-0.5 max-w-[280px] truncate font-mono text-[11px] text-slate-400" dir="ltr" title={source.url}>
+                      {source.url}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {source.type.toUpperCase()} · هر {source.fetchIntervalMinutes} دقیقه
+                    </p>
+                  </td>
+                  <td className="p-3">
+                    <StatusBadge tone={HEALTH_TONE[source.health]}>{HEALTH_LABEL[source.health]}</StatusBadge>
+                    {source.errorCount > 0 ? <p className="mt-1 text-[11px] text-rose-500">خطاهای متوالی/کل: {source.errorCount}</p> : null}
+                    {source.lastError ? (
+                      <p className="mt-1 max-w-[220px] truncate text-[11px] text-slate-400" title={source.lastError}>
+                        {source.lastError}
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="p-3 text-slate-600">{source.priority}</td>
+                  <td className="p-3 text-xs text-slate-600">
+                    {source.totalFetched} / {source.totalAccepted} / {source.totalDuplicates}
+                  </td>
+                  <td className="p-3 text-xs text-slate-500">
+                    <p>تلاش: {formatTime(source.lastAttemptAt)}</p>
+                    <p className="mt-0.5">موفق: {formatTime(source.lastSuccessAt)}</p>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      <MiniButton disabled={busy !== null} onClick={() => handleTest(source)}>
+                        تست
+                      </MiniButton>
+                      <MiniButton disabled={busy !== null} primary onClick={() => handleFetch(source)}>
+                        {busy === `fetch-${source.id}` ? "..." : "دریافت فوری"}
+                      </MiniButton>
+                      <MiniButton disabled={busy !== null} onClick={() => handleToggle(source)}>
+                        {source.active ? "غیرفعال" : "فعال"}
+                      </MiniButton>
+                      <MiniButton
+                        disabled={busy !== null}
+                        onClick={() =>
+                          setForm({
+                            id: source.id,
+                            name: source.name,
+                            type: source.type === "api" ? "api" : "rss",
+                            url: source.url,
+                            description: source.description ?? "",
+                            category: source.category ?? "",
+                            priority: source.priority,
+                            active: source.active,
+                            fetchIntervalMinutes: source.fetchIntervalMinutes,
+                            maxItemsPerFetch: source.maxItemsPerFetch,
+                          })
+                        }
+                      >
+                        ویرایش
+                      </MiniButton>
+                      <MiniButton danger disabled={busy !== null} onClick={() => handleDelete(source)}>
+                        حذف
+                      </MiniButton>
+                    </div>
+                    {fetchReports[source.id] ? <p className="mt-2 max-w-[260px] text-[11px] text-slate-500">{fetchReports[source.id]}</p> : null}
+                    {testResults[source.id] ? <TestResultView result={testResults[source.id]} /> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-bold text-slate-950">تاریخچه دریافت‌ها (Ingestion Log)</h2>
+        {runs.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-400">هنوز رکوردی ثبت نشده است.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {runs.slice(0, 15).map((run) => (
+              <li className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2 text-xs" key={run.id}>
+                <StatusBadge tone={run.status === "success" ? "success" : run.status === "partial" ? "warning" : "danger"}>
+                  {run.status === "success" ? "موفق" : run.status === "partial" ? "ناقص" : "ناموفق"}
+                </StatusBadge>
+                <span className="text-slate-400">{formatTime(run.startedAt)}</span>
+                <span>
+                  یافته: {run.itemsFound} · جدید: {run.itemsCreated} · تکراری: {run.duplicates} · خطا: {run.errors}
+                </span>
+                {run.errorMessage ? <span className="max-w-[400px] truncate text-rose-600" title={run.errorMessage}>{run.errorMessage}</span> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function TestResultView({ result }: { result: TestResult }) {
+  return (
+    <div className={`mt-2 rounded-lg border p-2.5 text-[11px] ${result.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+      {result.ok ? (
+        <>
+          <p className="font-bold">
+            اتصال موفق ✓ — {result.feedTitle} ({result.itemCount} آیتم، {result.elapsedMs}ms)
+          </p>
+          {result.sample && result.sample.length > 0 ? (
+            <ul className="mt-1 space-y-0.5">
+              {result.sample.slice(0, 3).map((s, i) => (
+                <li className="truncate" key={i} title={s.title}>
+                  • {s.title}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : (
+        <p>
+          اتصال ناموفق: {result.message}
+          {result.detail ? <span className="mt-0.5 block opacity-80" dir="ltr">{result.detail}</span> : null}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, tone }: { label: string; value: number; tone?: "success" | "warning" | "danger" }) {
+  const toneClass = tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : tone === "danger" ? "text-rose-700" : "text-slate-950";
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className={`mt-1 text-xl font-bold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function FieldInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  dir,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  dir?: "ltr";
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
+      <input
+        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none ${dir === "ltr" ? "font-mono text-xs" : ""}`}
+        dir={dir}
+        onChange={(e) => onChange(e.target.value)}
+        type={type}
+        value={value}
+      />
+    </div>
+  );
+}
+
+function MiniButton({
+  children,
+  onClick,
+  disabled,
+  primary,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  primary?: boolean;
+  danger?: boolean;
+}) {
+  const cls = primary
+    ? "bg-blue-600 text-white hover:bg-blue-700"
+    : danger
+      ? "border border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50";
+  return (
+    <button className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-40 ${cls}`} disabled={disabled} onClick={onClick} type="button">
+      {children}
+    </button>
+  );
+}

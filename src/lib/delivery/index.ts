@@ -1,0 +1,242 @@
+/**
+ * Delivery service (Milestone 5) — SERVER-SIDE ONLY.
+ *
+ * Analyzed News -> Delivery Service -> Local | Bale
+ *
+ * This is the ONLY place that knows about both providers, so the send flow is not
+ * duplicated. Destinations are attempted independently: one failing never blocks
+ * the other. A provider is only ever reported as "sent" when that provider itself
+ * confirmed success — no fabricated deliveries.
+ */
+
+import { db } from "@/db";
+import { deliveries, news, type NewsRow } from "@/db/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { deliverToBale } from "./bale";
+import { deliverToLocal } from "./local";
+import { buildNewsMessage } from "./message";
+import type {
+  DeliveryDestination,
+  DeliverySendResult,
+  DeliveryStatus,
+  DeliveryTarget,
+  DestinationResult,
+  ProviderOutcome,
+} from "./types";
+
+const PROVIDERS: Record<DeliveryDestination, (text: string) => Promise<ProviderOutcome>> = {
+  local: deliverToLocal,
+  bale: deliverToBale,
+};
+
+const DESTINATIONS: DeliveryDestination[] = ["local", "bale"];
+
+export const ALREADY_SENT_MESSAGE = "این خبر قبلاً به این مقصد ارسال شده است.";
+
+function isAnalyzed(article: NewsRow): boolean {
+  return Boolean(article.analyzedAt && article.summary?.trim());
+}
+
+async function findSuccessfulDelivery(newsId: string, destination: DeliveryDestination): Promise<boolean> {
+  const [existing] = await db
+    .select({ id: deliveries.id })
+    .from(deliveries)
+    .where(
+      and(
+        eq(deliveries.newsId, newsId),
+        eq(deliveries.destination, destination),
+        eq(deliveries.status, "sent"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(existing);
+}
+
+export type SendTrigger = "manual" | "auto";
+
+export type SendOptions = {
+  /** Who initiated the send — recorded for auditing only. */
+  trigger?: SendTrigger;
+};
+
+async function persistAttempt(params: {
+  newsId: string;
+  destination: DeliveryDestination;
+  status: DeliveryStatus;
+  message: string;
+  errorMessage: string | null;
+  trigger: SendTrigger;
+}): Promise<void> {
+  await db.insert(deliveries).values({
+    newsId: params.newsId,
+    destination: params.destination,
+    status: params.status,
+    triggeredBy: params.trigger,
+    message: params.message,
+    errorMessage: params.errorMessage,
+    sentAt: params.status === "sent" ? new Date() : null,
+  });
+}
+
+async function deliverToOne(
+  article: NewsRow,
+  destination: DeliveryDestination,
+  message: string,
+  trigger: SendTrigger,
+): Promise<DestinationResult> {
+  // Duplicate protection: a confirmed prior delivery to this destination blocks a
+  // second one. Failed attempts stay retryable on purpose.
+  if (await findSuccessfulDelivery(article.id, destination)) {
+    return { destination, status: "already_sent", ok: false, errorMessage: ALREADY_SENT_MESSAGE };
+  }
+
+  let outcome: ProviderOutcome;
+  try {
+    outcome = await PROVIDERS[destination](message);
+  } catch (error) {
+    // A provider throwing must not abort the sibling destination.
+    const detail = error instanceof Error ? error.message : String(error);
+    outcome = { ok: false, providerMessageId: null, errorMessage: detail.slice(0, 200) };
+  }
+
+  const status: DeliveryStatus = outcome.ok ? "sent" : "failed";
+
+  try {
+    await persistAttempt({
+      newsId: article.id,
+      destination,
+      status,
+      message,
+      errorMessage: outcome.errorMessage,
+      trigger,
+    });
+  } catch (error) {
+    // Persistence problems are reported, but never rewrite the provider's verdict.
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      destination,
+      status,
+      ok: outcome.ok,
+      errorMessage: `${outcome.errorMessage ?? "Delivery recorded, but the log insert failed."} | log: ${detail.slice(0, 120)}`,
+    };
+  }
+
+  return { destination, status, ok: outcome.ok, errorMessage: outcome.errorMessage };
+}
+
+/**
+ * Sends one analyzed article to the selected destination(s) and records the result.
+ * Never throws: every failure is returned as a structured, safe payload.
+ */
+export async function sendNewsDelivery(
+  newsId: string,
+  target: DeliveryTarget,
+  options: SendOptions = {},
+): Promise<DeliverySendResult> {
+  let article: NewsRow | undefined;
+
+  try {
+    const [row] = await db.select().from(news).where(eq(news.id, newsId)).limit(1);
+    article = row;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { ok: false, code: "db_error", message: "خواندن خبر از پایگاه داده ناموفق بود.", detail: detail.slice(0, 200) };
+  }
+
+  if (!article) {
+    return { ok: false, code: "not_found", message: "خبر مورد نظر پیدا نشد." };
+  }
+
+  // Delivery is gated on analysis existing — but analysis never triggers delivery.
+  if (!isAnalyzed(article)) {
+    return {
+      ok: false,
+      code: "not_analyzed",
+      message: "این خبر هنوز تحلیل نشده است. ابتدا «تحلیل با AI» را اجرا کنید.",
+    };
+  }
+
+  const message = buildNewsMessage(article);
+  const destinations = target === "both" ? DESTINATIONS : [target];
+
+  // Independent per-destination attempts.
+  const trigger: SendTrigger = options.trigger ?? "manual";
+  const results = await Promise.all(
+    destinations.map((destination) => deliverToOne(article!, destination, message, trigger)),
+  );
+
+  return { ok: true, message, results };
+}
+
+export type DeliveryState = {
+  local: "sent" | "failed" | null;
+  bale: "sent" | "failed" | null;
+  lastSentAt: string | null;
+};
+
+/**
+ * Delivery status per news id, for the Dashboard/news list. "sent" always wins
+ * over "failed" so a later retry can mark an article as delivered.
+ */
+export async function getDeliveryStates(newsIds: string[]): Promise<Record<string, DeliveryState>> {
+  const states: Record<string, DeliveryState> = {};
+  if (newsIds.length === 0) return states;
+
+  for (const id of newsIds) {
+    states[id] = { local: null, bale: null, lastSentAt: null };
+  }
+
+  type DeliveryStateRow = {
+    newsId: string;
+    destination: string;
+    status: string;
+    sentAt: Date | null;
+  };
+
+  let rows: DeliveryStateRow[];
+  try {
+    rows = await db
+      .select({
+        newsId: deliveries.newsId,
+        destination: deliveries.destination,
+        status: deliveries.status,
+        sentAt: deliveries.sentAt,
+      })
+      .from(deliveries)
+      .where(inArray(deliveries.newsId, newsIds))
+      .orderBy(desc(deliveries.createdAt))
+      .limit(1000);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error("[delivery] could not read delivery states:", detail.slice(0, 160));
+    return states;
+  }
+
+  // Rows are newest-first: the first write for a destination wins, and a later
+  // successful retry upgrades a previous failure.
+  const resolved: Record<string, Record<string, { status: string; sentAt: Date | null }>> = {};
+
+  for (const row of rows) {
+    if (row.status !== "sent" && row.status !== "failed") continue;
+    resolved[row.newsId] ??= {};
+    const bucket = resolved[row.newsId];
+    if (!bucket[row.destination] || row.status === "sent") {
+      bucket[row.destination] = { status: row.status, sentAt: row.sentAt };
+    }
+  }
+
+  for (const [newsId, bucket] of Object.entries(resolved)) {
+    const state = states[newsId];
+    if (!state) continue;
+    if (bucket.local) state.local = bucket.local.status as "sent" | "failed";
+    if (bucket.bale) state.bale = bucket.bale.status as "sent" | "failed";
+
+    const times = [bucket.local?.sentAt, bucket.bale?.sentAt].filter(Boolean) as Date[];
+    if (times.length > 0) {
+      state.lastSentAt = times.sort((a, b) => b.getTime() - a.getTime())[0].toISOString();
+    }
+  }
+
+  return states;
+}

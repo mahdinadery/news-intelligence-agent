@@ -1,0 +1,196 @@
+/**
+ * Server-side AI News Analysis logic — SERVER-SIDE ONLY.
+ *
+ * Coordinates database reads, AI service completion and persistence.
+ * Analyzed news are updated with scores and summary in PostgreSQL.
+ *
+ * Milestone 5: the prompt/model/thresholds/output-schema now come from the
+ * active AI Configuration (`getActiveAiConfig()`) instead of being hard-coded,
+ * so an administrator can retune AI behavior from `/admin/ai-config` without a
+ * code change. If no configuration has ever been saved, a default one — that
+ * reproduces the original Milestone 4 prompt behavior — is created automatically.
+ */
+
+import { db } from "@/db";
+import { aiAnalyses, news, type NewsRow } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { resolveEffectiveModel, runAiAnalysis } from "../ai/client";
+import { getActiveAiConfig } from "../ai/config-service";
+
+export type AnalyzeResult =
+  | { ok: true; newsItem: NewsRow }
+  | { ok: false; code: string; message: string; detail?: string | null };
+
+/**
+ * Append one row to the immutable AI analysis history. History never overwrites
+ * earlier analyses and records which AI configuration produced each result.
+ * A history-write hiccup must never mask the analysis outcome, so failures are
+ * logged, not thrown.
+ */
+async function recordAnalysisHistory(input: {
+  newsId: string;
+  configurationId: string;
+  configurationVersion: number;
+  model: string;
+  status: "success" | "failed";
+  errorMessage?: string | null;
+  analysis?: {
+    summary: string;
+    category: string;
+    importance: number;
+    relevance: number;
+    novelty: number;
+    mainEvent: string | null;
+    shouldSend: boolean;
+    reason: string;
+  } | null;
+}): Promise<void> {
+  try {
+    await db.insert(aiAnalyses).values({
+      newsId: input.newsId,
+      configurationId: input.configurationId,
+      configurationVersion: input.configurationVersion,
+      model: input.model,
+      status: input.status,
+      errorMessage: input.errorMessage ?? null,
+      summary: input.analysis?.summary ?? null,
+      category: input.analysis?.category ?? null,
+      importance: input.analysis?.importance ?? null,
+      relevance: input.analysis?.relevance ?? null,
+      novelty: input.analysis?.novelty ?? null,
+      mainEvent: input.analysis?.mainEvent ?? null,
+      shouldSend: input.analysis?.shouldSend ?? null,
+      reason: input.analysis?.reason ?? null,
+    });
+  } catch (error) {
+    console.error("[analyze] history write failed:", String(error).slice(0, 160));
+  }
+}
+
+/**
+ * Loads a news article by ID, analyzes it with AI using the active
+ * configuration, and stores the structured results.
+ */
+export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
+  let article: NewsRow | undefined;
+
+  try {
+    const rows = await db.select().from(news).where(eq(news.id, id)).limit(1);
+    article = rows[0];
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      code: "db_error",
+      message: "خطا در بارگذاری خبر از پایگاه داده.",
+      detail,
+    };
+  }
+
+  if (!article) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "خبر مورد نظر پیدا نشد.",
+      detail: null,
+    };
+  }
+
+  const config = await getActiveAiConfig();
+
+  // Transition to AI_PROCESSING before the API call.
+  try {
+    await db.update(news).set({ status: "AI_PROCESSING", updatedAt: new Date() }).where(eq(news.id, id));
+  } catch {
+    // Best effort; the analysis will still proceed.
+  }
+
+  // AI Service call — prompt/model/thresholds/output schema all come from `config`.
+  const result = await runAiAnalysis(
+    {
+      title: article.title,
+      description: article.description,
+      source: article.source,
+      publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
+    },
+    config,
+  );
+
+  if (!result.ok) {
+    // AI failure handling: the news item is kept, its status flags the failure
+    // (retryable via the admin action), and the error is preserved in history.
+    await recordAnalysisHistory({
+      newsId: id,
+      configurationId: config.id,
+      configurationVersion: config.version,
+      model: resolveEffectiveModel(config.model),
+      status: "failed",
+      errorMessage: `${result.message}${result.detail ? ` — ${String(result.detail).slice(0, 300)}` : ""}`,
+    });
+    try {
+      await db.update(news).set({ status: "FAILED", updatedAt: new Date() }).where(eq(news.id, id));
+    } catch {
+      // status bookkeeping must not change the response contract
+    }
+    return {
+      ok: false,
+      code: result.kind,
+      message: result.message,
+      detail: result.detail,
+    };
+  }
+
+  const { summary, category, importance, relevance, novelty, mainEvent, shouldSend, reason } = result.analysis;
+
+  try {
+    const [updated] = await db
+      .update(news)
+      .set({
+        summary,
+        category,
+        importanceScore: importance,
+        relevanceScore: relevance,
+        noveltyScore: novelty,
+        mainEvent,
+        shouldSend,
+        analysisReason: reason,
+        analyzedAt: new Date(),
+        aiConfigVersion: config.version,
+        // Milestone 7/8 transition rule: the AI recommendation moves the article
+        // to READY_TO_SEND (a publishing candidate becomes possible), while a
+        // negative recommendation stops at AI_ANALYZED. No sending happens here.
+        status: shouldSend ? "READY_TO_SEND" : "AI_ANALYZED",
+        updatedAt: new Date(),
+      })
+      .where(eq(news.id, id))
+      .returning();
+
+    if (!updated) {
+      return {
+        ok: false,
+        code: "update_failed",
+        message: "ذخیره تحلیل در پایگاه داده ناموفق بود.",
+        detail: null,
+      };
+    }
+
+    await recordAnalysisHistory({
+      newsId: id,
+      configurationId: config.id,
+      configurationVersion: config.version,
+      model: result.model ?? resolveEffectiveModel(config.model),
+      status: "success",
+      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, shouldSend, reason },
+    });
+
+    return { ok: true, newsItem: updated };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      code: "db_write_error",
+      message: "خطا در نوشتن نتایج تحلیل روی دیتابیس.",
+      detail,
+    };
+  }
+}
