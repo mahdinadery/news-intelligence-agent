@@ -28,6 +28,7 @@ export type PipelineReport = {
   ok: true;
   itemsFound: number;
   itemsCreated: number;
+  newArticleIds: string[];
   duplicates: number;
   skippedMalformed: number;
   feedSourceName: string;
@@ -131,8 +132,9 @@ async function storeCandidates(
   duplicateRefs: Array<{ candidate: Candidate; originalId: string }>,
   source: NewsSourceRow | null,
   defaults: { sourceName: string },
-): Promise<{ created: number; duplicateRowsStored: number }> {
+): Promise<{ created: number; duplicateRowsStored: number; newArticleIds: string[] }> {
   let created = 0;
+  const newArticleIds: string[] = [];
 
   for (let index = 0; index < fresh.length; index += CHUNK_SIZE) {
     const chunk = fresh.slice(index, index + CHUNK_SIZE);
@@ -147,6 +149,7 @@ async function storeCandidates(
       .onConflictDoNothing({ target: news.url })
       .returning({ id: news.id });
     created += inserted.length;
+    newArticleIds.push(...inserted.map((row) => row.id));
   }
 
   let duplicateRowsStored = 0;
@@ -168,7 +171,7 @@ async function storeCandidates(
     }
   }
 
-  return { created, duplicateRowsStored };
+  return { created, duplicateRowsStored, newArticleIds };
 }
 
 /**
@@ -213,7 +216,7 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
       }
     }
 
-    const { created, duplicateRowsStored } = await storeCandidates(fresh, duplicateRefs, source, {
+    const { created, duplicateRowsStored, newArticleIds } = await storeCandidates(fresh, duplicateRefs, source, {
       sourceName: fetched.source,
     });
 
@@ -229,6 +232,7 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
       ok: true,
       itemsFound,
       itemsCreated: created,
+      newArticleIds,
       duplicates: Math.max(duplicates, 0),
       skippedMalformed: fetched.skipped,
       feedSourceName: fetched.source,
@@ -335,6 +339,7 @@ export async function ingestAllActiveSources(): Promise<
       source: string;
       fetched: number;
       stored: number;
+      newArticleIds: string[];
       duplicates: number;
       skipped: number;
       bySource: Array<{ name: string; fetched: number; stored: number; duplicates: number }>;
@@ -349,12 +354,18 @@ export async function ingestAllActiveSources(): Promise<
   if (activeSources.length === 0) {
     const legacy = await ingestViaPipeline();
     return legacy.ok
-      ? { ...legacy, ok: true as const, bySource: [{ name: legacy.source, fetched: legacy.fetched, stored: legacy.stored, duplicates: legacy.duplicates }] }
+      ? {
+          ...legacy,
+          ok: true as const,
+          newArticleIds: [],
+          bySource: [{ name: legacy.source, fetched: legacy.fetched, stored: legacy.stored, duplicates: legacy.duplicates }],
+        }
       : legacy;
   }
 
   let fetched = 0;
   let stored = 0;
+  const newArticleIds: string[] = [];
   let duplicates = 0;
   let skipped = 0;
   let lastError: { code: string; message: string; detail?: string | null } | null = null;
@@ -377,6 +388,7 @@ export async function ingestAllActiveSources(): Promise<
     if (report.ok) {
       fetched += report.itemsFound;
       stored += report.itemsCreated;
+      newArticleIds.push(...report.newArticleIds);
       duplicates += report.duplicates;
       skipped += report.skippedMalformed;
       bySource.push({ name: source.name, fetched: report.itemsFound, stored: report.itemsCreated, duplicates: report.duplicates });
@@ -397,6 +409,7 @@ export async function ingestAllActiveSources(): Promise<
     source: bySource.length > 1 ? `${bySource.length} منبع` : firstName,
     fetched,
     stored,
+    newArticleIds,
     duplicates,
     skipped,
     bySource,

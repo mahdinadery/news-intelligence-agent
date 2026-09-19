@@ -22,6 +22,7 @@ export type IngestResult =
       source: string;
       fetched: number;
       stored: number;
+      newArticleIds: string[];
       duplicates: number;
       skipped: number;
     }
@@ -41,6 +42,7 @@ export async function ingestNews(): Promise<IngestResult> {
       source: result.source,
       fetched: result.fetched,
       stored: result.stored,
+      newArticleIds: result.newArticleIds,
       duplicates: result.duplicates,
       skipped: result.skipped,
     };

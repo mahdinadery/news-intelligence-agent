@@ -11,6 +11,9 @@ const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MODEL = "gpt-4o-mini";
 const REQUEST_TIMEOUT_MS = 30_000;
 
+const MAX_RATE_LIMIT_RETRIES = 3;
+const RATE_LIMIT_BUFFER_MS = 1_000;
+
 export type CompletionErrorKind =
   | "missing_key"
   | "timeout"
@@ -20,16 +23,48 @@ export type CompletionErrorKind =
 
 export type CompletionResult =
   | { ok: true; rawText: string; model: string }
-  | { ok: false; kind: CompletionErrorKind; message: string; detail?: string | null };
+  | {
+      ok: false;
+      kind: CompletionErrorKind;
+      message: string;
+      detail?: string | null;
+    };
 
 function sanitizeSecrets(text: string): string {
   const key = process.env.AI_API_KEY?.trim();
   if (!key) return text;
+
   return text.split(key).join("[REDACTED_API_KEY]");
 }
 
 export function resolveEffectiveModel(configModel: string | undefined): string {
-  return configModel?.trim() || process.env.AI_API_MODEL?.trim() || process.env.AI_MODEL?.trim() || DEFAULT_MODEL;
+  return (
+    configModel?.trim() ||
+    process.env.AI_API_MODEL?.trim() ||
+    process.env.AI_MODEL?.trim() ||
+    DEFAULT_MODEL
+  );
+}
+
+function extractRateLimitWaitMs(detail: string): number | null {
+  // Groq commonly returns:
+  // "Please try again in 7.86s."
+  const secondsMatch = detail.match(/try again in\s+([\d.]+)s/i);
+
+  if (secondsMatch) {
+    const seconds = Number(secondsMatch[1]);
+
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.ceil(seconds * 1000);
+    }
+  }
+
+  // Fallback if the provider does not expose a retry-after duration.
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function callAiChatCompletion(params: {
@@ -40,6 +75,7 @@ export async function callAiChatCompletion(params: {
   maxTokens: number;
 }): Promise<CompletionResult> {
   const apiKey = process.env.AI_API_KEY?.trim();
+
   if (!apiKey) {
     return {
       ok: false,
@@ -49,68 +85,120 @@ export async function callAiChatCompletion(params: {
     };
   }
 
-  const baseUrl = (process.env.AI_API_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const baseUrl = (
+    process.env.AI_API_BASE_URL?.trim() || DEFAULT_BASE_URL
+  ).replace(/\/+$/, "");
+
   const model = resolveEffectiveModel(params.model);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+    const controller = new AbortController();
 
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "system",
+              content: params.systemPrompt,
+            },
+            {
+              role: "user",
+              content: params.userPrompt,
+            },
+          ],
+          response_format: {
+            type: "json_object",
+          },
+          temperature: params.temperature,
+          max_tokens: params.maxTokens,
+        }),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        const rawErr = await response.text().catch(() => "");
+        const safeDetail = sanitizeSecrets(rawErr);
+
+        // Only retry rate-limit errors.
+        if (response.status === 429 && attempt < MAX_RATE_LIMIT_RETRIES) {
+          const providerWaitMs = extractRateLimitWaitMs(safeDetail);
+
+          const waitMs =
+            (providerWaitMs ?? 8_000) + RATE_LIMIT_BUFFER_MS;
+
+          console.warn(
+            `[ai] Rate limit reached. Retrying in ${waitMs}ms ` +
+              `(attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES}).`,
+          );
+
+          await sleep(waitMs);
+          continue;
+        }
+
+        return {
+          ok: false,
+          kind: "http_error",
+          message: `سرویس هوش مصنوعی خطای HTTP ${response.status} بازگرداند.`,
+          detail: safeDetail,
+        };
+      }
+
+      const payload = await response.json();
+      const rawContent = payload?.choices?.[0]?.message?.content;
+
+      if (typeof rawContent !== "string" || !rawContent.trim()) {
+        return {
+          ok: false,
+          kind: "api_error",
+          message: "پاسخ خالی از سرویس هوش مصنوعی دریافت شد.",
+          detail: null,
+        };
+      }
+
+      return {
+        ok: true,
+        rawText: rawContent,
         model,
-        messages: [
-          { role: "system", content: params.systemPrompt },
-          { role: "user", content: params.userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: params.temperature,
-        max_tokens: params.maxTokens,
-      }),
-      signal: controller.signal,
-      cache: "no-store",
-    });
+      };
+    } catch (error) {
+      clearTimeout(timer);
 
-    clearTimeout(timer);
+      const aborted =
+        error instanceof Error &&
+        (error.name === "AbortError" || error.name === "TimeoutError");
 
-    if (!response.ok) {
-      const rawErr = await response.text().catch(() => "");
       return {
         ok: false,
-        kind: "http_error",
-        message: `سرویس هوش مصنوعی خطای HTTP ${response.status} بازگرداند.`,
-        detail: sanitizeSecrets(rawErr),
+        kind: aborted ? "timeout" : "network_error",
+        message: aborted
+          ? `زمان درخواست هوش مصنوعی به پایان رسید (${REQUEST_TIMEOUT_MS}ms).`
+          : "خطای ارتباط با سرور هوش مصنوعی.",
+        detail:
+          error instanceof Error
+            ? sanitizeSecrets(error.message)
+            : null,
       };
     }
-
-    const payload = await response.json();
-    const rawContent = payload?.choices?.[0]?.message?.content;
-
-    if (typeof rawContent !== "string" || !rawContent.trim()) {
-      return {
-        ok: false,
-        kind: "api_error",
-        message: "پاسخ خالی از سرویس هوش مصنوعی دریافت شد.",
-        detail: null,
-      };
-    }
-
-    return { ok: true, rawText: rawContent, model };
-  } catch (error) {
-    clearTimeout(timer);
-    const aborted = error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
-    return {
-      ok: false,
-      kind: aborted ? "timeout" : "network_error",
-      message: aborted
-        ? `زمان درخواست هوش مصنوعی به پایان رسید (${REQUEST_TIMEOUT_MS}ms).`
-        : "خطای ارتباط با سرور هوش مصنوعی.",
-      detail: error instanceof Error ? sanitizeSecrets(error.message) : null,
-    };
   }
+
+  return {
+    ok: false,
+    kind: "http_error",
+    message: "تلاش‌های مجدد برای سرویس هوش مصنوعی به پایان رسید.",
+    detail: null,
+  };
 }
