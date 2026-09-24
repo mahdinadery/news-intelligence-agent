@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { news } from "@/db/schema";
 import { and, eq, lt, sql } from "drizzle-orm";
+import { checkAdminAccess } from "@/lib/admin/access";
 import { maybeRunAutoSend } from "@/lib/agent/auto-hook";
 import { analyzeArticle } from "@/lib/news/analyze";
 import { ingestNews } from "@/lib/news/ingest";
@@ -22,7 +23,19 @@ const STALE_PROCESSING_MINUTES = 15;
  * Ingestion is intentionally not limited: all newly fetched articles are
  * stored and remain in READY_FOR_AI until a later scheduled run processes them.
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const access = checkAdminAccess(request);
+
+  if (!access.authorized) {
+    return Response.json(
+      {
+        success: false,
+        code: "unauthorized",
+        message: access.reason,
+      },
+      { status: 401 },
+    );
+  }
   try {
     const result = await ingestNews();
 
