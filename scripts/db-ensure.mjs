@@ -228,64 +228,153 @@ const STEPS = [
   { name: "column ai_configurations.auto_send_policy", sql: `ALTER TABLE "ai_configurations" ADD COLUMN IF NOT EXISTS "auto_send_policy" jsonb` },
 
   // ── Foreign keys (named exactly as drizzle-kit generates them) ───────────
+  // Each block is failure-proof by design (M1):
+  //   - existence is checked by constraint NAME *or* by the real relation
+  //     identity (conrelid, confrelid, contype + key columns), so an equivalent
+  //     FK that already exists under a different name is not added twice;
+  //   - if the ADD CONSTRAINT itself fails on legacy/orphan rows, we WARN with
+  //     the step + constraint name and the error reason, then CONTINUE — the
+  //     sync must never abort halfway and orphan data is never touched.
   {
     name: "fk ai_analyses.news_id",
     sql: `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_analyses_news_id_news_id_fk') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'ai_analyses_news_id_news_id_fk'
+          OR (
+            contype = 'f'
+            AND conrelid = 'ai_analyses'::regclass
+            AND confrelid = 'news'::regclass
+            AND conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = 'ai_analyses'::regclass AND a.attname = 'news_id' AND NOT a.attisdropped)]::smallint[]
+            AND confkey = ARRAY[(SELECT b.attnum FROM pg_attribute b WHERE b.attrelid = 'news'::regclass AND b.attname = 'id' AND NOT b.attisdropped)]::smallint[]
+          )
+      ) THEN
         ALTER TABLE "ai_analyses" ADD CONSTRAINT "ai_analyses_news_id_news_id_fk"
           FOREIGN KEY ("news_id") REFERENCES "news"("id") ON DELETE cascade ON UPDATE no action;
       END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "fk ai_analyses.news_id": constraint "ai_analyses_news_id_news_id_fk" not created (%). Orphan rows are left untouched — fix them manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
   {
     name: "fk deliveries.news_id",
     sql: `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'deliveries_news_id_news_id_fk') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'deliveries_news_id_news_id_fk'
+          OR (
+            contype = 'f'
+            AND conrelid = 'deliveries'::regclass
+            AND confrelid = 'news'::regclass
+            AND conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = 'deliveries'::regclass AND a.attname = 'news_id' AND NOT a.attisdropped)]::smallint[]
+            AND confkey = ARRAY[(SELECT b.attnum FROM pg_attribute b WHERE b.attrelid = 'news'::regclass AND b.attname = 'id' AND NOT b.attisdropped)]::smallint[]
+          )
+      ) THEN
         ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_news_id_news_id_fk"
           FOREIGN KEY ("news_id") REFERENCES "news"("id") ON DELETE cascade ON UPDATE no action;
       END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "fk deliveries.news_id": constraint "deliveries_news_id_news_id_fk" not created (%). Orphan rows are left untouched — fix them manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
   {
     name: "fk delivery_events.delivery_id",
     sql: `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'delivery_events_delivery_id_deliveries_id_fk') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'delivery_events_delivery_id_deliveries_id_fk'
+          OR (
+            contype = 'f'
+            AND conrelid = 'delivery_events'::regclass
+            AND confrelid = 'deliveries'::regclass
+            AND conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = 'delivery_events'::regclass AND a.attname = 'delivery_id' AND NOT a.attisdropped)]::smallint[]
+            AND confkey = ARRAY[(SELECT b.attnum FROM pg_attribute b WHERE b.attrelid = 'deliveries'::regclass AND b.attname = 'id' AND NOT b.attisdropped)]::smallint[]
+          )
+      ) THEN
         ALTER TABLE "delivery_events" ADD CONSTRAINT "delivery_events_delivery_id_deliveries_id_fk"
           FOREIGN KEY ("delivery_id") REFERENCES "deliveries"("id") ON DELETE cascade ON UPDATE no action;
       END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "fk delivery_events.delivery_id": constraint "delivery_events_delivery_id_deliveries_id_fk" not created (%). Orphan rows are left untouched — fix them manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
   {
     name: "fk ingestion_runs.source_id",
     sql: `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ingestion_runs_source_id_news_sources_id_fk') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'ingestion_runs_source_id_news_sources_id_fk'
+          OR (
+            contype = 'f'
+            AND conrelid = 'ingestion_runs'::regclass
+            AND confrelid = 'news_sources'::regclass
+            AND conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = 'ingestion_runs'::regclass AND a.attname = 'source_id' AND NOT a.attisdropped)]::smallint[]
+            AND confkey = ARRAY[(SELECT b.attnum FROM pg_attribute b WHERE b.attrelid = 'news_sources'::regclass AND b.attname = 'id' AND NOT b.attisdropped)]::smallint[]
+          )
+      ) THEN
         ALTER TABLE "ingestion_runs" ADD CONSTRAINT "ingestion_runs_source_id_news_sources_id_fk"
           FOREIGN KEY ("source_id") REFERENCES "news_sources"("id") ON DELETE set null ON UPDATE no action;
       END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "fk ingestion_runs.source_id": constraint "ingestion_runs_source_id_news_sources_id_fk" not created (%). Orphan rows are left untouched — fix them manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
   {
     name: "fk news.source_id",
     sql: `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'news_source_id_news_sources_id_fk') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'news_source_id_news_sources_id_fk'
+          OR (
+            contype = 'f'
+            AND conrelid = 'news'::regclass
+            AND confrelid = 'news_sources'::regclass
+            AND conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = 'news'::regclass AND a.attname = 'source_id' AND NOT a.attisdropped)]::smallint[]
+            AND confkey = ARRAY[(SELECT b.attnum FROM pg_attribute b WHERE b.attrelid = 'news_sources'::regclass AND b.attname = 'id' AND NOT b.attisdropped)]::smallint[]
+          )
+      ) THEN
         ALTER TABLE "news" ADD CONSTRAINT "news_source_id_news_sources_id_fk"
           FOREIGN KEY ("source_id") REFERENCES "news_sources"("id") ON DELETE set null ON UPDATE no action;
       END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "fk news.source_id": constraint "news_source_id_news_sources_id_fk" not created (%). Orphan rows are left untouched — fix them manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
   {
     name: "fk news.duplicate_of_id",
     sql: `DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'news_duplicate_of_id_news_id_fk') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'news_duplicate_of_id_news_id_fk'
+          OR (
+            contype = 'f'
+            AND conrelid = 'news'::regclass
+            AND confrelid = 'news'::regclass
+            AND conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid = 'news'::regclass AND a.attname = 'duplicate_of_id' AND NOT a.attisdropped)]::smallint[]
+            AND confkey = ARRAY[(SELECT b.attnum FROM pg_attribute b WHERE b.attrelid = 'news'::regclass AND b.attname = 'id' AND NOT b.attisdropped)]::smallint[]
+          )
+      ) THEN
         ALTER TABLE "news" ADD CONSTRAINT "news_duplicate_of_id_news_id_fk"
           FOREIGN KEY ("duplicate_of_id") REFERENCES "news"("id") ON DELETE set null ON UPDATE no action;
       END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "fk news.duplicate_of_id": constraint "news_duplicate_of_id_news_id_fk" not created (%). Orphan rows are left untouched — fix them manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
 
   // ── Indexes ─────────────────────────────────────────────────────────────
   { name: "index news_sources_active_idx", sql: `CREATE INDEX IF NOT EXISTS "news_sources_active_idx" ON "news_sources" ("active")` },
-  { name: "index news_url_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS "news_url_unique" ON "news" ("url")` },
+  // Unique URL index: if legacy rows violate uniqueness, WARN and CONTINUE
+  // instead of aborting the sync (M2). Duplicate rows are never deleted or
+  // rewritten here — clean them up manually, then re-run db:ensure.
+  {
+    name: "index news_url_unique",
+    sql: `DO $$ BEGIN
+      CREATE UNIQUE INDEX IF NOT EXISTS "news_url_unique" ON "news" ("url");
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'db-ensure step "index news_url_unique": unique index "news_url_unique" not created (%). Duplicate rows are left untouched — clean them up manually, then re-run db:ensure.', SQLERRM;
+    END $$`,
+  },
   { name: "index news_published_at_idx", sql: `CREATE INDEX IF NOT EXISTS "news_published_at_idx" ON "news" ("published_at")` },
   { name: "index news_canonical_url_idx", sql: `CREATE INDEX IF NOT EXISTS "news_canonical_url_idx" ON "news" ("canonical_url")` },
   { name: "index news_external_id_idx", sql: `CREATE INDEX IF NOT EXISTS "news_external_id_idx" ON "news" ("external_id")` },
@@ -323,15 +412,27 @@ if (isDirectRun) {
 
   const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000 });
 
-  try {
-    const client = await pool.connect();
     try {
-      for (const step of STEPS) {
-        await client.query(step.sql);
+      const client = await pool.connect();
+      // Surface the M1/M2 WARNING notices in the console (PG otherwise only
+      // forwards them to the client); ordinary IF NOT EXISTS NOTICEs stay quiet.
+      client.on("notice", (notice) => {
+        if (String(notice?.severity ?? "WARNING").toUpperCase() === "WARNING") {
+          console.warn(`db-ensure warning: ${notice.message}`);
+        }
+      });
+      try {
+        for (const step of STEPS) {
+          try {
+            await client.query(step.sql);
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            throw new Error(`step "${step.name}": ${detail}`);
+          }
+        }
+      } finally {
+        client.release();
       }
-    } finally {
-      client.release();
-    }
 
     console.log(`db-ensure: ${STEPS.length} schema statements executed successfully.`);
     console.log("Schema is now in sync with src/db/schema.ts (additive-only; no data was modified).");
