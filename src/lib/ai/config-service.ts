@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { aiConfigurations, type AiConfigurationRow } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import {
+  DEFAULT_AUTO_SEND_POLICY,
   DEFAULT_CONFIG_NAME,
   DEFAULT_DECISION_RULES,
   DEFAULT_FEATURES,
@@ -20,9 +21,12 @@ import {
   DEFAULT_PUBLISHING_TEMPLATE,
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_TEMPERATURE,
+  DEFAULT_TOPIC_FILTER,
   type ActiveAiConfig,
+  type AiAutoSendPolicy,
   type AiConfigInput,
   type AiFeatureKey,
+  type AiTopicFilterConfig,
 } from "./config-types";
 
 function toActiveConfig(row: AiConfigurationRow): ActiveAiConfig {
@@ -38,6 +42,9 @@ function toActiveConfig(row: AiConfigurationRow): ActiveAiConfig {
     decisionRules: row.decisionRules,
     outputSchema: row.outputSchema,
     publishingTemplate: row.publishingTemplate ?? "",
+    // Rows written before these columns existed read as null -> safe defaults.
+    topicFilter: row.topicFilter ?? DEFAULT_TOPIC_FILTER,
+    autoSendPolicy: row.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY,
     isActive: row.isActive,
     version: row.version,
     createdAt: row.createdAt.toISOString(),
@@ -58,7 +65,42 @@ export function buildDefaultConfigInput(): AiConfigInput {
     decisionRules: DEFAULT_DECISION_RULES,
     outputSchema: DEFAULT_OUTPUT_SCHEMA,
     publishingTemplate: DEFAULT_PUBLISHING_TEMPLATE,
+    topicFilter: DEFAULT_TOPIC_FILTER,
+    autoSendPolicy: DEFAULT_AUTO_SEND_POLICY,
   };
+}
+
+/**
+ * Read-only view of the operational knobs (topic filter + auto-send policy).
+ *
+ * Unlike getActiveAiConfig() this NEVER seeds or writes: the ingestion pipeline
+ * and the auto-delivery pass call it on hot paths, so a missing configuration
+ * simply means "use the safe defaults" (filter off / env-driven auto-send).
+ * Returns null when no active configuration exists or the read fails.
+ */
+export async function readActiveOperationalSettings(): Promise<{
+  topicFilter: AiTopicFilterConfig;
+  autoSendPolicy: AiAutoSendPolicy;
+} | null> {
+  try {
+    const [active] = await db
+      .select({
+        topicFilter: aiConfigurations.topicFilter,
+        autoSendPolicy: aiConfigurations.autoSendPolicy,
+      })
+      .from(aiConfigurations)
+      .where(eq(aiConfigurations.isActive, true))
+      .orderBy(desc(aiConfigurations.version))
+      .limit(1);
+
+    if (!active) return null;
+    return {
+      topicFilter: active.topicFilter ?? DEFAULT_TOPIC_FILTER,
+      autoSendPolicy: active.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -140,6 +182,8 @@ export async function createAiConfigVersion(
         decisionRules: input.decisionRules,
         outputSchema: input.outputSchema,
         publishingTemplate: input.publishingTemplate?.trim() ?? "",
+        topicFilter: input.topicFilter ?? DEFAULT_TOPIC_FILTER,
+        autoSendPolicy: input.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY,
         isActive: options.activate,
         version,
       })
@@ -262,6 +306,54 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
     );
     if (disabledButRequiredByPipeline.length > 0) {
       errors.push("فیلدهای «summary» و «shouldSend» برای عملکرد صحیح سامانه باید فعال بمانند.");
+    }
+  }
+
+  // ── Topic filter (optional section; defaults are always valid) ──────────
+  const topicFilter = input.topicFilter;
+  if (topicFilter) {
+    if (topicFilter.mode !== "include" && topicFilter.mode !== "exclude") {
+      errors.push("حالت فیلتر موضوعی باید «تمرکز» (include) یا «حذف» (exclude) باشد.");
+    }
+    if (!Array.isArray(topicFilter.topics)) {
+      errors.push("ساختار موضوعات فیلتر نامعتبر است.");
+    } else {
+      if (topicFilter.topics.length > 30) {
+        errors.push("حداکثر ۳۰ موضوع قابل تعریف است.");
+      }
+      for (const topic of topicFilter.topics) {
+        const label = topic.label?.trim() ?? "";
+        if (!label) errors.push("عنوان هر موضوع نمی‌تواند خالی باشد.");
+        if (label.length > 80) errors.push("عنوان موضوع نباید بیش از ۸۰ کاراکتر باشد.");
+        if (!Array.isArray(topic.keywords) || topic.keywords.length > 50) {
+          errors.push(`برای موضوع «${label || topic.id || "بدون‌نام"}» حداکثر ۵۰ کلیدواژه قابل تعریف است.`);
+        } else if (topic.keywords.some((keyword) => (keyword ?? "").length > 120)) {
+          errors.push(`کلیدواژه‌های موضوع «${label || topic.id || "بدون‌نام"}» نباید بیش از ۱۲۰ کاراکتر باشند.`);
+        }
+      }
+    }
+  }
+
+  // ── Auto-send policy (optional section; env fallback when not customized) ─
+  const policy = input.autoSendPolicy;
+  if (policy?.useCustom) {
+    if (policy.destination !== "local" && policy.destination !== "bale" && policy.destination !== "both") {
+      errors.push("مقصد ارسال خودکار باید local، bale یا both باشد.");
+    }
+    for (const [label, value] of [
+      ["حداقل امتیاز اهمیت (ارسال خودکار)", policy.minImportance],
+      ["حداقل امتیاز مرتبط بودن (ارسال خودکار)", policy.minRelevance],
+      ["حداقل امتیاز تازگی (ارسال خودکار)", policy.minNovelty],
+    ] as const) {
+      if (!Number.isFinite(value) || value < 0 || value > 100) {
+        errors.push(`${label} باید عددی بین ۰ و ۱۰۰ باشد.`);
+      }
+    }
+    if (!Number.isInteger(policy.maxItemsPerPass) || policy.maxItemsPerPass < 1 || policy.maxItemsPerPass > 100) {
+      errors.push("سقف اخبار هر نوبت ارسال خودکار باید عددی صحیح بین ۱ و ۱۰۰ باشد.");
+    }
+    if (policy.categories !== null && (!Array.isArray(policy.categories) || policy.categories.length > 30)) {
+      errors.push("فهرست دسته‌های مجاز ارسال خودکار نامعتبر است (حداکثر ۳۰ دسته).");
     }
   }
 

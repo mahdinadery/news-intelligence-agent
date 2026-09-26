@@ -201,6 +201,7 @@ export type RunView = {
   completedAt: string | null;
   itemsFound: number;
   itemsCreated: number;
+  itemsFiltered: number;
   duplicates: number;
   errors: number;
   errorMessage: string | null;
@@ -217,6 +218,7 @@ export async function listRecentRuns(limit = 25): Promise<RunView[]> {
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     itemsFound: row.itemsFound,
     itemsCreated: row.itemsCreated,
+    itemsFiltered: row.itemsFiltered,
     duplicates: row.duplicates,
     errors: row.errors,
     errorMessage: row.errorMessage,

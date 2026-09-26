@@ -28,6 +28,8 @@ const FEED_USER_AGENT =
 const DEFAULT_TIMEOUT_MS = 12_000;
 const FAST_RETRY_TIMEOUT_MS = 6_000;
 const RETRY_DELAY_MS = 800;
+/** Upper bound for a single feed document (5 MB) — see attemptFetch. */
+const MAX_FEED_BODY_BYTES = 5_000_000;
 
 export type FeedFetchFailureKind = "dns" | "connect" | "tls" | "timeout" | "http" | "proxy_config" | "unknown";
 
@@ -124,6 +126,19 @@ async function attemptFetch(targetUrl: string, timeoutMs: number, dispatcher: Pr
           response.status === 403
             ? "News source blocked the request (HTTP 403)."
             : `News source returned HTTP ${response.status}.`,
+        hint: null,
+      };
+    }
+
+    // Memory guard: some feeds (or hostile/misconfigured hosts) return huge
+    // payloads. RSS/Atom feeds never need megabytes of XML — refuse early
+    // instead of pushing an unbounded string through the parser.
+    if (body.length > MAX_FEED_BODY_BYTES) {
+      return {
+        ok: false,
+        kind: "http",
+        status: response.status,
+        message: `News feed is too large (${Math.round(body.length / 1_000_000)}MB > ${Math.round(MAX_FEED_BODY_BYTES / 1_000_000)}MB limit).`,
         hint: null,
       };
     }

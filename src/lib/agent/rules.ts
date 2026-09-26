@@ -4,9 +4,13 @@
  * The rule is the "Agent decision layer": it turns a stored AI analysis into a
  * delivery decision. Every threshold is environment-driven so the policy can be
  * retuned without touching code. No secret values are read or exposed here.
+ *
+ * This module stays PURE (no DB imports) so the policy logic is unit-testable;
+ * dashboard-override resolution lives in src/lib/agent/resolve-rule.ts.
  */
 
 import type { NewsRow } from "@/db/schema";
+import type { AiAutoSendPolicy } from "@/lib/ai/config-types";
 import type { DeliveryTarget } from "@/lib/delivery/types";
 
 export type AutoSendRule = {
@@ -88,6 +92,20 @@ export function loadAutoSendRule(): AutoSendRule {
     requireAiRecommendation: readBool(AUTO_SEND_ENV.requireAi, DEFAULTS.requireAiRecommendation),
     categories: readCategories(),
     maxItemsPerPass: Number.isFinite(maxRaw) && maxRaw > 0 ? Math.min(maxRaw, 100) : DEFAULTS.maxItemsPerPass,
+  };
+}
+
+/** Maps a dashboard `autoSendPolicy` onto the runtime rule shape (pure). */
+export function policyToRule(policy: AiAutoSendPolicy): AutoSendRule {
+  return {
+    enabled: policy.enabled,
+    destination: policy.destination,
+    minImportance: Math.max(0, Math.min(100, policy.minImportance)),
+    minRelevance: Math.max(0, Math.min(100, policy.minRelevance)),
+    minNovelty: Math.max(0, Math.min(100, policy.minNovelty)),
+    requireAiRecommendation: policy.requireAiRecommendation,
+    categories: policy.categories && policy.categories.length > 0 ? policy.categories : null,
+    maxItemsPerPass: Math.max(1, Math.min(100, policy.maxItemsPerPass)),
   };
 }
 

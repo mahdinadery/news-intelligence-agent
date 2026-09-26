@@ -59,13 +59,15 @@ export function AutoSendCard({ onAutoSendComplete }: { onAutoSendComplete?: () =
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<PassResult | null>(null);
 
-  const loadRule = useCallback(async () => {
-    try {
-      const res = await fetch("/api/agent/rules", { cache: "no-store" });
-      setRule((await res.json()) as RuleInfo);
-    } catch {
-      setRule(null);
-    }
+  const loadRule = useCallback(() => {
+    return fetch("/api/agent/rules", { cache: "no-store" })
+      .then((res) => res.json() as Promise<RuleInfo>)
+      .then((data) => {
+        setRule(data);
+      })
+      .catch(() => {
+        setRule(null);
+      });
   }, []);
 
   useEffect(() => {

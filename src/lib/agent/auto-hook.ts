@@ -17,6 +17,7 @@ export type AutoSendSummary = {
   matched: number;
   sent: number;
   skippedDuplicates: number;
+  skippedReview: number;
   failed: number;
 };
 
@@ -29,6 +30,7 @@ function disabled(destination = "", enabled = true): AutoSendSummary {
     matched: 0,
     sent: 0,
     skippedDuplicates: 0,
+    skippedReview: 0,
     failed: 0,
   };
 }
@@ -45,6 +47,7 @@ export async function maybeRunAutoSend(newsIds?: string[]): Promise<AutoSendSumm
       matched: result.matched,
       sent: result.sent,
       skippedDuplicates: result.skippedDuplicates,
+      skippedReview: result.skippedReview,
       failed: result.failed,
     };
   } catch (error) {

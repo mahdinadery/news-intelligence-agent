@@ -12,13 +12,22 @@
  * place that knows how a configuration becomes a prompt.
  */
 
-import { AI_FEATURE_ORDER, type AiDecisionRules, type AiFeaturesConfig, type AiOutputSchema } from "./config-types";
+import { describeTopicFocus } from "@/lib/news/topic-filter";
+import {
+  AI_FEATURE_ORDER,
+  type AiDecisionRules,
+  type AiFeaturesConfig,
+  type AiOutputSchema,
+  type AiTopicFilterConfig,
+} from "./config-types";
 
 export type PromptableConfig = {
   systemPrompt: string;
   features: AiFeaturesConfig;
   decisionRules: AiDecisionRules;
   outputSchema: AiOutputSchema;
+  /** Optional topic focus — injected as context so relevance judgments align with it. */
+  topicFilter?: AiTopicFilterConfig | null;
 };
 
 export type ArticleInput = {
@@ -89,6 +98,7 @@ export function buildAIAnalysisPrompt(
 ): { systemPrompt: string; userPrompt: string; enabledFields: string[] } {
   const { template, enabledFields } = buildOutputContract(config);
   const decisionSection = buildDecisionRulesSection(config);
+  const topicSection = describeTopicFocus(config.topicFilter);
 
   const systemPrompt = [
     config.systemPrompt.trim(),
@@ -98,9 +108,13 @@ export function buildAIAnalysisPrompt(
     "",
     "قوانین راهنما برای تصمیم ارسال:",
     decisionSection,
+    topicSection ? "" : null,
+    topicSection,
     "",
     "پاسخ باید دقیقاً یک شیء JSON معتبر با همان کلیدهای بالا باشد؛ هیچ کلید یا متن اضافه‌ای اضافه نکن.",
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   const userPrompt = [
     "لطفاً این مقاله را تحلیل کن:",

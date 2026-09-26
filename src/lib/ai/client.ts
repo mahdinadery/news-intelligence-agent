@@ -41,7 +41,10 @@ export { resolveEffectiveModel };
  */
 export async function runAiAnalysis(
   article: ArticleInput,
-  config: Pick<ActiveAiConfig, "systemPrompt" | "features" | "decisionRules" | "outputSchema" | "model" | "temperature" | "maxTokens">,
+  config: Pick<
+    ActiveAiConfig,
+    "systemPrompt" | "features" | "decisionRules" | "outputSchema" | "model" | "temperature" | "maxTokens" | "topicFilter"
+  >,
 ): Promise<AiAnalysisResult> {
   const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(config, article);
 

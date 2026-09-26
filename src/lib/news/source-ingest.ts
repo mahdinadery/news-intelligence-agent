@@ -17,17 +17,30 @@
 
 import { db } from "@/db";
 import { ingestionRuns, news, newsSources, type NewsSourceRow } from "@/db/schema";
+import { readActiveOperationalSettings } from "@/lib/ai/config-service";
+import type { AiTopicFilterConfig } from "@/lib/ai/config-types";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { canonicalizeUrl } from "./canonical-url";
 import { normalizeContent, normalizeTitle } from "./normalize";
 import { fetchFeed, parseFeed, type NewsFetchResult, type NormalizedNews } from "./rss";
+import { evaluateTopicFilter } from "./topic-filter";
 
 const CHUNK_SIZE = 50;
+
+/**
+ * Max sources fetched at the same time. Geo-blocked hosts can hold a socket
+ * open until timeout, so unlimited Promise.all concurrency used to stack
+ * dozens of in-flight fetches + XML parses on small VMs (CPU/memory spikes).
+ * A small window keeps sources independent while bounding resource usage.
+ */
+const SOURCE_FETCH_CONCURRENCY = 3;
 
 export type PipelineReport = {
   ok: true;
   itemsFound: number;
   itemsCreated: number;
+  /** Rows stored with SKIPPED_OFFTOPIC by the topic filter (never sent to AI). */
+  itemsFiltered: number;
   newArticleIds: string[];
   duplicates: number;
   skippedMalformed: number;
@@ -45,6 +58,46 @@ type Candidate = {
   item: NormalizedNews;
   canonical: string;
 };
+
+/**
+ * Stage: topic relevance gate (cheap keyword rules, BEFORE AI). Returns the
+ * partition of fresh candidates; skipped ones are still stored (marked
+ * SKIPPED_OFFTOPIC) so nothing is silently discarded and re-queueing stays
+ * possible after the topics change. Fails open when the filter is inactive.
+ */
+function partitionByTopic(
+  fresh: Candidate[],
+  topicFilter: AiTopicFilterConfig | null,
+): { pass: Candidate[]; skip: Candidate[] } {
+  if (fresh.length === 0) return { pass: fresh, skip: [] };
+
+  const outcome = evaluateTopicFilter({ title: "" }, topicFilter);
+  if (outcome.reason === "filter_disabled" || outcome.reason === "no_effective_topics") {
+    return { pass: fresh, skip: [] };
+  }
+
+  const pass: Candidate[] = [];
+  const skip: Candidate[] = [];
+  for (const candidate of fresh) {
+    const result = evaluateTopicFilter(
+      {
+        title: candidate.item.title,
+        description: candidate.item.description,
+        content: candidate.item.content,
+      },
+      topicFilter,
+    );
+    if (result.verdict === "pass") pass.push(candidate);
+    else skip.push(candidate);
+  }
+  return { pass, skip };
+}
+
+/** Reads the active topic filter without seeding a configuration row. */
+async function loadTopicFilter(): Promise<AiTopicFilterConfig | null> {
+  const settings = await readActiveOperationalSettings();
+  return settings?.topicFilter ?? null;
+}
 
 /** Stage: parse + cap. Returns candidates newest-first. */
 function toCandidates(parsed: NormalizedNews[], maxItems: number): Candidate[] {
@@ -125,14 +178,16 @@ function buildValues(candidate: Candidate, source: NewsSourceRow | null, default
  * Stage: store. Inserts fresh items as READY_FOR_AI; inserts canonical
  * duplicates as marked DUPLICATE rows referencing the original (exact-URL
  * duplicates collide with the unique index and stay represented by the
- * original row).
+ * original row); topic-filtered items are stored as SKIPPED_OFFTOPIC rows so
+ * they remain visible/re-queueable and never reach the AI stage.
  */
 async function storeCandidates(
   fresh: Candidate[],
   duplicateRefs: Array<{ candidate: Candidate; originalId: string }>,
+  filtered: Candidate[],
   source: NewsSourceRow | null,
   defaults: { sourceName: string },
-): Promise<{ created: number; duplicateRowsStored: number; newArticleIds: string[] }> {
+): Promise<{ created: number; filteredCreated: number; duplicateRowsStored: number; newArticleIds: string[] }> {
   let created = 0;
   const newArticleIds: string[] = [];
 
@@ -150,6 +205,22 @@ async function storeCandidates(
       .returning({ id: news.id });
     created += inserted.length;
     newArticleIds.push(...inserted.map((row) => row.id));
+  }
+
+  let filteredCreated = 0;
+  for (let index = 0; index < filtered.length; index += CHUNK_SIZE) {
+    const chunk = filtered.slice(index, index + CHUNK_SIZE);
+    const inserted = await db
+      .insert(news)
+      .values(
+        chunk.map((candidate) => ({
+          ...buildValues(candidate, source, defaults),
+          status: "SKIPPED_OFFTOPIC",
+        })),
+      )
+      .onConflictDoNothing({ target: news.url })
+      .returning({ id: news.id });
+    filteredCreated += inserted.length;
   }
 
   let duplicateRowsStored = 0;
@@ -171,7 +242,7 @@ async function storeCandidates(
     }
   }
 
-  return { created, duplicateRowsStored, newArticleIds };
+  return { created, filteredCreated, duplicateRowsStored, newArticleIds };
 }
 
 /**
@@ -192,7 +263,7 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
   const fetched = await fetchFeed(source.url);
 
   if (!fetched.ok) {
-    await recordRun(source.id, startedAt, "failed", { itemsFound: 0, created: 0, duplicates: 0, skipped: 0 }, fetched.message, fetched.detail ?? null);
+    await recordRun(source.id, startedAt, "failed", { itemsFound: 0, created: 0, filtered: 0, duplicates: 0, skipped: 0 }, fetched.message, fetched.detail ?? null);
     await updateSourceAfterFailure(source.id, fetched.message);
     return { ok: false, code: fetched.code, message: fetched.message, detail: fetched.detail ?? null };
   }
@@ -216,22 +287,41 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
       }
     }
 
-    const { created, duplicateRowsStored, newArticleIds } = await storeCandidates(fresh, duplicateRefs, source, {
-      sourceName: fetched.source,
-    });
+    // Cheap topic gate BEFORE anything AI-related: filtered rows are stored as
+    // SKIPPED_OFFTOPIC and excluded from newArticleIds (the AI work queue).
+    const topicFilter = await loadTopicFilter();
+    const { pass, skip } = partitionByTopic(fresh, topicFilter);
+
+    const { created, filteredCreated, duplicateRowsStored, newArticleIds } = await storeCandidates(
+      pass,
+      duplicateRefs,
+      skip,
+      source,
+      {
+        sourceName: fetched.source,
+      },
+    );
 
     // Exact-URL collisions that onConflictDoNothing dropped count as duplicates too.
-    const duplicates = candidates.length - created;
+    const duplicates = candidates.length - created - filteredCreated;
     const itemsFound = fetched.items.length;
     const runStatus = created === 0 && duplicates === 0 && itemsFound > 0 ? "partial" : "success";
 
-    await recordRun(source.id, startedAt, runStatus, { itemsFound, created, duplicates, skipped: fetched.skipped }, null, null);
-    await updateSourceAfterSuccess(source.id, itemsFound, created, duplicates);
+    await recordRun(
+      source.id,
+      startedAt,
+      runStatus,
+      { itemsFound, created, filtered: filteredCreated, duplicates, skipped: fetched.skipped },
+      null,
+      null,
+    );
+    await updateSourceAfterSuccess(source.id, itemsFound, created + filteredCreated, duplicates);
 
     return {
       ok: true,
       itemsFound,
       itemsCreated: created,
+      itemsFiltered: filteredCreated,
       newArticleIds,
       duplicates: Math.max(duplicates, 0),
       skippedMalformed: fetched.skipped,
@@ -239,7 +329,14 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
     };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    await recordRun(source.id, startedAt, "failed", { itemsFound: fetched.items.length, created: 0, duplicates: 0, skipped: fetched.skipped }, "خطا در ذخیره‌سازی اخبار", detail.slice(0, 500));
+    await recordRun(
+      source.id,
+      startedAt,
+      "failed",
+      { itemsFound: fetched.items.length, created: 0, filtered: 0, duplicates: 0, skipped: fetched.skipped },
+      "خطا در ذخیره‌سازی اخبار",
+      detail.slice(0, 500),
+    );
     await updateSourceAfterFailure(source.id, detail.slice(0, 300));
     return { ok: false, code: "db_error", message: "خطا در ذخیره‌سازی اخبار این منبع.", detail: detail.slice(0, 200) };
   }
@@ -281,12 +378,24 @@ export async function ingestViaPipeline(): Promise<
       else fresh.push(candidate);
     }
 
-    const { created } = await storeCandidates(fresh, duplicateRefs, matchingSource ?? null, { sourceName: fetched.source });
-    const duplicates = Math.max(candidates.length - created, 0);
+    const topicFilter = await loadTopicFilter();
+    const { pass, skip } = partitionByTopic(fresh, topicFilter);
+
+    const { created, filteredCreated } = await storeCandidates(pass, duplicateRefs, skip, matchingSource ?? null, {
+      sourceName: fetched.source,
+    });
+    const duplicates = Math.max(candidates.length - created - filteredCreated, 0);
 
     if (matchingSource) {
-      await recordRun(matchingSource.id, new Date(), "success", { itemsFound: fetched.items.length, created, duplicates, skipped: fetched.skipped }, null, null);
-      await updateSourceAfterSuccess(matchingSource.id, fetched.items.length, created, duplicates);
+      await recordRun(
+        matchingSource.id,
+        new Date(),
+        "success",
+        { itemsFound: fetched.items.length, created, filtered: filteredCreated, duplicates, skipped: fetched.skipped },
+        null,
+        null,
+      );
+      await updateSourceAfterSuccess(matchingSource.id, fetched.items.length, created + filteredCreated, duplicates);
     }
 
     return {
@@ -339,10 +448,11 @@ export async function ingestAllActiveSources(): Promise<
       source: string;
       fetched: number;
       stored: number;
+      filtered: number;
       newArticleIds: string[];
       duplicates: number;
       skipped: number;
-      bySource: Array<{ name: string; fetched: number; stored: number; duplicates: number }>;
+      bySource: Array<{ name: string; fetched: number; stored: number; filtered: number; duplicates: number }>;
     }
   | { ok: false; code: string; message: string; detail?: string | null }
 > {
@@ -358,48 +468,57 @@ export async function ingestAllActiveSources(): Promise<
           ...legacy,
           ok: true as const,
           newArticleIds: [],
-          bySource: [{ name: legacy.source, fetched: legacy.fetched, stored: legacy.stored, duplicates: legacy.duplicates }],
+          filtered: 0,
+          bySource: [{ name: legacy.source, fetched: legacy.fetched, stored: legacy.stored, filtered: 0, duplicates: legacy.duplicates }],
         }
       : legacy;
   }
 
   let fetched = 0;
   let stored = 0;
+  let filtered = 0;
   const newArticleIds: string[] = [];
   let duplicates = 0;
   let skipped = 0;
   let lastError: { code: string; message: string; detail?: string | null } | null = null;
-  const bySource: Array<{ name: string; fetched: number; stored: number; duplicates: number }> = [];
+  const bySource: Array<{ name: string; fetched: number; stored: number; filtered: number; duplicates: number }> = [];
 
-  // Sources run CONCURRENTLY so one geo-blocked host (a slow timeout) cannot
-  // add up across the sweep; the whole dashboard fetch costs at most the
-  // slowest single source instead of the sum of all sources.
-  const reports = await Promise.allSettled(activeSources.map((source) => ingestFromSource(source)));
+  // Sources run CONCURRENTLY (bounded window) so one geo-blocked host (a slow
+  // timeout) cannot add up across the sweep, while a burst of sources can no
+  // longer stack unbounded parallel fetches + XML parses on a small VM.
+  const reports = await mapWithConcurrency(activeSources, SOURCE_FETCH_CONCURRENCY, (source) => ingestFromSource(source));
 
   for (let index = 0; index < reports.length; index += 1) {
     const settled = reports[index];
     const source = activeSources[index];
     if (settled.status === "rejected") {
       lastError = { code: "unknown_error", message: `${source.name}: خطای غیرمنتظره هنگام دریافت`, detail: String(settled.reason).slice(0, 200) };
-      bySource.push({ name: source.name, fetched: 0, stored: 0, duplicates: 0 });
+      bySource.push({ name: source.name, fetched: 0, stored: 0, filtered: 0, duplicates: 0 });
       continue;
     }
     const report = settled.value;
     if (report.ok) {
       fetched += report.itemsFound;
       stored += report.itemsCreated;
+      filtered += report.itemsFiltered;
       newArticleIds.push(...report.newArticleIds);
       duplicates += report.duplicates;
       skipped += report.skippedMalformed;
-      bySource.push({ name: source.name, fetched: report.itemsFound, stored: report.itemsCreated, duplicates: report.duplicates });
+      bySource.push({
+        name: source.name,
+        fetched: report.itemsFound,
+        stored: report.itemsCreated,
+        filtered: report.itemsFiltered,
+        duplicates: report.duplicates,
+      });
     } else {
       // One broken source must not stop the others; remember it for reporting.
       lastError = { code: report.code, message: `${source.name}: ${report.message}`, detail: report.detail ?? null };
-      bySource.push({ name: source.name, fetched: 0, stored: 0, duplicates: 0 });
+      bySource.push({ name: source.name, fetched: 0, stored: 0, filtered: 0, duplicates: 0 });
     }
   }
 
-  if (stored === 0 && duplicates === 0 && fetched === 0 && lastError) {
+  if (stored === 0 && filtered === 0 && duplicates === 0 && fetched === 0 && lastError) {
     return { ok: false, ...lastError };
   }
 
@@ -409,11 +528,38 @@ export async function ingestAllActiveSources(): Promise<
     source: bySource.length > 1 ? `${bySource.length} منبع` : firstName,
     fetched,
     stored,
+    filtered,
     newArticleIds,
     duplicates,
     skipped,
     bySource,
   };
+}
+
+/** Runs `fn` over `items` with at most `limit` in flight, preserving order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      try {
+        results[current] = { status: "fulfilled", value: await fn(items[current]) };
+      } catch (reason) {
+        results[current] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 export type FeedImportReport = {
@@ -461,12 +607,22 @@ export async function ingestFeedXml(
       else fresh.push(candidate);
     }
 
-    const { created } = await storeCandidates(fresh, duplicateRefs, source, { sourceName: parsed.source });
-    const duplicates = Math.max(candidates.length - created, 0);
+    const topicFilter = await loadTopicFilter();
+    const { pass, skip } = partitionByTopic(fresh, topicFilter);
+
+    const { created, filteredCreated } = await storeCandidates(pass, duplicateRefs, skip, source, { sourceName: parsed.source });
+    const duplicates = Math.max(candidates.length - created - filteredCreated, 0);
 
     if (source) {
-      await recordRun(source.id, startedAt, "success", { itemsFound: parsed.items.length, created, duplicates, skipped: parsed.skipped }, null, "manual import");
-      await updateSourceAfterSuccess(source.id, parsed.items.length, created, duplicates);
+      await recordRun(
+        source.id,
+        startedAt,
+        "success",
+        { itemsFound: parsed.items.length, created, filtered: filteredCreated, duplicates, skipped: parsed.skipped },
+        null,
+        "manual import",
+      );
+      await updateSourceAfterSuccess(source.id, parsed.items.length, created + filteredCreated, duplicates);
     }
 
     return {
@@ -531,7 +687,7 @@ async function recordRun(
   sourceId: string,
   startedAt: Date,
   status: "success" | "partial" | "failed",
-  counts: { itemsFound: number; created: number; duplicates: number; skipped: number },
+  counts: { itemsFound: number; created: number; filtered: number; duplicates: number; skipped: number },
   errorMessage: string | null,
   detail: string | null,
 ): Promise<void> {
@@ -542,7 +698,8 @@ async function recordRun(
       completedAt: new Date(),
       status,
       itemsFound: counts.itemsFound,
-      itemsCreated: counts.created,
+      itemsCreated: counts.created + counts.filtered,
+      itemsFiltered: counts.filtered,
       duplicates: counts.duplicates,
       errors: counts.skipped + (status === "failed" ? 1 : 0),
       errorMessage: detail ? `${errorMessage ?? ""} — ${detail}`.slice(0, 1000) : errorMessage,

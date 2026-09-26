@@ -4,72 +4,133 @@ import { DashboardActions } from "@/components/dashboard-actions";
 import { DashboardCard } from "@/components/dashboard-card";
 import { Sidebar } from "@/components/sidebar";
 import { StatusBadge } from "@/components/status-badge";
+import { getDeliveryStats } from "@/lib/delivery/publishing";
+import { getNewsStats } from "@/lib/news/ingest";
+import { listRecentRuns, listSourcesForAdmin, summarizeSources } from "@/lib/news/sources-service";
 
-// UI milestone: these values are intentionally static placeholders.
-// Replace this object with a server-side data source when the backend is ready.
-const dashboardStats: Array<{
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type StatCard = {
   label: string;
   value: ReactNode;
   detail: string;
   accent: "blue" | "violet" | "amber" | "slate";
   icon: ReactNode;
-}> = [
-  {
-    label: "منابع خبری",
-    value: "0",
-    detail: "منبع فعال",
-    accent: "blue",
-    icon: (
-      <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 4.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6M7 16h4" />
-      </svg>
-    ),
-  },
-  {
-    label: "اخبار دریافت‌شده",
-    value: "0",
-    detail: "در تمام منابع",
-    accent: "violet",
-    icon: (
-      <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5.5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h8M8 12h8M8 16h5" />
-      </svg>
-    ),
-  },
-  {
-    label: "اخبار ارسال‌شده",
-    value: "0",
-    detail: "از طریق بله",
-    accent: "amber",
-    icon: (
-      <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path strokeLinecap="round" strokeLinejoin="round" d="m21 3-7.6 18-3.8-7.6L2 9.6 21 3Z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="m9.6 13.4 4.8-4.8" />
-      </svg>
-    ),
-  },
-  {
-    label: "آخرین اجرای Agent",
-    value: "هنوز اجرا نشده",
-    detail: "اجرای خودکار فعال نیست",
-    accent: "slate",
-    icon: (
-      <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="12" r="8.5" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
-      </svg>
-    ),
-  },
-];
+};
+
+const sourcesIcon = (
+  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 4.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6M7 16h4" />
+  </svg>
+);
+
+const newsIcon = (
+  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5.5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h8M8 12h8M8 16h5" />
+  </svg>
+);
+
+const sendIcon = (
+  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m21 3-7.6 18-3.8-7.6L2 9.6 21 3Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="m9.6 13.4 4.8-4.8" />
+  </svg>
+);
+
+const clockIcon = (
+  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <circle cx="12" cy="12" r="8.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
+  </svg>
+);
+
+function formatTime(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("fa-IR");
+}
+
+/**
+ * Real dashboard counters (the UI milestone's static placeholders, as the
+ * backend is now ready). Every source is best-effort: a DB hiccup degrades one
+ * card to "—" instead of breaking the whole page.
+ */
+async function loadDashboardStats(): Promise<StatCard[]> {
+  let activeSources = 0;
+  let totalStored = 0;
+  let sentCount: number | null = null;
+  let lastRunAt: string | null = null;
+
+  try {
+    const summary = summarizeSources(await listSourcesForAdmin());
+    activeSources = summary.active;
+  } catch {
+    // keep 0
+  }
+
+  try {
+    const stats = await getNewsStats();
+    totalStored = stats.totalStored;
+  } catch {
+    // keep 0
+  }
+
+  try {
+    const delivery = await getDeliveryStats();
+    sentCount = delivery.sent;
+  } catch {
+    // keep null
+  }
+
+  try {
+    const runs = await listRecentRuns(1);
+    lastRunAt = runs[0]?.startedAt ?? null;
+  } catch {
+    // keep null
+  }
+
+  return [
+    {
+      label: "منابع خبری",
+      value: String(activeSources),
+      detail: "منبع فعال",
+      accent: "blue",
+      icon: sourcesIcon,
+    },
+    {
+      label: "اخبار دریافت‌شده",
+      value: String(totalStored),
+      detail: "در تمام منابع",
+      accent: "violet",
+      icon: newsIcon,
+    },
+    {
+      label: "اخبار ارسال‌شده",
+      value: sentCount === null ? "—" : String(sentCount),
+      detail: "در تمام مقاصد",
+      accent: "amber",
+      icon: sendIcon,
+    },
+    {
+      label: "آخرین اجرای Agent",
+      value: lastRunAt ? formatTime(lastRunAt) : "هنوز اجرا نشده",
+      detail: lastRunAt ? "آخرین نوبت دریافت منابع" : "از بخش منابع خبری اجرا کنید",
+      accent: "slate",
+      icon: clockIcon,
+    },
+  ];
+}
 
 export const metadata = {
   title: "داشبورد | دستیار هوشمند اخبار",
   description: "داشبورد مدیریت دریافت، تحلیل و ارسال اخبار",
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const dashboardStats = await loadDashboardStats();
   return (
     <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
       <div className="lg:flex">

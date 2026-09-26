@@ -33,6 +33,7 @@ type RunView = {
   startedAt: string;
   itemsFound: number;
   itemsCreated: number;
+  itemsFiltered?: number;
   duplicates: number;
   errors: number;
   errorMessage: string | null;
@@ -121,29 +122,40 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
     return base;
   }, [adminKey]);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/news-sources", { headers: headers(), cache: "no-store" });
-      const data = (await res.json()) as {
+  const load = useCallback(() => {
+    return fetch("/api/admin/news-sources", { headers: headers(), cache: "no-store" })
+      .then((res) => res.json() as Promise<{
         success: boolean;
         sources?: SourceView[];
         runs?: RunView[];
-        summary?: typeof summary;
+        summary?: { total: number; active: number; healthy: number; warning: number; failed: number };
         message?: string;
-      };
-      if (data.success) {
-        setSources(data.sources ?? []);
-        setRuns(data.runs ?? []);
-        setSummary(data.summary ?? summary);
-      } else {
-        setPageMessage({ kind: "err", text: data.message ?? "بارگذاری منابع ناموفق بود." });
-      }
-    } catch {
-      setPageMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });
-    } finally {
-      setLoading(false);
-    }
-  }, [headers, summary]);
+        detail?: string;
+        hint?: string;
+      }>)
+      .then((data) => {
+        if (data.success) {
+          setSources(data.sources ?? []);
+          setRuns(data.runs ?? []);
+          // Functional update keeps `load`'s deps stable — a previous version
+          // depended on `summary` state, which made every response re-trigger
+          // the load effect (an endless fetch loop while the page stayed open).
+          setSummary((prev) => data.summary ?? prev);
+        } else {
+          // Surface the real cause + actionable hint (never the old opaque error).
+          const parts = [data.message ?? "بارگذاری منابع ناموفق بود."];
+          if (data.hint) parts.push(data.hint);
+          if (data.detail) parts.push(`جزئیات: ${data.detail}`);
+          setPageMessage({ kind: "err", text: parts.join(" — ") });
+        }
+      })
+      .catch(() => {
+        setPageMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [headers]);
 
   useEffect(() => {
     void load();
@@ -207,12 +219,13 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         const res = await fetch(`/api/admin/news-sources/${source.id}/fetch`, { method: "POST", headers: headers(), body: "{}" });
         const data = (await res.json()) as {
           success: boolean;
-          report?: { itemsFound: number; itemsCreated: number; duplicates: number; skipped: number };
+          report?: { itemsFound: number; itemsCreated: number; itemsFiltered?: number; duplicates: number; skipped: number };
           failure?: { message: string };
           message?: string;
         };
+        const filteredPart = data.report?.itemsFiltered ? ` · خارج از موضوع: ${data.report.itemsFiltered}` : "";
         const text = data.report
-          ? `موارد یافت‌شده: ${data.report.itemsFound} · جدید: ${data.report.itemsCreated} · تکراری: ${data.report.duplicates} · خطا: ${data.report.skipped}`
+          ? `موارد یافت‌شده: ${data.report.itemsFound} · جدید: ${data.report.itemsCreated}${filteredPart} · تکراری: ${data.report.duplicates} · خطا: ${data.report.skipped}`
           : (data.failure?.message ?? data.message ?? "دریافت ناموفق بود.");
         setFetchReports((prev) => ({ ...prev, [source.id]: text }));
         await load();
@@ -566,7 +579,8 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
                 </StatusBadge>
                 <span className="text-slate-400">{formatTime(run.startedAt)}</span>
                 <span>
-                  یافته: {run.itemsFound} · جدید: {run.itemsCreated} · تکراری: {run.duplicates} · خطا: {run.errors}
+                  یافته: {run.itemsFound} · جدید: {run.itemsCreated}
+                  {run.itemsFiltered ? ` · خارج از موضوع: ${run.itemsFiltered}` : ""} · تکراری: {run.duplicates} · خطا: {run.errors}
                 </span>
                 {run.errorMessage ? <span className="max-w-[400px] truncate text-rose-600" title={run.errorMessage}>{run.errorMessage}</span> : null}
               </li>

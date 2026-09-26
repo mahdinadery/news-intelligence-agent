@@ -1,4 +1,5 @@
 import { checkAdminAccess } from "@/lib/admin/access";
+import { diagnoseDbError } from "@/lib/admin/db-errors";
 import {
   createSource,
   listRecentRuns,
@@ -25,7 +26,18 @@ export async function GET(request: Request) {
     return Response.json({ success: true, sources, runs, summary: summarizeSources(sources) });
   } catch (error) {
     console.error("[news-sources] list failed:", (error instanceof Error ? error.message : String(error)).slice(0, 200));
-    return Response.json({ success: false, message: "خطا در بارگذاری فهرست منابع." }, { status: 500 });
+    // Surface the REAL cause (missing table / unreachable DB / ...) instead of
+    // the old opaque generic message that made root-cause analysis impossible.
+    const diagnosis = diagnoseDbError(error);
+    return Response.json(
+      {
+        success: false,
+        message: "خطا در بارگذاری فهرست منابع.",
+        detail: diagnosis.detail,
+        hint: diagnosis.hint,
+      },
+      { status: diagnosis.status },
+    );
   }
 }
 
@@ -51,6 +63,15 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "اعتبارسنجی منبع ناموفق بود.", errors: error.errors }, { status: 400 });
     }
     console.error("[news-sources] create failed:", (error instanceof Error ? error.message : String(error)).slice(0, 200));
-    return Response.json({ success: false, message: "ثبت منبع در پایگاه داده ناموفق بود." }, { status: 500 });
+    const diagnosis = diagnoseDbError(error);
+    return Response.json(
+      {
+        success: false,
+        message: "ثبت منبع در پایگاه داده ناموفق بود.",
+        detail: diagnosis.detail,
+        hint: diagnosis.hint,
+      },
+      { status: diagnosis.status },
+    );
   }
 }

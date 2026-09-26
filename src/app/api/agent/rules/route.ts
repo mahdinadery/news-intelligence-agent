@@ -1,17 +1,18 @@
 import { getBaleConfigStatus } from "@/lib/bale/client";
-import { describeRule, loadAutoSendRule } from "@/lib/agent";
+import { describeRule, resolveAutoSendRule } from "@/lib/agent";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/agent/rules
  *
- * Exposes the *policy* only: thresholds, destination and whether the rule is on.
+ * Exposes the *policy* only: thresholds, destination and whether the rule is on
+ * (dashboard policy when configured, otherwise the AUTO_SEND_* env rule).
  * No API keys, tokens, connection strings or env values are ever returned —
  * `baleConfigured` is a boolean, not a credential.
  */
 export async function GET() {
-  const rule = loadAutoSendRule();
+  const rule = await resolveAutoSendRule();
   const bale = getBaleConfigStatus();
 
   return Response.json({
