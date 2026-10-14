@@ -35,6 +35,7 @@ export async function POST(request: Request, routeContext: RouteContext) {
         report: {
           itemsFound: report.itemsFound,
           itemsCreated: report.itemsCreated,
+          itemsFiltered: report.itemsFiltered,
           duplicates: report.duplicates,
           skipped: report.skippedMalformed,
           feedSourceName: report.feedSourceName,

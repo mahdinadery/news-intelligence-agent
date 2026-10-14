@@ -12,7 +12,13 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import type { AiDecisionRules, AiFeaturesConfig, AiOutputSchema } from "@/lib/ai/config-types";
+import type {
+  AiAutoSendPolicy,
+  AiDecisionRules,
+  AiFeaturesConfig,
+  AiOutputSchema,
+  AiTopicFilterConfig,
+} from "@/lib/ai/config-types";
 
 /**
  * Registered news sources (Milestone 6 — Data Layer).
@@ -176,6 +182,9 @@ export const ingestionRuns = pgTable(
     status: text("status").notNull(),
     itemsFound: integer("items_found").notNull().default(0),
     itemsCreated: integer("items_created").notNull().default(0),
+    // Rows written with status SKIPPED_OFFTOPIC by the topic filter (subset of
+    // rows inserted this run; kept separate so filter impact stays visible).
+    itemsFiltered: integer("items_filtered").notNull().default(0),
     duplicates: integer("duplicates").notNull().default(0),
     errors: integer("errors").notNull().default(0),
     errorMessage: text("error_message"),
@@ -297,6 +306,13 @@ export const aiConfigurations = pgTable(
     // template changes are versioned/auditable like prompt changes, and the
     // delivery row that used a template can be explained by the config snapshot.
     publishingTemplate: text("publishing_template").notNull().default(""),
+    // Topic / relevance filter (pre-AI, cheap keyword rules). Versioned with the
+    // configuration so topic changes are traceable. Null/absent on rows written
+    // before the column existed — readers fall back to DEFAULT_TOPIC_FILTER.
+    topicFilter: jsonb("topic_filter").$type<AiTopicFilterConfig | null>(),
+    // Agent auto-delivery policy (dashboard override of AUTO_SEND_* env vars).
+    // useCustom=false keeps the historical env-driven behavior.
+    autoSendPolicy: jsonb("auto_send_policy").$type<AiAutoSendPolicy | null>(),
     isActive: boolean("is_active").notNull().default(false),
     version: integer("version").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),

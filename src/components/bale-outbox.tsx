@@ -30,28 +30,58 @@ export function BaleOutbox({ refreshKey }: { refreshKey?: number }) {
   const [entries, setEntries] = useState<OutboxEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    try {
-      const response = await fetch("/api/bale/outbox", { cache: "no-store" });
-      const data = (await response.json()) as { entries?: OutboxEntry[] };
-      setEntries(data.entries ?? []);
-    } catch {
-      // keep current entries on transient network blip
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    return fetch("/api/bale/outbox", { cache: "no-store" })
+      .then((response) => response.json() as Promise<{ entries?: OutboxEntry[] }>)
+      .then((data) => {
+        setEntries(data.entries ?? []);
+      })
+      .catch(() => {
+        // keep current entries on transient network blip
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
 
-  // Auto-refresh every 5 seconds so messages sent automatically after AI analysis appear immediately
+  // Auto-refresh every 30 seconds (was 5s — a needless constant load on the
+  // server and database), and only while the tab is actually visible: a hidden
+  // tab must not keep polling the API on a small VM.
   useEffect(() => {
-    const timer = setInterval(() => {
-      void load();
-    }, 5000);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (timer === null) {
+        timer = setInterval(() => {
+          if (document.visibilityState === "visible") void load();
+        }, 30_000);
+      }
+    };
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void load();
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      stop();
+    };
   }, [load]);
 
   const autoCount = entries.filter((e) => e.trigger === "auto" && e.status === "sent").length;

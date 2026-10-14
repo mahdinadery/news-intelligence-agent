@@ -57,15 +57,18 @@ export function NewsFetchCard({ onIngestComplete }: { onIngestComplete?: () => v
     null,
   );
 
-  const loadStats = useCallback(async () => {
-    try {
-      const response = await fetch("/api/news/stats", { cache: "no-store" });
-      setStats((await response.json()) as NewsStats);
-    } catch {
-      setStats(null);
-    } finally {
-      setLoadingStats(false);
-    }
+  const loadStats = useCallback(() => {
+    return fetch("/api/news/stats", { cache: "no-store" })
+      .then((response) => response.json() as Promise<NewsStats>)
+      .then((data) => {
+        setStats(data);
+      })
+      .catch(() => {
+        setStats(null);
+      })
+      .finally(() => {
+        setLoadingStats(false);
+      });
   }, []);
 
   useEffect(() => {

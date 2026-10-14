@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   AI_FEATURE_ORDER,
+  DEFAULT_AUTO_SEND_POLICY,
   DEFAULT_CONFIG_NAME,
   DEFAULT_DECISION_RULES,
   DEFAULT_FEATURES,
@@ -12,14 +13,19 @@ import {
   DEFAULT_PUBLISHING_TEMPLATE,
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_TEMPERATURE,
+  DEFAULT_TOPIC_FILTER,
+  type AiAutoSendPolicy,
   type AiConfigInput,
   type AiFeatureKey,
+  type AiTopicFilterConfig,
   type ActiveAiConfig,
 } from "@/lib/ai/config-types";
 import { PUBLISHING_TEMPLATE_VARS, findUnknownTemplateVars } from "@/lib/delivery/template";
+import { TOPIC_PRESETS } from "@/lib/news/topic-filter";
 import { AiConfigFeatureRow } from "./ai-config-feature-row";
 import { AiConfigOutputFieldRow } from "./ai-config-output-field-row";
 import { AiConfigTestPanel } from "./ai-config-test-panel";
+import { AiConfigTopicRow } from "./ai-config-topic-row";
 import { AiConfigVersionHistory } from "./ai-config-version-history";
 
 type Props = { adminKey: string };
@@ -32,7 +38,18 @@ const LOCKED_FEATURES: AiFeatureKey[] = ["summary", "shouldSend"];
 function buildDraft(
   config: Pick<
     ActiveAiConfig,
-    "name" | "provider" | "model" | "systemPrompt" | "temperature" | "maxTokens" | "features" | "decisionRules" | "outputSchema" | "publishingTemplate"
+    | "name"
+    | "provider"
+    | "model"
+    | "systemPrompt"
+    | "temperature"
+    | "maxTokens"
+    | "features"
+    | "decisionRules"
+    | "outputSchema"
+    | "publishingTemplate"
+    | "topicFilter"
+    | "autoSendPolicy"
   >,
 ): AiConfigInput {
   return {
@@ -46,6 +63,8 @@ function buildDraft(
     decisionRules: config.decisionRules,
     outputSchema: config.outputSchema,
     publishingTemplate: config.publishingTemplate ?? "",
+    topicFilter: config.topicFilter ?? DEFAULT_TOPIC_FILTER,
+    autoSendPolicy: config.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY,
   };
 }
 
@@ -61,6 +80,8 @@ function defaultDraft(): AiConfigInput {
     decisionRules: DEFAULT_DECISION_RULES,
     outputSchema: DEFAULT_OUTPUT_SCHEMA,
     publishingTemplate: DEFAULT_PUBLISHING_TEMPLATE,
+    topicFilter: DEFAULT_TOPIC_FILTER,
+    autoSendPolicy: DEFAULT_AUTO_SEND_POLICY,
   };
 }
 
@@ -83,42 +104,52 @@ export function AiConfigConsole({ adminKey }: Props) {
   const [versionsLoading, setVersionsLoading] = useState(true);
   const [activatingId, setActivatingId] = useState<string | null>(null);
 
-  const loadActive = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/admin/ai-config", { headers: authHeaders(adminKey), cache: "no-store" });
-      const data = (await response.json()) as {
+  const loadActive = useCallback(() => {
+    return fetch("/api/admin/ai-config", { headers: authHeaders(adminKey), cache: "no-store" })
+      .then((response) => response.json() as Promise<{
         success: boolean;
         config?: ActiveAiConfig;
         aiKeyConfigured?: boolean;
         effectiveModel?: string;
         message?: string;
-      };
-
-      if (data.success && data.config) {
-        setDraft(buildDraft(data.config));
-        setMeta({ version: data.config.version, isActive: data.config.isActive, updatedAt: data.config.updatedAt });
-        setAiKeyConfigured(Boolean(data.aiKeyConfigured));
-        setEffectiveModel(data.effectiveModel ?? "");
-      }
-    } catch {
-      // Keep defaults visible; the save/test buttons will surface a clearer error if needed.
-    } finally {
-      setLoading(false);
-    }
+        detail?: string;
+        hint?: string;
+      }>)
+      .then((data) => {
+        if (data.success && data.config) {
+          setDraft(buildDraft(data.config));
+          setMeta({ version: data.config.version, isActive: data.config.isActive, updatedAt: data.config.updatedAt });
+          setAiKeyConfigured(Boolean(data.aiKeyConfigured));
+          setEffectiveModel(data.effectiveModel ?? "");
+        } else if (!data.success) {
+          setSaveErrors([
+            data.message ?? "بارگذاری پیکربندی ناموفق بود.",
+            ...(data.hint ? [data.hint] : []),
+            ...(data.detail ? [`جزئیات: ${data.detail}`] : []),
+          ]);
+        }
+      })
+      .catch(() => {
+        setSaveErrors(["ارتباط با سرور برای بارگذاری پیکربندی برقرار نشد."]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [adminKey]);
 
-  const loadVersions = useCallback(async () => {
-    setVersionsLoading(true);
-    try {
-      const response = await fetch("/api/admin/ai-config/history", { headers: authHeaders(adminKey), cache: "no-store" });
-      const data = (await response.json()) as { success: boolean; versions?: ActiveAiConfig[] };
-      if (data.success) setVersions(data.versions ?? []);
-    } catch {
-      setVersions([]);
-    } finally {
-      setVersionsLoading(false);
-    }
+  const loadVersions = useCallback(() => {
+    return fetch("/api/admin/ai-config/history", { headers: authHeaders(adminKey), cache: "no-store" })
+      .then((response) => response.json() as Promise<{ success: boolean; versions?: ActiveAiConfig[] }>)
+      .then((data) => {
+        if (data.success) setVersions(data.versions ?? []);
+        else setVersions([]);
+      })
+      .catch(() => {
+        setVersions([]);
+      })
+      .finally(() => {
+        setVersionsLoading(false);
+      });
   }, [adminKey]);
 
   useEffect(() => {
@@ -381,6 +412,305 @@ export function AiConfigConsole({ adminKey }: Props) {
           />
           فعال‌سازی پیشنهاد خودکار هوش مصنوعی (shouldSend)
         </label>
+      </section>
+
+      {/* E1. Topic Filter (pre-AI relevance gate) */}
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-slate-950">موضوعات و فیلتر مرتبط‌سازی (Topic Filter)</h2>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              checked={draft.topicFilter?.enabled ?? false}
+              className="h-4 w-4 accent-blue-600"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  topicFilter: { ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER), enabled: event.target.checked },
+                })
+              }
+              type="checkbox"
+            />
+            فعال‌سازی فیلتر موضوعی
+          </label>
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          پیش از مرحله پرهزینه تحلیل هوش مصنوعی، اخبار با قواعد ساده کلیدواژه‌ای غربال می‌شوند. اخبار نامرتبط ذخیره اما
+          با وضعیت «خارج از موضوع» علامت‌گذاری می‌شوند و هرگز به AI ارسال نمی‌شوند (قابل بازگشت به صف از مدیریت اخبار).
+          وقتی فیلتر غیرفعال یا بدون کلیدواژه باشد، همه اخبار رد می‌شوند (هیچ خبری از دست نمی‌رود).
+        </p>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Field label="حالت فیلتر">
+            <select
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  topicFilter: {
+                    ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER),
+                    mode: event.target.value === "exclude" ? "exclude" : "include",
+                  },
+                })
+              }
+              value={draft.topicFilter?.mode ?? "include"}
+            >
+              <option value="include">تمرکز (فقط اخبار مرتبط با موضوعات)</option>
+              <option value="exclude">حذف (کنار گذاشتن اخبار موضوعات زیر)</option>
+            </select>
+          </Field>
+          <button
+            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100"
+            onClick={() =>
+              setDraft({
+                ...draft,
+                topicFilter: {
+                  ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER),
+                  enabled: true,
+                  topics: [
+                    ...(draft.topicFilter?.topics ?? []),
+                    { id: crypto.randomUUID(), label: "", enabled: true, keywords: [] },
+                  ],
+                },
+              })
+            }
+            type="button"
+          >
+            + افزودن موضوع سفارشی
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-slate-500">افزودن سریع موضوعات پیشنهادی:</span>
+          {TOPIC_PRESETS.map((preset) => (
+            <button
+              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              key={preset.label}
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  topicFilter: {
+                    ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER),
+                    enabled: true,
+                    topics: [
+                      ...(draft.topicFilter?.topics ?? []),
+                      { id: crypto.randomUUID(), label: preset.label, enabled: true, keywords: [...preset.keywords] },
+                    ],
+                  },
+                })
+              }
+              type="button"
+            >
+              + {preset.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {(draft.topicFilter?.topics ?? []).length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm text-slate-400">
+              هنوز موضوعی تعریف نشده است. تا زمانی که موضوعی با کلیدواژه نداشته باشید، فیلتری اعمال نمی‌شود.
+            </p>
+          ) : (
+            (draft.topicFilter?.topics ?? []).map((topic, index) => (
+              <AiConfigTopicRow
+                key={topic.id || index}
+                onChange={(next) => {
+                  const topics = [...(draft.topicFilter?.topics ?? [])];
+                  topics[index] = next;
+                  setDraft({ ...draft, topicFilter: { ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER), topics } });
+                }}
+                onRemove={() => {
+                  const topics = (draft.topicFilter?.topics ?? []).filter((_, i) => i !== index);
+                  setDraft({ ...draft, topicFilter: { ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER), topics } });
+                }}
+                value={topic}
+              />
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* E2. Auto-send policy (Agent / Bale delivery conditions) */}
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-slate-950">سیاست ارسال خودکار (Agent / بله)</h2>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              checked={draft.autoSendPolicy?.useCustom ?? false}
+              className="h-4 w-4 accent-blue-600"
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: { ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY), useCustom: event.target.checked },
+                })
+              }
+              type="checkbox"
+            />
+            استفاده از تنظیمات این بخش (به‌جای متغیرهای محیطی)
+          </label>
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          شرایط ارسال خودکار تحلیل‌شده‌ها به مقصد بله/Local. تا وقتی گزینه بالا فعال نیست، رفتار تاریخی سامانه (متغیرهای
+          محیطی <code className="rounded bg-slate-100 px-1">AUTO_SEND_*</code>) حفظ می‌شود. با فعال‌سازی، مقادیر زیر روی
+          نسخه پیکربندی ذخیره و قابل ردیابی می‌شوند.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="ارسال خودکار">
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    enabled: event.target.value === "true",
+                  },
+                })
+              }
+              value={String(draft.autoSendPolicy?.enabled ?? true)}
+            >
+              <option value="true">روشن</option>
+              <option value="false">خاموش</option>
+            </select>
+          </Field>
+          <Field label="مقصد ارسال">
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    destination: event.target.value as AiAutoSendPolicy["destination"],
+                  },
+                })
+              }
+              value={draft.autoSendPolicy?.destination ?? "local"}
+            >
+              <option value="local">Local</option>
+              <option value="bale">بله (Bale)</option>
+              <option value="both">Local و بله</option>
+            </select>
+          </Field>
+          <Field label="حداقل اهمیت (۰-۱۰۰)">
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              max={100}
+              min={0}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    minImportance: Number(event.target.value),
+                  },
+                })
+              }
+              type="number"
+              value={draft.autoSendPolicy?.minImportance ?? 50}
+            />
+          </Field>
+          <Field label="حداقل مرتبط بودن (۰-۱۰۰)">
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              max={100}
+              min={0}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    minRelevance: Number(event.target.value),
+                  },
+                })
+              }
+              type="number"
+              value={draft.autoSendPolicy?.minRelevance ?? 50}
+            />
+          </Field>
+          <Field label="حداقل تازگی (۰-۱۰۰)">
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              max={100}
+              min={0}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    minNovelty: Number(event.target.value),
+                  },
+                })
+              }
+              type="number"
+              value={draft.autoSendPolicy?.minNovelty ?? 0}
+            />
+          </Field>
+          <Field label="سقف اخبار هر نوبت (۱-۱۰۰)">
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              max={100}
+              min={1}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    maxItemsPerPass: Number(event.target.value),
+                  },
+                })
+              }
+              type="number"
+              value={draft.autoSendPolicy?.maxItemsPerPass ?? 20}
+            />
+          </Field>
+          <Field label="دسته‌های مجاز (جدا با ویرگول؛ خالی = همه)">
+            <input
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    categories: event.target.value
+                      .split(/[,،]/)
+                      .map((category) => category.trim())
+                      .filter(Boolean),
+                  },
+                })
+              }
+              placeholder="مثال: اقتصاد، بازار"
+              value={(draft.autoSendPolicy?.categories ?? []).join("، ")}
+            />
+          </Field>
+          <Field label="الزام پیشنهاد AI (shouldSend)">
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              disabled={!draft.autoSendPolicy?.useCustom}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  autoSendPolicy: {
+                    ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                    requireAiRecommendation: event.target.value === "true",
+                  },
+                })
+              }
+              value={String(draft.autoSendPolicy?.requireAiRecommendation ?? false)}
+            >
+              <option value="false">خیر</option>
+              <option value="true">بله</option>
+            </select>
+          </Field>
+        </div>
       </section>
 
       {/* F. Output Schema */}

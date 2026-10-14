@@ -1,4 +1,5 @@
 import { checkAdminAccess } from "@/lib/admin/access";
+import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { isAiConfigured, resolveEffectiveModel } from "@/lib/ai/client";
 import { createAiConfigVersion, getActiveAiConfig, validateAiConfigInput } from "@/lib/ai/config-service";
 import type { AiConfigInput } from "@/lib/ai/config-types";
@@ -33,9 +34,15 @@ export async function GET(request: Request) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error("[ai-config] failed to load active config:", detail.slice(0, 200));
+    const diagnosis = diagnoseDbError(error);
     return Response.json(
-      { success: false, message: "خطا در بارگذاری پیکربندی هوش مصنوعی از پایگاه داده." },
-      { status: 500 },
+      {
+        success: false,
+        message: "خطا در بارگذاری پیکربندی هوش مصنوعی از پایگاه داده.",
+        detail: diagnosis.detail,
+        hint: diagnosis.hint,
+      },
+      { status: diagnosis.status },
     );
   }
 }
@@ -74,6 +81,8 @@ export async function POST(request: Request) {
     decisionRules: body.decisionRules,
     outputSchema: body.outputSchema,
     publishingTemplate: body.publishingTemplate ?? "",
+    topicFilter: body.topicFilter,
+    autoSendPolicy: body.autoSendPolicy,
   };
 
   const validation = validateAiConfigInput(input);
@@ -93,6 +102,15 @@ export async function POST(request: Request) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error("[ai-config] failed to save config:", detail.slice(0, 200));
-    return Response.json({ success: false, message: "ذخیره پیکربندی در پایگاه داده ناموفق بود." }, { status: 500 });
+    const diagnosis = diagnoseDbError(error);
+    return Response.json(
+      {
+        success: false,
+        message: "ذخیره پیکربندی در پایگاه داده ناموفق بود.",
+        detail: diagnosis.detail,
+        hint: diagnosis.hint,
+      },
+      { status: diagnosis.status },
+    );
   }
 }

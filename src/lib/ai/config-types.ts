@@ -68,6 +68,59 @@ export type AiOutputSchema = AiOutputFieldSchema[];
 
 export type AiProvider = "openai-compatible";
 
+/**
+ * Topic / relevance filter (dashboard-configurable, no code changes needed).
+ *
+ * Deliberately CHEAP rule-based matching (keywords, not an LLM call): it runs
+ * BEFORE the expensive AI analysis stage, so off-topic articles never reach the
+ * model. Fails open by design — when disabled (or no effective keywords exist),
+ * every article passes, so a misconfigured filter can never lose important news.
+ */
+export type AiTopicRule = {
+  /** Stable client-generated id (UI list keys / edit identity). */
+  id: string;
+  /** Human-readable Persian label, e.g. «بازار خودرو». */
+  label: string;
+  enabled: boolean;
+  /** Matched against title+description+content (normalized). ANY keyword hits => topic matches. */
+  keywords: string[];
+};
+
+export type AiTopicFilterMode = "include" | "exclude";
+
+export type AiTopicFilterConfig = {
+  /** Master switch. false => filter inactive, everything passes. */
+  enabled: boolean;
+  /**
+   * include (focus mode): an article must match at least one enabled topic.
+   * exclude (noise mode): an article is dropped when it matches any enabled topic.
+   */
+  mode: AiTopicFilterMode;
+  topics: AiTopicRule[];
+};
+
+/**
+ * Agent auto-delivery policy ("conditions for sending to Bale").
+ *
+ * Kept conceptually separate from AiDecisionRules (which only shapes the AI's
+ * shouldSend recommendation). `useCustom: false` (default) preserves the
+ * historical behavior exactly: the AUTO_SEND_* environment variables decide.
+ * When `useCustom: true`, the values below are authoritative — so the operator
+ * can retune delivery from the dashboard without touching code or env files.
+ */
+export type AiAutoSendPolicy = {
+  useCustom: boolean;
+  enabled: boolean;
+  destination: "local" | "bale" | "both";
+  minImportance: number;
+  minRelevance: number;
+  minNovelty: number;
+  requireAiRecommendation: boolean;
+  /** Persian categories allow-list; null/empty => all categories. */
+  categories: string[] | null;
+  maxItemsPerPass: number;
+};
+
 /** The fully-resolved configuration used to build a prompt and call the AI service. */
 export type ActiveAiConfig = {
   id: string;
@@ -87,6 +140,10 @@ export type ActiveAiConfig = {
    * Empty string means "use the built-in layout" (backward compatible).
    */
   publishingTemplate: string;
+  /** Pre-AI topic/relevance gate (versioned with the rest of the configuration). */
+  topicFilter: AiTopicFilterConfig;
+  /** Agent auto-delivery policy (dashboard override of the AUTO_SEND_* env rule). */
+  autoSendPolicy: AiAutoSendPolicy;
   isActive: boolean;
   version: number;
   createdAt: string;
@@ -106,6 +163,10 @@ export type AiConfigInput = {
   outputSchema: AiOutputSchema;
   /** Milestone 8 — publishing format. Empty string => built-in layout. */
   publishingTemplate: string;
+  /** Topic/relevance gate. Omitted => DEFAULT_TOPIC_FILTER (inactive, fails open). */
+  topicFilter?: AiTopicFilterConfig;
+  /** Auto-delivery policy. Omitted => DEFAULT_AUTO_SEND_POLICY (env-driven). */
+  autoSendPolicy?: AiAutoSendPolicy;
 };
 
 export const AI_FEATURE_ORDER: AiFeatureKey[] = [
@@ -225,6 +286,33 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 export const DEFAULT_CONFIG_NAME = "پیکربندی پیش‌فرض";
 export const DEFAULT_MODEL_PLACEHOLDER = ""; // empty => env AI_API_MODEL / AI_MODEL / built-in fallback
+
+/**
+ * Default topic filter — INACTIVE and failing open: existing installations keep
+ * ingesting and analyzing everything exactly as before until an admin enables
+ * topics from the dashboard.
+ */
+export const DEFAULT_TOPIC_FILTER: AiTopicFilterConfig = {
+  enabled: false,
+  mode: "include",
+  topics: [],
+};
+
+/**
+ * Default auto-send policy — `useCustom: false` so the AUTO_SEND_* environment
+ * variables keep deciding (zero behavior change for existing deployments).
+ */
+export const DEFAULT_AUTO_SEND_POLICY: AiAutoSendPolicy = {
+  useCustom: false,
+  enabled: true,
+  destination: "local",
+  minImportance: 50,
+  minRelevance: 50,
+  minNovelty: 0,
+  requireAiRecommendation: false,
+  categories: null,
+  maxItemsPerPass: 20,
+};
 export const DEFAULT_TEMPERATURE = 0.2;
 // Reasoning-style models (e.g. openai/gpt-oss-20b on Groq) spend a large,
 // variable number of hidden "thinking" tokens before emitting the final JSON.

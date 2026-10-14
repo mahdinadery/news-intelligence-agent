@@ -1,15 +1,65 @@
 import { db } from "@/db";
 import { news } from "@/db/schema";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { readActiveOperationalSettings } from "@/lib/ai/config-service";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { checkAdminAccess } from "@/lib/admin/access";
 import { maybeRunAutoSend } from "@/lib/agent/auto-hook";
 import { analyzeArticle } from "@/lib/news/analyze";
 import { ingestNews } from "@/lib/news/ingest";
+import { evaluateTopicFilter } from "@/lib/news/topic-filter";
 
 export const dynamic = "force-dynamic";
 
 const MAX_AI_ITEMS_PER_RUN = 4;
 const STALE_PROCESSING_MINUTES = 15;
+
+/**
+ * Last gate before the expensive AI stage: applies the configured topic filter
+ * to the selected backlog rows. Non-matching rows are marked SKIPPED_OFFTOPIC
+ * (still stored, re-queueable later) and excluded from this run's AI calls.
+ * Fails open — when the filter is inactive, everything passes unchanged.
+ */
+async function applyTopicGate(selectedIds: string[]): Promise<{ pass: string[]; skipped: string[] }> {
+  if (selectedIds.length === 0) return { pass: [], skipped: [] };
+
+  const settings = await readActiveOperationalSettings();
+  const filter = settings?.topicFilter ?? null;
+  const outcome = evaluateTopicFilter({ title: "" }, filter);
+  if (outcome.reason === "filter_disabled" || outcome.reason === "no_effective_topics") {
+    return { pass: selectedIds, skipped: [] };
+  }
+
+  const rows = await db
+    .select({
+      id: news.id,
+      title: news.title,
+      description: news.description,
+      content: news.content,
+    })
+    .from(news)
+    .where(inArray(news.id, selectedIds));
+
+  const pass: string[] = [];
+  const skipped: string[] = [];
+  const skippedIds: string[] = [];
+  for (const row of rows) {
+    const result = evaluateTopicFilter(row, filter);
+    if (result.verdict === "pass") pass.push(row.id);
+    else {
+      skipped.push(row.id);
+      skippedIds.push(row.id);
+    }
+  }
+
+  if (skippedIds.length > 0) {
+    await db
+      .update(news)
+      .set({ status: "SKIPPED_OFFTOPIC", updatedAt: new Date() })
+      .where(inArray(news.id, skippedIds));
+  }
+
+  return { pass, skipped };
+}
 
 /**
  * POST /api/news/fetch
@@ -98,11 +148,15 @@ export async function POST(request: Request) {
       selectedIds.push(...backlog.map((row) => row.id));
     }
 
+    // Topic relevance gate BEFORE AI — off-topic items never reach the model.
+    const gated = await applyTopicGate(selectedIds);
+    const aiQueue = gated.pass;
+
     const analysisResults = [];
 
     // IMPORTANT: keep AI calls sequential. This is intentional because the
     // provider has a low TPM limit.
-    for (const id of selectedIds) {
+    for (const id of aiQueue) {
       try {
         const analysis = await analyzeArticle(id);
 
@@ -152,10 +206,12 @@ export async function POST(request: Request) {
       fetched: result.fetched,
       stored: result.stored,
       newArticleIds: result.newArticleIds,
-      queuedForAnalysis: selectedIds,
+      queuedForAnalysis: aiQueue,
+      topicSkipped: gated.skipped,
       analyzed: analysisResults,
       duplicates: result.duplicates,
       skipped: result.skipped,
+      filtered: result.filtered,
       autoSend,
     });
   } catch (error) {

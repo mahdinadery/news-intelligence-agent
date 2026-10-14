@@ -67,6 +67,7 @@ async function persistAttempt(params: {
   message: string;
   errorMessage: string | null;
   trigger: SendTrigger;
+  providerMessageId: string | null;
 }): Promise<void> {
   await db.insert(deliveries).values({
     newsId: params.newsId,
@@ -75,6 +76,7 @@ async function persistAttempt(params: {
     triggeredBy: params.trigger,
     message: params.message,
     errorMessage: params.errorMessage,
+    providerMessageId: params.providerMessageId,
     sentAt: params.status === "sent" ? new Date() : null,
   });
 }
@@ -110,6 +112,7 @@ async function deliverToOne(
       message,
       errorMessage: outcome.errorMessage,
       trigger,
+      providerMessageId: outcome.providerMessageId,
     });
   } catch (error) {
     // Persistence problems are reported, but never rewrite the provider's verdict.

@@ -5,8 +5,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "prestart": "node scripts/db-ensure.mjs || true",
+    "postinstall": "node scripts/db-ensure.mjs || true",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "db:ensure": "node scripts/db-ensure.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
     "dotenv": "17.3.1",

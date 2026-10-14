@@ -22,6 +22,8 @@ export type IngestResult =
       source: string;
       fetched: number;
       stored: number;
+      /** Rows stored as SKIPPED_OFFTOPIC by the topic filter (never analyzed). */
+      filtered: number;
       newArticleIds: string[];
       duplicates: number;
       skipped: number;
@@ -42,6 +44,7 @@ export async function ingestNews(): Promise<IngestResult> {
       source: result.source,
       fetched: result.fetched,
       stored: result.stored,
+      filtered: result.filtered,
       newArticleIds: result.newArticleIds,
       duplicates: result.duplicates,
       skipped: result.skipped,
@@ -64,7 +67,7 @@ export async function getNewsStats(): Promise<NewsStats> {
       sources: sql<number>`count(distinct ${news.source})::int`,
     })
     .from(news)
-    .where(sql`${news.status} <> 'DUPLICATE'`);
+    .where(sql`${news.status} NOT IN ('DUPLICATE', 'SKIPPED_OFFTOPIC')`);
 
   // Timestamps are compared entirely inside SQL: Postgres stores microseconds
   // while a JS Date round-trip truncates to milliseconds, so filtering with
@@ -127,7 +130,7 @@ export async function listLatestNews(limit = 60): Promise<NewsListItem[]> {
       analyzedAt: news.analyzedAt,
     })
     .from(news)
-    .where(sql`${news.status} <> 'DUPLICATE'`)
+    .where(sql`${news.status} NOT IN ('DUPLICATE', 'SKIPPED_OFFTOPIC')`)
     .orderBy(desc(sql`coalesce(${news.publishedAt}, ${news.createdAt})`), desc(news.id))
     .limit(Math.min(Math.max(limit, 1), 200));
 

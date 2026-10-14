@@ -13,7 +13,7 @@
 
 import { db } from "@/db";
 import { aiAnalyses, news, type NewsRow } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { resolveEffectiveModel, runAiAnalysis } from "../ai/client";
 import { getActiveAiConfig } from "../ai/config-service";
 
@@ -98,11 +98,28 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
 
   const config = await getActiveAiConfig();
 
-  // Transition to AI_PROCESSING before the API call.
+  // Atomic claim before the AI call: exactly one analysis per article at a
+  // time. Two concurrent requests (e.g. overlapping scheduled fetch runs) can
+  // no longer both spend an AI round-trip on the same row — the loser is told
+  // the article is being processed. Stale AI_PROCESSING rows are recovered by
+  // the fetch route after STALE_PROCESSING_MINUTES.
   try {
-    await db.update(news).set({ status: "AI_PROCESSING", updatedAt: new Date() }).where(eq(news.id, id));
+    const [claimed] = await db
+      .update(news)
+      .set({ status: "AI_PROCESSING", updatedAt: new Date() })
+      .where(and(eq(news.id, id), sql`${news.status} <> 'AI_PROCESSING'`))
+      .returning({ id: news.id });
+
+    if (!claimed) {
+      return {
+        ok: false,
+        code: "already_processing",
+        message: "تحلیل این خبر هم‌اکنون در حال انجام است؛ چند دقیقه دیگر دوباره تلاش کنید.",
+        detail: null,
+      };
+    }
   } catch {
-    // Best effort; the analysis will still proceed.
+    // Best effort; on a transient bookkeeping error the analysis will still proceed.
   }
 
   // AI Service call — prompt/model/thresholds/output schema all come from `config`.

@@ -12,15 +12,17 @@
  */
 
 import { db } from "@/db";
-import { news, type NewsRow } from "@/db/schema";
+import { deliveries, news, type NewsRow } from "@/db/schema";
 import { sendNewsDelivery } from "@/lib/delivery";
-import { desc, inArray, sql } from "drizzle-orm";
-import { evaluateArticle, loadAutoSendRule, type AutoSendRule } from "./rules";
+import { expandTargets } from "@/lib/delivery/types";
+import { and, desc, inArray, sql } from "drizzle-orm";
+import { resolveAutoSendRule } from "./resolve-rule";
+import { evaluateArticle, type AutoSendRule } from "./rules";
 
 export type AutoSendItem = {
   id: string;
   title: string;
-  outcome: "sent" | "partially_sent" | "failed" | "already_sent" | "not_matched";
+  outcome: "sent" | "partially_sent" | "failed" | "already_sent" | "skipped_review" | "not_matched";
   reasons?: string[];
   errors?: string[];
 };
@@ -32,6 +34,8 @@ export type AutoPassResult = {
   matched: number;
   sent: number;
   skippedDuplicates: number;
+  /** Articles deferred because an open manual publishing candidate exists. */
+  skippedReview: number;
   failed: number;
   items: AutoSendItem[];
 };
@@ -43,9 +47,35 @@ const NOT_MATCHED: AutoPassResult = {
   matched: 0,
   sent: 0,
   skippedDuplicates: 0,
+  skippedReview: 0,
   failed: 0,
   items: [],
 };
+
+/** News ids that already have an OPEN candidate for any auto destination. */
+async function findPendingReviewIds(newsIds: string[], rule: AutoSendRule): Promise<Set<string>> {
+  const pending = new Set<string>();
+  if (newsIds.length === 0) return pending;
+
+  try {
+    const targets = expandTargets(rule.destination);
+    const rows = await db
+      .select({ newsId: deliveries.newsId })
+      .from(deliveries)
+      .where(
+        and(
+          inArray(deliveries.newsId, newsIds),
+          inArray(deliveries.destination, targets),
+          sql`${deliveries.status} IN ('pending_approval', 'approved')`,
+        ),
+      );
+    for (const row of rows) pending.add(row.newsId);
+  } catch (error) {
+    // Fail open on the lookup itself (sending still has its own duplicate guard).
+    console.error("[agent] pending-review lookup failed:", String(error).slice(0, 160));
+  }
+  return pending;
+}
 
 async function loadCandidates(rule: AutoSendRule, newsIds?: string[]): Promise<NewsRow[]> {
   if (newsIds && newsIds.length > 0) {
@@ -68,7 +98,7 @@ async function loadCandidates(rule: AutoSendRule, newsIds?: string[]): Promise<N
 export async function runAutoDeliveryPass(
   options: { newsIds?: string[]; force?: boolean } = {},
 ): Promise<AutoPassResult> {
-  const rule = loadAutoSendRule();
+  const rule = await resolveAutoSendRule();
 
   if (!rule.enabled && !options.force) {
     return { ...NOT_MATCHED, destination: rule.destination };
@@ -83,6 +113,16 @@ export async function runAutoDeliveryPass(
     return { ...NOT_MATCHED, enabled: rule.enabled, destination: rule.destination };
   }
 
+  // Auto-send must never bypass the controlled publishing workflow: when an
+  // OPEN candidate (pending_approval/approved) already exists for one of the
+  // auto destinations, the article is under manual review and this pass defers
+  // to it (observed in production as `sent|auto` rows racing `pending_approval|
+  // manual` candidates for the same news).
+  const pendingReviewIds = await findPendingReviewIds(
+    candidates.map((article) => article.id),
+    rule,
+  );
+
   const result: AutoPassResult = {
     enabled: rule.enabled,
     destination: rule.destination,
@@ -90,11 +130,23 @@ export async function runAutoDeliveryPass(
     matched: 0,
     sent: 0,
     skippedDuplicates: 0,
+    skippedReview: 0,
     failed: 0,
     items: [],
   };
 
   for (const article of candidates) {
+    if (pendingReviewIds.has(article.id)) {
+      result.skippedReview += 1;
+      result.items.push({
+        id: article.id,
+        title: article.title,
+        outcome: "skipped_review",
+        reasons: ["pending_manual_review"],
+      });
+      continue;
+    }
+
     const check = options.force ? { matches: true, reasons: [] as string[] } : evaluateArticle(article, rule);
 
     if (!check.matches) {
@@ -147,5 +199,6 @@ export async function runAutoDeliveryPass(
   return result;
 }
 
-export { loadAutoSendRule, describeRule } from "./rules";
+export { loadAutoSendRule, describeRule, evaluateArticle } from "./rules";
+export { resolveAutoSendRule, policyToRule } from "./resolve-rule";
 export type { AutoSendRule };
