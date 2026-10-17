@@ -276,6 +276,9 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
   if (!rules) {
     errors.push("قوانین تصمیم‌گیری تعریف نشده است.");
   } else {
+    if (rules.combine !== undefined && rules.combine !== "all" && rules.combine !== "any") {
+      errors.push("حالت ترکیب قوانین تصمیم‌گیری باید «all» (همه شرط‌ها) یا «any» (یکی کافی است) باشد.");
+    }
     for (const [label, value] of [
       ["حداقل امتیاز اهمیت", rules.minImportanceToSend],
       ["حداقل امتیاز مرتبط بودن", rules.minRelevanceToSend],
@@ -329,6 +332,18 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
           errors.push(`برای موضوع «${label || topic.id || "بدون‌نام"}» حداکثر ۵۰ کلیدواژه قابل تعریف است.`);
         } else if (topic.keywords.some((keyword) => (keyword ?? "").length > 120)) {
           errors.push(`کلیدواژه‌های موضوع «${label || topic.id || "بدون‌نام"}» نباید بیش از ۱۲۰ کاراکتر باشند.`);
+        }
+      }
+    }
+
+    const blocked = topicFilter.blockedKeywords;
+    if (blocked !== undefined) {
+      if (!Array.isArray(blocked)) {
+        errors.push("فهرست کلیدواژه‌های ممنوع نامعتبر است.");
+      } else {
+        if (blocked.length > 100) errors.push("حداکثر ۱۰۰ کلیدواژهٔ ممنوع قابل تعریف است.");
+        if (blocked.some((keyword) => (keyword ?? "").length > 80)) {
+          errors.push("هر کلیدواژهٔ ممنوع نباید بیش از ۸۰ کاراکتر باشد.");
         }
       }
     }

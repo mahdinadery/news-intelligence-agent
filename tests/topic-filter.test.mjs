@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  describeTopicFocus,
   evaluateTopicFilter,
   isTopicFilterActive,
   normalizeForMatch,
@@ -108,6 +107,46 @@ test("disabled topic rows are ignored", () => {
   assert.equal(outcome.reason, "no_effective_topics");
 });
 
+test("blocked keywords win in include mode even when a topic matches", () => {
+  const f = filter({ topics: [topic()], blockedKeywords: ["ورزش", "فوتبال"] });
+  const outcome = evaluateTopicFilter({ title: "قیمت خودرو و حاشیه‌های فوتبال" }, f);
+  assert.equal(outcome.verdict, "skip");
+  assert.equal(outcome.reason, "matched_blocked_keyword");
+  assert.deepEqual(outcome.blockedKeywords, ["فوتبال"]);
+  assert.deepEqual(outcome.matchedTopics, []);
+});
+
+test("blocked keywords win in exclude mode too", () => {
+  const f = filter({ mode: "exclude", topics: [topic()], blockedKeywords: ["حوادث"] });
+  const outcome = evaluateTopicFilter({ title: "گزارش حوادث جاده‌ای" }, f);
+  assert.equal(outcome.verdict, "skip");
+  assert.equal(outcome.reason, "matched_blocked_keyword");
+});
+
+test("deny-list-only configuration filters blocked news and passes the rest", () => {
+  const f = filter({ topics: [], blockedKeywords: ["ورزش", "سرگرمی"] });
+
+  const blocked = evaluateTopicFilter({ title: "نتایج مسابقات ورزشی" }, f);
+  assert.equal(blocked.verdict, "skip");
+  assert.equal(blocked.reason, "matched_blocked_keyword");
+
+  const allowed = evaluateTopicFilter({ title: "انتشار صورت‌های مالی بانک" }, f);
+  assert.equal(allowed.verdict, "pass");
+  assert.equal(allowed.reason, "no_excluded_match");
+});
+
+test("blocked keyword matching is Persian-normalized", () => {
+  const f = filter({ topics: [topic()], blockedKeywords: ["سینما"] });
+  const outcome = evaluateTopicFilter({ title: "بازگشت هنرمندان به سينما" }, f);
+  assert.equal(outcome.verdict, "skip");
+  assert.equal(outcome.reason, "matched_blocked_keyword");
+});
+
+test("isTopicFilterActive recognises a deny-list-only configuration", () => {
+  assert.equal(isTopicFilterActive(filter({ topics: [], blockedKeywords: ["ورزش"] })), true);
+  assert.equal(isTopicFilterActive(filter({ topics: [], blockedKeywords: ["  "] })), false);
+});
+
 test("isTopicFilterActive reflects real narrowing only", () => {
   assert.equal(isTopicFilterActive(null), false);
   assert.equal(isTopicFilterActive(filter({ enabled: false })), false);
@@ -115,11 +154,3 @@ test("isTopicFilterActive reflects real narrowing only", () => {
   assert.equal(isTopicFilterActive(filter({ topics: [topic()] })), true);
 });
 
-test("describeTopicFocus lists topics only when active", () => {
-  assert.equal(describeTopicFocus(null), null);
-  assert.equal(describeTopicFocus(filter({ topics: [] })), null);
-
-  const text = describeTopicFocus(filter({ topics: [topic()] }));
-  assert.ok(text.includes("بازار خودرو"));
-  assert.ok(text.includes("خودرو"));
-});

@@ -67,6 +67,13 @@ export type ScheduleAnalysisSummary = {
   skippedOfftopic: number;
 };
 
+/** One candidate that was analyzed but rejected by the send rule (why it was not sent). */
+export type ScheduleSendRejection = {
+  title: string;
+  /** Machine-readable codes, e.g. "relevance_below_threshold". */
+  reasons: string[];
+};
+
 export type ScheduleSendSummary = {
   enabled: boolean;
   destination: string;
@@ -76,6 +83,8 @@ export type ScheduleSendSummary = {
   skippedDuplicates: number;
   skippedReview: number;
   failed: number;
+  /** Up to a handful of rejected candidates, so thresholds can be tuned from real data. */
+  rejected?: ScheduleSendRejection[];
 };
 
 /** Result of one scheduled (or manually forced) full pass, stored on the row. */

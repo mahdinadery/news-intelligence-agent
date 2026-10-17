@@ -192,6 +192,12 @@ async function executeScheduledPass(args: {
       skippedDuplicates: result.skippedDuplicates,
       skippedReview: result.skippedReview,
       failed: result.failed,
+      // Keep a few rejected candidates with their reasons so the operator can
+      // see WHY a news item was not sent instead of guessing at the thresholds.
+      rejected: result.items
+        .filter((item) => item.outcome === "not_matched" || item.outcome === "skipped_review")
+        .slice(0, 5)
+        .map((item) => ({ title: item.title, reasons: item.reasons ?? [] })),
     };
 
     for (const item of result.items) {

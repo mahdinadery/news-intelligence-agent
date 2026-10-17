@@ -45,7 +45,19 @@ export type AiDecisionRules = {
   minImportanceToSend: number;
   minRelevanceToSend: number;
   minNoveltyToSend: number;
-  /** Convenience "OR" threshold described to the model alongside the per-score minimums. */
+  /**
+   * How the score minimums combine when the model decides `shouldSend`:
+   *  - "all" (default, recommended): AND — every enabled minimum must be met.
+   *    A high importance score can never compensate for low relevance.
+   *  - "any": legacy OR behaviour (any one minimum is enough). Kept only for
+   *    backward compatibility with configurations saved before the fix; it is
+   *    the reason off-topic-but-important articles used to be recommended.
+   * Missing values read as "all".
+   */
+  combine?: "all" | "any";
+  /**
+   * Legacy convenience threshold used only in "any" mode. Unused in "all" mode.
+   */
   overallSendThreshold: number;
   /** When false, the AI is instructed to always return shouldSend=false and skip the recommendation. */
   enableAutoRecommendation: boolean;
@@ -97,6 +109,13 @@ export type AiTopicFilterConfig = {
    */
   mode: AiTopicFilterMode;
   topics: AiTopicRule[];
+  /**
+   * Hard deny-list that applies in BOTH modes: an article containing any of
+   * these keywords is dropped before the AI stage, even when it also matches an
+   * included topic. This is the "these kinds of news must never be sent" switch
+   * (sports, celebrity news, daily prices, ...). Optional/empty => no deny-list.
+   */
+  blockedKeywords?: string[];
 };
 
 /**
@@ -250,6 +269,9 @@ export const DEFAULT_DECISION_RULES: AiDecisionRules = {
   minImportanceToSend: 70,
   minRelevanceToSend: 70,
   minNoveltyToSend: 0,
+  // AND semantics: importance and relevance must BOTH pass. The previous
+  // default (OR) recommended important-but-irrelevant articles.
+  combine: "all",
   overallSendThreshold: 70,
   enableAutoRecommendation: true,
 };
@@ -296,6 +318,7 @@ export const DEFAULT_TOPIC_FILTER: AiTopicFilterConfig = {
   enabled: false,
   mode: "include",
   topics: [],
+  blockedKeywords: [],
 };
 
 /**
