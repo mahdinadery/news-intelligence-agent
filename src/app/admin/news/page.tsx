@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { isNextProductionBuild } from "@/db";
+import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
+import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
+import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
 import { getNewsStatusSummary, listAdminNews, listFilterOptions, type AdminNewsFilters } from "@/lib/news/news-admin";
 import { NEWS_STATUSES, NEWS_STATUS_LABELS } from "@/lib/news/status";
 import { Sidebar } from "@/components/sidebar";
@@ -61,6 +64,15 @@ export default async function AdminNewsPage({ searchParams }: PageProps) {
     return <PlaceholderShell />;
   }
 
+  // Gate before touching the database: an unauthorized visitor should get the
+  // key popup, not admin data.
+  const access = await getAdminPageAccess(first(sp.key));
+  if (!access.authorized) {
+    return <AdminGateScreen />;
+  }
+
+  const clientKey = adminKeyForClient(access);
+
   const [{ items, total, page, totalPages }, summary, options] = await Promise.all([
     listAdminNews(filters),
     getNewsStatusSummary(),
@@ -85,6 +97,7 @@ export default async function AdminNewsPage({ searchParams }: PageProps) {
         <Sidebar />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-10">
+            <AdminKeyQuerySync adminKey={clientKey} />
             <header className="border-b border-slate-200/80 pb-6">
               <p className="mb-2 text-sm font-medium text-blue-600">مرکز مدیریت اخبار</p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">اخبار</h1>

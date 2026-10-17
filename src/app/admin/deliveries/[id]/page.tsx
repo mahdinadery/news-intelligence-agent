@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { isAdminAccessConfigured } from "@/lib/admin/access";
 import { isNextProductionBuild } from "@/db";
+import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
+import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
+import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
 import { getDeliveryDetail } from "@/lib/delivery/publishing";
 import { publishStatusLabel, publishingStatusTone } from "@/lib/delivery/types";
 import { DeliveryActions } from "@/components/admin/delivery-actions";
@@ -35,17 +37,19 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
   const providedKeyRaw = sp.key;
   const providedKey = Array.isArray(providedKeyRaw) ? providedKeyRaw[0] : providedKeyRaw;
 
-  const requiredKey = process.env.ADMIN_ACCESS_KEY?.trim();
-  const gateConfigured = isAdminAccessConfigured();
-  const authorized = !gateConfigured || (requiredKey && providedKey?.trim() === requiredKey);
+  if (isNextProductionBuild) notFound();
 
-  if (!authorized || isNextProductionBuild) notFound();
+  const access = await getAdminPageAccess(providedKey);
+  if (!access.authorized) {
+    return <AdminGateScreen width="narrow" />;
+  }
 
+  const clientKey = adminKeyForClient(access);
   const detail = await getDeliveryDetail(resolvedParams.id);
   if (!detail) notFound();
 
   const { delivery, article, analysis, events } = detail;
-  const backHref = `/admin/deliveries${providedKey ? `?key=${encodeURIComponent(providedKey)}` : ""}`;
+  const backHref = `/admin/deliveries${clientKey ? `?key=${encodeURIComponent(clientKey)}` : ""}`;
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
@@ -53,6 +57,7 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
         <Sidebar />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1180px] space-y-6 p-4 sm:p-6 lg:p-10">
+            <AdminKeyQuerySync adminKey={clientKey} />
             <header>
               <Link className="text-sm font-medium text-blue-700 hover:underline" href={backHref}>
                 → بازگشت به فهرست ارسال‌ها
@@ -133,7 +138,7 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
             </Card>
 
             <DeliveryActions
-              adminKey={gateConfigured ? providedKey?.trim() ?? "" : ""}
+              adminKey={clientKey}
               canRetry={!delivery.providerMessageId && !delivery.sentAt}
               deliveryId={delivery.id}
               destination={delivery.destination}
