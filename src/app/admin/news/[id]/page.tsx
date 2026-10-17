@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { isAdminAccessConfigured } from "@/lib/admin/access";
 import { isNextProductionBuild } from "@/db";
+import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
+import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
+import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
 import { getAdminNewsDetail } from "@/lib/news/news-admin";
 import { publishStatusLabel, publishingStatusTone } from "@/lib/delivery/types";
 import { NewsAdminActions } from "@/components/admin/news-admin-actions";
@@ -35,14 +37,16 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
   const providedKeyRaw = sp.key;
   const providedKey = Array.isArray(providedKeyRaw) ? providedKeyRaw[0] : providedKeyRaw;
 
-  const requiredKey = process.env.ADMIN_ACCESS_KEY?.trim();
-  const gateConfigured = isAdminAccessConfigured();
-  const authorized = !gateConfigured || (requiredKey && providedKey?.trim() === requiredKey);
-
-  if (!authorized || isNextProductionBuild) {
+  if (isNextProductionBuild) {
     notFound();
   }
 
+  const access = await getAdminPageAccess(providedKey);
+  if (!access.authorized) {
+    return <AdminGateScreen width="narrow" />;
+  }
+
+  const clientKey = adminKeyForClient(access);
   const detail = await getAdminNewsDetail(resolvedParams.id);
   if (!detail) notFound();
 
@@ -55,6 +59,7 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
         <Sidebar />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1180px] space-y-6 p-4 sm:p-6 lg:p-10">
+            <AdminKeyQuerySync adminKey={clientKey} />
             <header>
               <Link className="text-sm font-medium text-blue-700 hover:underline" href="/admin/news">
                 → بازگشت به فهرست اخبار
@@ -67,7 +72,7 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
               </div>
             </header>
 
-            <NewsAdminActions adminKey={gateConfigured ? providedKey?.trim() ?? "" : ""} newsId={item.id} status={item.status} />
+            <NewsAdminActions adminKey={clientKey} newsId={item.id} status={item.status} />
 
             {detail.duplicateOf ? (
               <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

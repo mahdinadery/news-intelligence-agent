@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { isNextProductionBuild } from "@/db";
+import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
+import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
+import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
 import { listAdminDeliveries } from "@/lib/delivery/publishing";
 import { publishStatusLabel, publishingStatusTone } from "@/lib/delivery/types";
 import { Sidebar } from "@/components/sidebar";
@@ -64,6 +67,15 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
     );
   }
 
+  // Gate before touching the database: an unauthorized visitor should get the
+  // key popup, not admin data.
+  const access = await getAdminPageAccess(first(sp.key));
+  if (!access.authorized) {
+    return <AdminGateScreen />;
+  }
+
+  const clientKey = adminKeyForClient(access);
+
   const { rows, total, page, totalPages, stats } = await listAdminDeliveries({
     ...base,
     page: Number(first(sp.page) ?? 1) || 1,
@@ -71,6 +83,7 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
 
   return (
     <Shell>
+      <AdminKeyQuerySync adminKey={clientKey} />
       <header className="border-b border-slate-200/80 pb-6">
         <p className="mb-2 text-sm font-medium text-blue-600">مرکز مدیریت اخبار</p>
         <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">انتشار و ارسال‌ها</h1>

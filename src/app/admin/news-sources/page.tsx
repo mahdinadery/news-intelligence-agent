@@ -1,6 +1,8 @@
-import { isAdminAccessConfigured } from "@/lib/admin/access";
+import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
+import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
 import { NewsSourcesConsole } from "@/components/admin/news-sources-console";
 import { Sidebar } from "@/components/sidebar";
+import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,26 +18,35 @@ type PageProps = {
 
 export default async function NewsSourcesPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const providedKeyRaw = params.key;
-  const providedKey = Array.isArray(providedKeyRaw) ? providedKeyRaw[0] : providedKeyRaw;
+  const access = await getAdminPageAccess(params.key);
 
-  const requiredKey = process.env.ADMIN_ACCESS_KEY?.trim();
-  const gateConfigured = isAdminAccessConfigured();
-  const authorized = !gateConfigured || (requiredKey && providedKey?.trim() === requiredKey);
+  if (!access.authorized) {
+    return <AdminGateScreen />;
+  }
+
+  const clientKey = adminKeyForClient(access);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900" dir="rtl">
       <div className="lg:flex">
         <Sidebar />
+
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-10">
-            {authorized ? (
-              <NewsSourcesConsole adminKey={gateConfigured ? providedKey?.trim() ?? "" : ""} />
-            ) : (
-              <p className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-                دسترسی به این صفحه محدود شده است. با پارامتر <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">?key=</code> وارد شوید.
-              </p>
-            )}
+            {!access.gateConfigured ? (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+                <p className="font-bold">هشدار امنیتی: احراز هویت واقعی هنوز متصل نشده است.</p>
+                <p className="mt-1 leading-6">
+                  این صفحه با متغیر محیطی{" "}
+                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">ADMIN_ACCESS_KEY</code> قفل
+                  می‌شود؛ چون این متغیر تنظیم نشده، دسترسی برای همه باز است. برای محدودسازی، مقدار آن را در محیط
+                  سرور تنظیم کنید؛ از آن پس هنگام باز کردن صفحات مدیریت، پاپ‌آپ ورود کلید نمایش داده می‌شود.
+                </p>
+              </div>
+            ) : null}
+
+            <AdminKeyQuerySync adminKey={clientKey} />
+            <NewsSourcesConsole adminKey={clientKey} />
           </div>
         </main>
       </div>
