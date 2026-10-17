@@ -1,65 +1,16 @@
-import { db } from "@/db";
-import { news } from "@/db/schema";
-import { readActiveOperationalSettings } from "@/lib/ai/config-service";
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { checkAdminAccess } from "@/lib/admin/access";
 import { maybeRunAutoSend } from "@/lib/agent/auto-hook";
-import { analyzeArticle } from "@/lib/news/analyze";
+import {
+  analyzeSequentially,
+  applyTopicGate,
+  recoverStaleProcessing,
+  selectAnalysisBacklog,
+} from "@/lib/news/analysis-queue";
 import { ingestNews } from "@/lib/news/ingest";
-import { evaluateTopicFilter } from "@/lib/news/topic-filter";
 
 export const dynamic = "force-dynamic";
 
 const MAX_AI_ITEMS_PER_RUN = 4;
-const STALE_PROCESSING_MINUTES = 15;
-
-/**
- * Last gate before the expensive AI stage: applies the configured topic filter
- * to the selected backlog rows. Non-matching rows are marked SKIPPED_OFFTOPIC
- * (still stored, re-queueable later) and excluded from this run's AI calls.
- * Fails open — when the filter is inactive, everything passes unchanged.
- */
-async function applyTopicGate(selectedIds: string[]): Promise<{ pass: string[]; skipped: string[] }> {
-  if (selectedIds.length === 0) return { pass: [], skipped: [] };
-
-  const settings = await readActiveOperationalSettings();
-  const filter = settings?.topicFilter ?? null;
-  const outcome = evaluateTopicFilter({ title: "" }, filter);
-  if (outcome.reason === "filter_disabled" || outcome.reason === "no_effective_topics") {
-    return { pass: selectedIds, skipped: [] };
-  }
-
-  const rows = await db
-    .select({
-      id: news.id,
-      title: news.title,
-      description: news.description,
-      content: news.content,
-    })
-    .from(news)
-    .where(inArray(news.id, selectedIds));
-
-  const pass: string[] = [];
-  const skipped: string[] = [];
-  const skippedIds: string[] = [];
-  for (const row of rows) {
-    const result = evaluateTopicFilter(row, filter);
-    if (result.verdict === "pass") pass.push(row.id);
-    else {
-      skipped.push(row.id);
-      skippedIds.push(row.id);
-    }
-  }
-
-  if (skippedIds.length > 0) {
-    await db
-      .update(news)
-      .set({ status: "SKIPPED_OFFTOPIC", updatedAt: new Date() })
-      .where(inArray(news.id, skippedIds));
-  }
-
-  return { pass, skipped };
-}
 
 /**
  * POST /api/news/fetch
@@ -100,22 +51,7 @@ export async function POST(request: Request) {
 
     // Recover articles that were left in AI_PROCESSING by an interrupted
     // request or server restart.
-    const staleBefore = new Date(
-      Date.now() - STALE_PROCESSING_MINUTES * 60 * 1000,
-    );
-
-    await db
-      .update(news)
-      .set({
-        status: "READY_FOR_AI",
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(news.status, "AI_PROCESSING"),
-          lt(news.updatedAt, staleBefore),
-        ),
-      );
+    await recoverStaleProcessing();
 
     // Prefer articles fetched in this run, then continue with older backlog.
     const selectedIds: string[] = [];
@@ -127,63 +63,17 @@ export async function POST(request: Request) {
 
     if (selectedIds.length < MAX_AI_ITEMS_PER_RUN) {
       const remaining = MAX_AI_ITEMS_PER_RUN - selectedIds.length;
-
-      const backlog = await db
-        .select({ id: news.id })
-        .from(news)
-        .where(
-          and(
-            eq(news.status, "READY_FOR_AI"),
-            selectedIds.length > 0
-              ? sql`${news.id} NOT IN (${sql.join(
-                  selectedIds.map((id) => sql`${id}::uuid`),
-                  sql`, `,
-                )})`
-              : sql`TRUE`,
-          ),
-        )
-        .orderBy(sql`coalesce(${news.publishedAt}, ${news.createdAt}) ASC`)
-        .limit(remaining);
-
-      selectedIds.push(...backlog.map((row) => row.id));
+      const backlog = await selectAnalysisBacklog(remaining, selectedIds);
+      selectedIds.push(...backlog);
     }
 
     // Topic relevance gate BEFORE AI — off-topic items never reach the model.
     const gated = await applyTopicGate(selectedIds);
     const aiQueue = gated.pass;
 
-    const analysisResults = [];
-
     // IMPORTANT: keep AI calls sequential. This is intentional because the
     // provider has a low TPM limit.
-    for (const id of aiQueue) {
-      try {
-        const analysis = await analyzeArticle(id);
-
-        analysisResults.push({
-          id,
-          ok: analysis.ok,
-          code: analysis.ok ? null : analysis.code,
-          message: analysis.ok ? null : analysis.message,
-          detail: analysis.ok ? null : (analysis.detail ?? null),
-        });
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-
-        console.error(
-          "[news-fetch] article analysis failed:",
-          detail.slice(0, 200),
-        );
-
-        analysisResults.push({
-          id,
-          ok: false,
-          code: "analysis_error",
-          message: detail,
-          detail: null,
-        });
-      }
-    }
+    const analysisResults = await analyzeSequentially(aiQueue);
 
     // Auto-send only articles that were actually analyzed during this run.
     const analyzedIds = analysisResults

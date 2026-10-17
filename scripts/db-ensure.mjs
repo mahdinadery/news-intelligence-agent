@@ -198,6 +198,28 @@ const STEPS = [
     )`,
   },
 
+  {
+    name: "table agent_schedules",
+    sql: `CREATE TABLE IF NOT EXISTS "agent_schedules" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      "enabled" boolean DEFAULT false NOT NULL,
+      "timezone" text DEFAULT 'Asia/Tehran' NOT NULL,
+      "times" jsonb DEFAULT '["08:00"]'::jsonb NOT NULL,
+      "destination" text DEFAULT 'bale' NOT NULL,
+      "min_importance" integer DEFAULT 50 NOT NULL,
+      "min_relevance" integer DEFAULT 50 NOT NULL,
+      "min_novelty" integer DEFAULT 0 NOT NULL,
+      "require_ai_recommendation" boolean DEFAULT false NOT NULL,
+      "max_analyze" integer DEFAULT 8 NOT NULL,
+      "max_send" integer DEFAULT 10 NOT NULL,
+      "last_run_at" timestamp with time zone,
+      "last_run_slot" text,
+      "last_result" jsonb,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+    )`,
+  },
+
   // ── Column repair for drifted tables (older milestone shapes) ────────────
   { name: "column news.external_id", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "external_id" text` },
   { name: "column news.canonical_url", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "canonical_url" text` },
@@ -226,6 +248,10 @@ const STEPS = [
   { name: "column ai_configurations.publishing_template", sql: `ALTER TABLE "ai_configurations" ADD COLUMN IF NOT EXISTS "publishing_template" text DEFAULT '' NOT NULL` },
   { name: "column ai_configurations.topic_filter", sql: `ALTER TABLE "ai_configurations" ADD COLUMN IF NOT EXISTS "topic_filter" jsonb` },
   { name: "column ai_configurations.auto_send_policy", sql: `ALTER TABLE "ai_configurations" ADD COLUMN IF NOT EXISTS "auto_send_policy" jsonb` },
+  { name: "column agent_schedules.max_analyze", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "max_analyze" integer DEFAULT 8 NOT NULL` },
+  { name: "column agent_schedules.max_send", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "max_send" integer DEFAULT 10 NOT NULL` },
+  { name: "column agent_schedules.last_run_slot", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "last_run_slot" text` },
+  { name: "column agent_schedules.last_result", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "last_result" jsonb` },
 
   // ── Foreign keys (named exactly as drizzle-kit generates them) ───────────
   // Each block is failure-proof by design (M1):

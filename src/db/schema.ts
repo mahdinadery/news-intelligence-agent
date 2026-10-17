@@ -19,6 +19,7 @@ import type {
   AiOutputSchema,
   AiTopicFilterConfig,
 } from "@/lib/ai/config-types";
+import type { AgentRunSummary } from "@/lib/agent/schedule";
 
 /**
  * Registered news sources (Milestone 6 — Data Layer).
@@ -324,6 +325,33 @@ export const aiConfigurations = pgTable(
   ],
 );
 
+/**
+ * Scheduled automatic publishing (Agent). One row holds the whole schedule:
+ * which local times trigger a "fetch → analyze → send" pass, where the pass
+ * sends to, and how many items it may process. `last_run_slot` is the exact
+ * `YYYY-MM-DDTHH:MM` (local) slot that already ran, so a delayed cron or a
+ * restarted host can never send the same digest twice.
+ */
+export const agentSchedules = pgTable("agent_schedules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  timezone: text("timezone").notNull().default("Asia/Tehran"),
+  // Array of "HH:MM" wall-clock strings, interpreted in `timezone`.
+  times: jsonb("times").notNull().$type<string[]>().default(sql`'["08:00"]'::jsonb`),
+  destination: text("destination").notNull().default("bale"),
+  minImportance: integer("min_importance").notNull().default(50),
+  minRelevance: integer("min_relevance").notNull().default(50),
+  minNovelty: integer("min_novelty").notNull().default(0),
+  requireAiRecommendation: boolean("require_ai_recommendation").notNull().default(false),
+  maxAnalyze: integer("max_analyze").notNull().default(8),
+  maxSend: integer("max_send").notNull().default(10),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true, mode: "date" }),
+  lastRunSlot: text("last_run_slot"),
+  lastResult: jsonb("last_result").$type<AgentRunSummary | null>(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 export type NewsRow = typeof news.$inferSelect;
 export type NewNewsRow = typeof news.$inferInsert;
 export type NewsSourceRow = typeof newsSources.$inferSelect;
@@ -335,3 +363,4 @@ export type NewDeliveryRow = typeof deliveries.$inferInsert;
 export type DeliveryEventRow = typeof deliveryEvents.$inferSelect;
 export type AiConfigurationRow = typeof aiConfigurations.$inferSelect;
 export type NewAiConfigurationRow = typeof aiConfigurations.$inferInsert;
+export type AgentScheduleRow = typeof agentSchedules.$inferSelect;

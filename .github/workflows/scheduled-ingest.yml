@@ -1,8 +1,12 @@
-name: Scheduled news ingest & auto-send
+name: Scheduled news ingest
 
 # External cron for hosts without a background process (Render/Koyeb free tiers
-# have no scheduler and may sleep). Public repos => GitHub Actions cron is free
-# and unlimited. Every call also wakes the app up, so it effectively stays warm.
+# have no scheduler and may sleep). Public repos => GitHub Actions cron is free.
+#
+# This workflow ONLY fetches feeds (no analysis, no sending), so it can never
+# deliver anything outside the times configured in the dashboard.
+# Analysis + automatic Bale delivery run in `.github/workflows/scheduled-agent.yml`
+# at the times set in "ارسال خودکار زمان‌بندی‌شده" on /dashboard.
 #
 # Setup (once, in the GitHub repo): Settings -> Secrets and variables ->
 # Actions -> Repository secrets:
@@ -19,7 +23,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  pass:
+  ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -34,17 +38,5 @@ jobs:
           fi
           curl -fsS --max-time 120 --retry 3 --retry-all-errors --retry-delay 20 \
             -X POST "$APP_URL/api/admin/news-sources/run-due" \
-            ${ADMIN_ACCESS_KEY:+-H "x-admin-key: $ADMIN_ACCESS_KEY"} \
-            | head -c 2000
-
-      - name: Auto-delivery pass
-        run: |
-          if [ -z "$APP_URL" ]; then
-            echo "APP_URL secret is not set — skipping."
-            exit 0
-          fi
-          curl -fsS --max-time 120 --retry 3 --retry-all-errors --retry-delay 20 \
-            -X POST "$APP_URL/api/agent/auto-send" \
-            -H 'content-type: application/json' -d '{}' \
             ${ADMIN_ACCESS_KEY:+-H "x-admin-key: $ADMIN_ACCESS_KEY"} \
             | head -c 2000

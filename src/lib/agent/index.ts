@@ -96,9 +96,12 @@ async function loadCandidates(rule: AutoSendRule, newsIds?: string[]): Promise<N
  * reported in the result instead of bubbling up to the caller.
  */
 export async function runAutoDeliveryPass(
-  options: { newsIds?: string[]; force?: boolean } = {},
+  options: { newsIds?: string[]; force?: boolean; rule?: AutoSendRule } = {},
 ): Promise<AutoPassResult> {
-  const rule = await resolveAutoSendRule();
+  // The scheduled publisher passes its own rule so its configured time slots,
+  // destination and thresholds stay independent from the "after analysis"
+  // auto-send policy.
+  const rule = options.rule ?? (await resolveAutoSendRule());
 
   if (!rule.enabled && !options.force) {
     return { ...NOT_MATCHED, destination: rule.destination };

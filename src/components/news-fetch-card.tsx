@@ -49,7 +49,14 @@ function formatDateTime(iso: string | null): string {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
-export function NewsFetchCard({ onIngestComplete }: { onIngestComplete?: () => void }) {
+export function NewsFetchCard({
+  onIngestComplete,
+  adminKey = "",
+}: {
+  onIngestComplete?: () => void;
+  /** Forwarded as x-admin-key so the dashboard works when ADMIN_ACCESS_KEY is set. */
+  adminKey?: string;
+}) {
   const [stats, setStats] = useState<NewsStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
@@ -82,7 +89,10 @@ export function NewsFetchCard({ onIngestComplete }: { onIngestComplete?: () => v
     setResult(null);
 
     try {
-      const response = await fetch("/api/news/fetch", { method: "POST" });
+      const response = await fetch("/api/news/fetch", {
+        method: "POST",
+        headers: adminKey ? { "x-admin-key": adminKey } : undefined,
+      });
       const data = (await response.json()) as FetchResponse;
 
       if (data.success) {
