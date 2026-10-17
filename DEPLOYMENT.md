@@ -83,7 +83,9 @@ DATABASE_URL لحظهٔ بوت در دسترس نباشد، هوک بی‌آزا
 | نشانه | علت / کار |
 |---|---|
 | build در Render خطای DATABASE_URL داد | مقدار sync:false را در تب Environment ست نکرده‌اید (build هم به وجودش نیاز دارد) |
-| صفحات admin باز می‌شوند ولی اکشن‌ها ۵۰۰ + hint «db:ensure» | هوک بوت اجرا نشده؛ از Render → Shell (پلن پولی) یا یک‌بار موقتاً از `Run job`/local با `DATABASE_URL` اجرا کنید: `npm run db:ensure` |
+| صفحات admin باز می‌شوند ولی اکشن‌ها ۵۰۰ + hint «db:ensure» | هوک بوت اجرا نشده. از نسخهٔ فعلی، اولین درخواست ادمین اسکیما را **خودکار** (idempotent و فقط-افزودنی) همگام می‌کند؛ اگر باز هم خطا دیدید دکمهٔ «همگام‌سازی خودکار اسکیما» در همان صفحه یا `POST /api/admin/db-ensure` را بزنید، یا از Render → Shell / `Run job` / local با `DATABASE_URL`: `npm run db:ensure` |
+| روی Vercel خطای `relation "ai_configurations" does not exist` | Vercel فقط `next build` را اجرا می‌کند و `prestart`/`postinstall` عملاً اسکیما را نمی‌سازند؛ نسخهٔ فعلی در اولین درخواست ادمین خودکار repair می‌کند. برای repair دستی: `POST /api/admin/db-ensure` (با `x-admin-key`) یا از GitHub Actions → «Schema sync (db:ensure)» |
+| پیام «کلید API تنظیم نشده (AI_API_KEY)» در پیکربندی AI | متغیر `AI_API_KEY` (و اختیاری `AI_API_BASE_URL`/`AI_API_MODEL`) را در Environment Variables میزبان ست و سرویس را دوباره deploy کنید |
 | درخواست اول بعد از سکون ~۱ دقیقه طول می‌کشد | cold-start سرویس رایگان؛ cron بخش ۳ این را حذف می‌کند |
-| ۴۰۱ در admin | کلید را با `?key=` وارد هدر `x-admin-key` کنید (رفتار همیشگی پروژه) |
+| ۴۰۱ در admin | در مرورگر از پاپ‌آپ ورود کلید استفاده کنید؛ برای اسکریپت‌ها هدر `x-admin-key` یا پارامتر `?key=` هم پشتیبانی می‌شود |
 | فیدهای ایرانی timeout | `NEWS_FETCH_PROXY_URL` را روی پروکسی با IP مناسب ست کنید |

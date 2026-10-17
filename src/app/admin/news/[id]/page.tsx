@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { isNextProductionBuild } from "@/db";
 import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
 import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
+import { AdminPageErrorShell } from "@/components/admin/admin-page-error-shell";
 import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import { getAdminNewsDetail } from "@/lib/news/news-admin";
 import { publishStatusLabel, publishingStatusTone } from "@/lib/delivery/types";
 import { NewsAdminActions } from "@/components/admin/news-admin-actions";
@@ -47,7 +49,19 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
   }
 
   const clientKey = adminKeyForClient(access);
-  const detail = await getAdminNewsDetail(resolvedParams.id);
+
+  const outcome = await runWithSchemaRepair(() => getAdminNewsDetail(resolvedParams.id));
+  if (!outcome.ok) {
+    return (
+      <AdminPageErrorShell
+        adminKey={clientKey}
+        error={outcome.error}
+        message="بارگذاری جزئیات خبر از پایگاه داده ناموفق بود."
+      />
+    );
+  }
+
+  const detail = outcome.value;
   if (!detail) notFound();
 
   const { item } = detail;

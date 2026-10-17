@@ -24,6 +24,7 @@ import { PUBLISHING_TEMPLATE_VARS, findUnknownTemplateVars } from "@/lib/deliver
 import { TOPIC_PRESETS } from "@/lib/news/topic-filter";
 import { AiConfigFeatureRow } from "./ai-config-feature-row";
 import { AiConfigOutputFieldRow } from "./ai-config-output-field-row";
+import { SchemaRepairCard } from "./schema-repair-card";
 import { AiConfigTestPanel } from "./ai-config-test-panel";
 import { AiConfigTopicRow } from "./ai-config-topic-row";
 import { AiConfigVersionHistory } from "./ai-config-version-history";
@@ -99,6 +100,14 @@ export function AiConfigConsole({ adminKey }: Props) {
   const [saving, setSaving] = useState<"draft" | "activate" | null>(null);
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [loadFailure, setLoadFailure] = useState<{
+    message: string;
+    hint?: string;
+    detail?: string;
+    code?: string | null;
+    schemaMismatch?: boolean;
+  } | null>(null);
+  const [schemaSynced, setSchemaSynced] = useState(false);
 
   const [versions, setVersions] = useState<ActiveAiConfig[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(true);
@@ -114,6 +123,9 @@ export function AiConfigConsole({ adminKey }: Props) {
         message?: string;
         detail?: string;
         hint?: string;
+        code?: string | null;
+        schemaMismatch?: boolean;
+        schemaSynced?: boolean;
       }>)
       .then((data) => {
         if (data.success && data.config) {
@@ -121,16 +133,20 @@ export function AiConfigConsole({ adminKey }: Props) {
           setMeta({ version: data.config.version, isActive: data.config.isActive, updatedAt: data.config.updatedAt });
           setAiKeyConfigured(Boolean(data.aiKeyConfigured));
           setEffectiveModel(data.effectiveModel ?? "");
+          setLoadFailure(null);
+          setSchemaSynced(Boolean(data.schemaSynced));
         } else if (!data.success) {
-          setSaveErrors([
-            data.message ?? "بارگذاری پیکربندی ناموفق بود.",
-            ...(data.hint ? [data.hint] : []),
-            ...(data.detail ? [`جزئیات: ${data.detail}`] : []),
-          ]);
+          setLoadFailure({
+            message: data.message ?? "بارگذاری پیکربندی ناموفق بود.",
+            hint: data.hint,
+            detail: data.detail,
+            code: data.code,
+            schemaMismatch: data.schemaMismatch,
+          });
         }
       })
       .catch(() => {
-        setSaveErrors(["ارتباط با سرور برای بارگذاری پیکربندی برقرار نشد."]);
+        setLoadFailure({ message: "ارتباط با سرور برای بارگذاری پیکربندی برقرار نشد." });
       })
       .finally(() => {
         setLoading(false);
@@ -178,6 +194,7 @@ export function AiConfigConsole({ adminKey }: Props) {
       if (data.success && data.config) {
         setDraft(buildDraft(data.config));
         setMeta({ version: data.config.version, isActive: data.config.isActive, updatedAt: data.config.updatedAt });
+        setLoadFailure(null);
         setSaveSuccess(
           activate
             ? `نسخه ${data.config.version} ذخیره و فعال شد.`
@@ -242,6 +259,29 @@ export function AiConfigConsole({ adminKey }: Props) {
 
       {loading ? <p className="text-sm text-slate-400">در حال بارگذاری پیکربندی...</p> : null}
 
+      {schemaSynced && !loadFailure ? (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+          ساختار پایگاه داده با کد همگام نبود؛ به‌صورت خودکار (بدون حذف داده) همگام‌سازی شد و پیکربندی از مقادیر پیش‌فرض
+          ساخته شد. اکنون می‌توانید مقادیر را ذخیره و فعال کنید.
+        </p>
+      ) : null}
+
+      {loadFailure ? (
+        <SchemaRepairCard
+          adminKey={adminKey}
+          code={loadFailure.code}
+          detail={loadFailure.detail}
+          hint={loadFailure.hint}
+          message={loadFailure.message}
+          onRepaired={() => {
+            setLoading(true);
+            void loadActive();
+            void loadVersions();
+          }}
+          schemaMismatch={Boolean(loadFailure.schemaMismatch)}
+        />
+      ) : null}
+
       {/* A. Provider & Model */}
       <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
         <h2 className="text-base font-bold text-slate-950">ارائه‌دهنده و مدل هوش مصنوعی</h2>
@@ -291,6 +331,17 @@ export function AiConfigConsole({ adminKey }: Props) {
           </span>
           <span className="text-slate-500">مدل مؤثر فعلی: <b className="text-slate-800">{effectiveModel || "—"}</b></span>
         </div>
+
+        {!loading && !aiKeyConfigured ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-6 text-amber-800">
+            <b>تحلیل هوش مصنوعی غیرفعال است:</b> متغیر{" "}
+            <code className="rounded bg-white px-1 font-mono text-[11px]" dir="ltr">AI_API_KEY</code>{" "}
+            (و در صورت نیاز <code className="rounded bg-white px-1 font-mono text-[11px]" dir="ltr">AI_API_BASE_URL</code> /{" "}
+            <code className="rounded bg-white px-1 font-mono text-[11px]" dir="ltr">AI_API_MODEL</code>) را در
+            Environment Variables سرویس میزبان — مثل Vercel → Settings → Environment Variables — تنظیم کنید و
+            سرویس را دوباره Deploy کنید. تا آن زمان هیچ تحلیلی اجرا نمی‌شود، ولی بقیه پنل کار می‌کند.
+          </p>
+        ) : null}
       </section>
 
       {/* B. System Prompt */}

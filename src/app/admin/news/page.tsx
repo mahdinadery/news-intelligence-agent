@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { isNextProductionBuild } from "@/db";
+import { AdminDbErrorPanel } from "@/components/admin/admin-db-error-panel";
 import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
 import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
 import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import { getNewsStatusSummary, listAdminNews, listFilterOptions, type AdminNewsFilters } from "@/lib/news/news-admin";
 import { NEWS_STATUSES, NEWS_STATUS_LABELS } from "@/lib/news/status";
 import { Sidebar } from "@/components/sidebar";
@@ -73,11 +75,23 @@ export default async function AdminNewsPage({ searchParams }: PageProps) {
 
   const clientKey = adminKeyForClient(access);
 
-  const [{ items, total, page, totalPages }, summary, options] = await Promise.all([
-    listAdminNews(filters),
-    getNewsStatusSummary(),
-    listFilterOptions(),
-  ]);
+  const outcome = await runWithSchemaRepair(() =>
+    Promise.all([listAdminNews(filters), getNewsStatusSummary(), listFilterOptions()]),
+  );
+
+  if (!outcome.ok) {
+    return (
+      <StatusShell>
+        <AdminDbErrorPanel
+          adminKey={clientKey}
+          error={outcome.error}
+          message="بارگذاری فهرست اخبار از پایگاه داده ناموفق بود."
+        />
+      </StatusShell>
+    );
+  }
+
+  const [{ items, total, page, totalPages }, summary, options] = outcome.value;
 
   const rawFilters: Record<string, string | undefined> = {
     q: filters.q,
@@ -268,6 +282,19 @@ function FilterField({ label, children }: { label: string; children: ReactNode }
       <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
       {children}
     </label>
+  );
+}
+
+function StatusShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900" dir="rtl">
+      <div className="lg:flex">
+        <Sidebar />
+        <main className="min-w-0 flex-1">
+          <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-10">{children}</div>
+        </main>
+      </div>
+    </div>
   );
 }
 

@@ -1,7 +1,10 @@
 import { checkAdminAccess } from "@/lib/admin/access";
+import { dbErrorResponse } from "@/lib/admin/db-error-response";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import { listAiConfigVersions } from "@/lib/ai/config-service";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 /**
  * GET /api/admin/ai-config/history
@@ -15,12 +18,12 @@ export async function GET(request: Request) {
     return Response.json({ success: false, message: access.reason }, { status: 401 });
   }
 
-  try {
-    const versions = await listAiConfigVersions(50);
-    return Response.json({ success: true, versions });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.error("[ai-config-history] failed to load versions:", detail.slice(0, 200));
-    return Response.json({ success: false, message: "خطا در بارگذاری تاریخچه نسخه‌ها." }, { status: 500 });
+  const outcome = await runWithSchemaRepair(() => listAiConfigVersions(50));
+
+  if (outcome.ok) {
+    return Response.json({ success: true, versions: outcome.value, schemaSynced: outcome.schemaSynced });
   }
+
+  console.error("[ai-config-history] failed to load versions:", String(outcome.error).slice(0, 200));
+  return dbErrorResponse(outcome.error, "خطا در بارگذاری تاریخچه نسخه‌ها.", outcome.repair);
 }

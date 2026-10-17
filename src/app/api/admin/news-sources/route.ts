@@ -1,5 +1,7 @@
 import { checkAdminAccess } from "@/lib/admin/access";
+import { dbErrorResponse } from "@/lib/admin/db-error-response";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import {
   createSource,
   listRecentRuns,
@@ -21,24 +23,30 @@ export async function GET(request: Request) {
     return Response.json({ success: false, message: access.reason }, { status: 401 });
   }
 
-  try {
-    const [sources, runs] = await Promise.all([listSourcesForAdmin(), listRecentRuns(25)]);
-    return Response.json({ success: true, sources, runs, summary: summarizeSources(sources) });
-  } catch (error) {
-    console.error("[news-sources] list failed:", (error instanceof Error ? error.message : String(error)).slice(0, 200));
-    // Surface the REAL cause (missing table / unreachable DB / ...) instead of
-    // the old opaque generic message that made root-cause analysis impossible.
-    const diagnosis = diagnoseDbError(error);
-    return Response.json(
-      {
-        success: false,
-        message: "خطا در بارگذاری فهرست منابع.",
-        detail: diagnosis.detail,
-        hint: diagnosis.hint,
-      },
-      { status: diagnosis.status },
-    );
+  // Repair a drifted/older schema once (idempotent, additive) and retry.
+  const outcome = await runWithSchemaRepair(() =>
+    Promise.all([listSourcesForAdmin(), listRecentRuns(25)]),
+  );
+
+  if (outcome.ok) {
+    const [sources, runs] = outcome.value;
+    return Response.json({
+      success: true,
+      sources,
+      runs,
+      summary: summarizeSources(sources),
+      schemaSynced: outcome.schemaSynced,
+    });
   }
+
+  console.error("[news-sources] list failed:", String(outcome.error).slice(0, 200));
+  return dbErrorResponse(
+    outcome.error,
+    outcome.repair && !outcome.repair.ok
+      ? "خطا در بارگذاری فهرست منابع (همگام‌سازی خودکار اسکیما هم ناموفق بود)."
+      : "خطا در بارگذاری فهرست منابع.",
+    outcome.repair,
+  );
 }
 
 /** POST /api/admin/news-sources — register a new source. */
