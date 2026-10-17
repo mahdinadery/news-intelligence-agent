@@ -54,7 +54,14 @@ const REASON_LABEL: Record<string, string> = {
   category_excluded: "خارج از دسته‌های مجاز",
 };
 
-export function AutoSendCard({ onAutoSendComplete }: { onAutoSendComplete?: () => void }) {
+export function AutoSendCard({
+  onAutoSendComplete,
+  adminKey = "",
+}: {
+  onAutoSendComplete?: () => void;
+  /** Forwarded as x-admin-key when the dashboard is opened with ?key=... */
+  adminKey?: string;
+}) {
   const [rule, setRule] = useState<RuleInfo | null>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<PassResult | null>(null);
@@ -82,7 +89,7 @@ export function AutoSendCard({ onAutoSendComplete }: { onAutoSendComplete?: () =
     try {
       const res = await fetch("/api/agent/auto-send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(adminKey ? { "x-admin-key": adminKey } : {}) },
         body: JSON.stringify({ force }),
       });
       const data = (await res.json()) as PassResult;

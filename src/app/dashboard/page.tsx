@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ActivityList } from "@/components/activity-list";
+import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
 import { DashboardActions } from "@/components/dashboard-actions";
 import { DashboardCard } from "@/components/dashboard-card";
 import { Sidebar } from "@/components/sidebar";
@@ -129,7 +130,14 @@ export const metadata = {
   description: "داشبورد مدیریت دریافت، تحلیل و ارسال اخبار",
 };
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const params = await searchParams;
+  const keyParam = params.key;
+  const adminKey = (Array.isArray(keyParam) ? keyParam[0] : keyParam)?.trim() ?? "";
   const dashboardStats = await loadDashboardStats();
   return (
     <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
@@ -138,6 +146,7 @@ export default async function DashboardPage() {
 
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-10">
+            <AdminKeyQuerySync adminKey={adminKey} />
             <header className="flex flex-col gap-5 border-b border-slate-200/80 pb-7 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="mb-3 text-sm font-medium text-blue-600">مرکز کنترل اخبار</p>
@@ -178,7 +187,7 @@ export default async function DashboardPage() {
               </div>
             </section>
 
-            <DashboardActions />
+            <DashboardActions adminKey={adminKey} />
 
             <section aria-labelledby="activity-heading" className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
               <div className="mb-5">
