@@ -24,7 +24,7 @@ export function DashboardActions({ adminKey = "" }: { adminKey?: string }) {
       <ScheduleCard adminKey={adminKey} onRunComplete={bump} />
       <NewsFetchCard adminKey={adminKey} onIngestComplete={bump} />
       <AutoSendCard adminKey={adminKey} onAutoSendComplete={bump} />
-      <BaleTestCard onTestComplete={bump} />
+      <BaleTestCard adminKey={adminKey} onTestComplete={bump} />
       <BaleOutbox refreshKey={refreshKey} />
     </>
   );

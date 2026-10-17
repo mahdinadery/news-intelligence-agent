@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildIntervalTimes, detectInterval, intervalLabel } from "@/lib/agent/interval-times";
+import { diagnoseRunSummary } from "@/lib/agent/run-diagnosis";
 import { StatusBadge } from "./status-badge";
 
 type Destination = "local" | "bale" | "both";
@@ -78,6 +79,13 @@ const DESTINATION_LABELS: Record<Destination, string> = {
   local: "صندوق محلی (بدون ارسال واقعی)",
   both: "بله + صندوق محلی",
 };
+
+const DIAGNOSIS_TONES = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  warning: "border-amber-200 bg-amber-50 text-amber-900",
+  error: "border-rose-200 bg-rose-50 text-rose-900",
+  info: "border-sky-200 bg-sky-50 text-sky-900",
+} as const;
 
 function authHeaders(adminKey: string): Record<string, string> {
   return adminKey ? { "x-admin-key": adminKey } : {};
@@ -161,6 +169,7 @@ export function ScheduleCard({
   );
 
   const interval = useMemo(() => detectInterval(config.times), [config.times]);
+  const diagnosis = useMemo(() => diagnoseRunSummary(lastRun), [lastRun]);
 
   function updateTime(index: number, value: string) {
     setConfig((prev) => {
@@ -384,6 +393,19 @@ export function ScheduleCard({
           </p>
         </div>
       </div>
+
+      {diagnosis ? (
+        <div className={`mt-4 rounded-xl border px-4 py-3 text-xs leading-6 ${DIAGNOSIS_TONES[diagnosis.level]}`}>
+          <p className="font-bold">{diagnosis.title}</p>
+          {diagnosis.hints.length > 0 ? (
+            <ul className="mt-1 list-disc space-y-0.5 pr-4">
+              {diagnosis.hints.map((hint) => (
+                <li key={hint}>{hint}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <div>

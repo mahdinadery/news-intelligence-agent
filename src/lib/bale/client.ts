@@ -27,13 +27,22 @@ export type BaleSendResult =
   | { ok: true; messageId: string | null }
   | { ok: false; kind: BaleErrorKind; message: string; detail?: string };
 
+/** Safe result of any Telegram-compatible Bale Bot API method. */
+export type BaleApiResult<T> =
+  | { ok: true; result: T | null }
+  | { ok: false; kind: BaleErrorKind; message: string; detail?: string };
+
 type BaleApiEnvelope = {
   ok?: unknown;
   description?: unknown;
-  result?: { message_id?: unknown } | null;
+  result?: unknown;
 };
 
 function failure(kind: BaleErrorKind, message: string, detail?: string): BaleSendResult {
+  return { ok: false, kind, message, detail };
+}
+
+function apiFailure(kind: BaleErrorKind, message: string, detail?: string): BaleApiResult<never> {
   return { ok: false, kind, message, detail };
 }
 
@@ -78,25 +87,18 @@ export function getBaleConfigStatus(): { configured: boolean; missing: string[] 
 }
 
 /**
- * Sends a text message to the configured Bale chat.
+ * Calls any Bale Bot API method and normalizes the Telegram-compatible envelope.
  *
- * Flow: env credentials -> `https://tapi.bale.ai/bot<token>/sendMessage` -> parsed
- * Telegram-compatible envelope -> safe success/error result.
+ * The token never leaves this module: callers only receive the parsed `result`
+ * or a safe, redacted error. Every request is bounded by a hard timeout.
  */
-export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
-  const message = text.trim();
-  if (!message) {
-    return failure("empty_message", "Message text is empty.");
-  }
-
+export async function callBaleApi<T>(
+  method: string,
+  body: Record<string, unknown> = {},
+): Promise<BaleApiResult<T>> {
   const token = trimToUndefined(process.env.BALE_BOT_TOKEN);
   if (!token) {
-    return failure("missing_token", "BALE_BOT_TOKEN is not configured.");
-  }
-
-  const chatId = trimToUndefined(process.env.BALE_CHAT_ID);
-  if (!chatId) {
-    return failure("missing_chat_id", "BALE_CHAT_ID is not configured.");
+    return apiFailure("missing_token", "BALE_BOT_TOKEN is not configured.");
   }
 
   const controller = new AbortController();
@@ -104,18 +106,18 @@ export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
 
   let response: Response;
   try {
-    response = await fetch(`${BALE_API_BASE_URL}${token}/sendMessage`, {
+    response = await fetch(`${BALE_API_BASE_URL}${token}/${method}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: message }),
+      body: JSON.stringify(body),
       signal: controller.signal,
       cache: "no-store",
     });
   } catch (error) {
     if (isAbortError(error)) {
-      return failure("timeout", `Bale request timed out after ${REQUEST_TIMEOUT_MS}ms.`);
+      return apiFailure("timeout", `Bale request timed out after ${REQUEST_TIMEOUT_MS}ms.`);
     }
-    return failure(
+    return apiFailure(
       "network_error",
       "Could not reach the Bale Bot API.",
       redactSecrets(error instanceof Error ? error.message : String(error)),
@@ -128,7 +130,7 @@ export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
   try {
     payload = (await response.json()) as BaleApiEnvelope;
   } catch {
-    return failure(
+    return apiFailure(
       "invalid_response",
       "Bale returned a response that is not valid JSON.",
       `HTTP ${response.status}`,
@@ -136,7 +138,7 @@ export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
   }
 
   if (!response.ok) {
-    return failure(
+    return apiFailure(
       "http_error",
       `Bale Bot API returned HTTP ${response.status}.`,
       typeof payload.description === "string" ? redactSecrets(payload.description) : undefined,
@@ -144,14 +146,47 @@ export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
   }
 
   if (payload.ok !== true) {
-    return failure(
+    return apiFailure(
       "api_rejected",
       "Bale Bot API rejected the request.",
       typeof payload.description === "string" ? redactSecrets(payload.description) : undefined,
     );
   }
 
-  const rawMessageId = payload.result?.message_id;
+  return { ok: true, result: (payload.result ?? null) as T | null };
+}
+
+/**
+ * Sends a text message to the configured Bale chat.
+ *
+ * Flow: env credentials -> `https://tapi.bale.ai/bot<token>/sendMessage` -> parsed
+ * Telegram-compatible envelope -> safe success/error result.
+ */
+export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
+  const message = text.trim();
+  if (!message) {
+    return failure("empty_message", "Message text is empty.");
+  }
+
+  if (!trimToUndefined(process.env.BALE_BOT_TOKEN)) {
+    return failure("missing_token", "BALE_BOT_TOKEN is not configured.");
+  }
+
+  const chatId = trimToUndefined(process.env.BALE_CHAT_ID);
+  if (!chatId) {
+    return failure("missing_chat_id", "BALE_CHAT_ID is not configured.");
+  }
+
+  const response = await callBaleApi<{ message_id?: unknown }>("sendMessage", {
+    chat_id: chatId,
+    text: message,
+  });
+
+  if (!response.ok) {
+    return failure(response.kind, response.message, response.detail);
+  }
+
+  const rawMessageId = response.result?.message_id;
   const messageId = typeof rawMessageId === "number" || typeof rawMessageId === "string" ? String(rawMessageId) : null;
 
   return { ok: true, messageId };

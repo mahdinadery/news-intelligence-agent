@@ -152,12 +152,23 @@ async function executeScheduledPass(args: {
     const gated = await applyTopicGate(selected);
     const results = await analyzeSequentially(gated.pass);
 
+    const failedAnalyses = results.filter((item) => !item.ok);
+
     analysis = {
       selected: selected.length,
       analyzed: results.filter((item) => item.ok).length,
-      failed: results.filter((item) => !item.ok).length,
+      failed: failedAnalyses.length,
       skippedOfftopic: gated.skipped.length,
     };
+
+    // Without this, a missing AI key only shows up as "0 analyzed / N failed"
+    // and the dashboard cannot tell the operator why nothing was sent.
+    if (failedAnalyses.length > 0) {
+      const first = failedAnalyses[0];
+      const reason = first.message ?? first.code ?? "ناموفق";
+      const rest = failedAnalyses.length > 1 ? ` (و ${failedAnalyses.length - 1} مورد دیگر)` : "";
+      errors.push(`تحلیل خبر: ${reason}${rest}`);
+    }
   } catch (error) {
     const detail = errorText(error);
     analysis = { selected: 0, analyzed: 0, failed: 0, skippedOfftopic: 0 };
