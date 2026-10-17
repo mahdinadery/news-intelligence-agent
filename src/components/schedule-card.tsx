@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { buildIntervalTimes, detectInterval, intervalLabel } from "@/lib/agent/interval-times";
 import { StatusBadge } from "./status-badge";
 
 type Destination = "local" | "bale" | "both";
@@ -93,6 +94,8 @@ function formatInZone(iso: string | null, timeZone: string): string {
   }
 }
 
+const INTERVAL_PRESETS = [15, 30, 60, 120];
+
 function defaultConfig(): ScheduleConfig {
   return {
     enabled: false,
@@ -126,6 +129,7 @@ export function ScheduleCard({
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [lastRun, setLastRun] = useState<RunSummary | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [timesEditing, setTimesEditing] = useState(false);
 
   const load = useCallback(() => {
     return fetch("/api/agent/scheduler", { cache: "no-store" })
@@ -155,6 +159,8 @@ export function ScheduleCard({
     () => formatInZone(status?.nextRunAt ?? null, config.timezone),
     [status?.nextRunAt, config.timezone],
   );
+
+  const interval = useMemo(() => detectInterval(config.times), [config.times]);
 
   function updateTime(index: number, value: string) {
     setConfig((prev) => {
@@ -385,40 +391,96 @@ export function ScheduleCard({
             <p className="text-sm font-bold text-slate-800">زمان‌های اجرا (به وقت {config.timezone})</p>
             <button
               className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              onClick={addTime}
+              onClick={() => {
+                addTime();
+                setTimesEditing(true);
+              }}
               type="button"
             >
               + افزودن زمان
             </button>
           </div>
 
-          <div className="mt-2 space-y-2">
-            {config.times.length === 0 ? (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                حداقل یک زمان اضافه کنید تا زمان‌بندی بتواند اجرا شود.
-              </p>
-            ) : null}
-            {config.times.map((time, index) => (
-              <div className="flex items-center gap-2" key={`${index}-${time}`}>
-                <input
-                  className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
-                  onChange={(event) => updateTime(index, event.target.value)}
-                  step={300}
-                  type="time"
-                  value={time}
-                />
-                <button
-                  aria-label="حذف زمان"
-                  className="rounded-lg px-2 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-50 disabled:opacity-40"
-                  disabled={config.times.length <= 1}
-                  onClick={() => removeTime(index)}
-                  type="button"
-                >
-                  حذف
-                </button>
-              </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-medium text-slate-500">تکرار سریع:</span>
+            {INTERVAL_PRESETS.map((minutes) => (
+              <button
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                  interval === minutes
+                    ? "border-sky-300 bg-sky-50 text-sky-700"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+                }`}
+                key={minutes}
+                onClick={() => {
+                  setConfig({ ...config, times: buildIntervalTimes(minutes) });
+                  setTimesEditing(false);
+                }}
+                type="button"
+              >
+                {intervalLabel(minutes)}
+              </button>
             ))}
           </div>
+
+          {interval && !timesEditing ? (
+            <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-6 text-emerald-900">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  زمان‌بندی فعلی: <b>{intervalLabel(interval)}</b> ({config.times.length} نوبت در روز)
+                </span>
+                <button
+                  className="rounded-md border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
+                  onClick={() => setTimesEditing(true)}
+                  type="button"
+                >
+                  ویرایش دستی زمان‌ها
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-emerald-800/80">
+                در هر نوبت، خبرهای تازه تحلیل می‌شوند و فقط در صورت وجود خبر واجد شرایط ارسالی انجام می‌شود.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-2 space-y-2">
+                {config.times.length === 0 ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    حداقل یک زمان اضافه کنید تا زمان‌بندی بتواند اجرا شود.
+                  </p>
+                ) : null}
+                {config.times.map((time, index) => (
+                  <div className="flex items-center gap-2" key={`${index}-${time}`}>
+                    <input
+                      className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
+                      onChange={(event) => updateTime(index, event.target.value)}
+                      step={300}
+                      type="time"
+                      value={time}
+                    />
+                    <button
+                      aria-label="حذف زمان"
+                      className="rounded-lg px-2 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-50 disabled:opacity-40"
+                      disabled={config.times.length <= 1}
+                      onClick={() => removeTime(index)}
+                      type="button"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {interval ? (
+                <button
+                  className="mt-2 text-[11px] font-bold text-emerald-700 underline-offset-2 hover:underline"
+                  onClick={() => setTimesEditing(false)}
+                  type="button"
+                >
+                  نمایش خلاصه بازه
+                </button>
+              ) : null}
+            </>
+          )}
 
           <label className="mt-3 block">
             <span className="mb-1 block text-xs font-medium text-slate-500">منطقه زمانی</span>
