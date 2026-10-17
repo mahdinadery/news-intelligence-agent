@@ -21,13 +21,24 @@ import {
   type ActiveAiConfig,
 } from "@/lib/ai/config-types";
 import { PUBLISHING_TEMPLATE_VARS, findUnknownTemplateVars } from "@/lib/delivery/template";
+import { CREDIT_RATING_PACK } from "@/lib/news/news-packs";
 import { TOPIC_PRESETS } from "@/lib/news/topic-filter";
 import { AiConfigFeatureRow } from "./ai-config-feature-row";
 import { AiConfigOutputFieldRow } from "./ai-config-output-field-row";
 import { SchemaRepairCard } from "./schema-repair-card";
 import { AiConfigTestPanel } from "./ai-config-test-panel";
 import { AiConfigTopicRow } from "./ai-config-topic-row";
+
 import { AiConfigVersionHistory } from "./ai-config-version-history";
+
+/**
+ * Generic quick-add presets plus the credit-rating domain topics (the same
+ * topics the one-click «بسته خبری اعتبارسنجی» applies, offered individually).
+ */
+const ALL_TOPIC_PRESETS = [
+  ...TOPIC_PRESETS,
+  ...CREDIT_RATING_PACK.topics.map((topic) => ({ label: topic.label, keywords: [...topic.keywords] })),
+];
 
 type Props = { adminKey: string };
 
@@ -532,7 +543,7 @@ export function AiConfigConsole({ adminKey }: Props) {
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-medium text-slate-500">افزودن سریع موضوعات پیشنهادی:</span>
-          {TOPIC_PRESETS.map((preset) => (
+          {ALL_TOPIC_PRESETS.map((preset) => (
             <button
               className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
               key={preset.label}

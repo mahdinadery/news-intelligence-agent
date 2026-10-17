@@ -7,6 +7,7 @@ import {
   computeDueSlot,
   computeNextRun,
   describeSchedule,
+  effectiveGraceMinutes,
   getZonedParts,
   isValidTimeZone,
   normalizeTimes,
@@ -77,6 +78,40 @@ test("before the slot and after the grace window nothing runs", () => {
     graceMinutes: 30,
   });
   assert.equal(after.due, false);
+});
+
+test("effective grace follows the schedule cadence", () => {
+  assert.equal(effectiveGraceMinutes(["08:00"]), 60);
+  assert.equal(effectiveGraceMinutes(["08:00", "08:30", "09:00"]), 30);
+  assert.equal(effectiveGraceMinutes(["08:00", "20:00"]), 60);
+  assert.equal(effectiveGraceMinutes(["23:30", "00:00"]), 30);
+});
+
+test("a 30-minute cadence cannot fire an old slot after a newer one ran", () => {
+  const times = Array.from({ length: 48 }, (_, index) => {
+    const minutes = index * 30;
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  });
+
+  // 09:05 Tehran, the 09:00 slot already ran: the 08:30 slot is outside its
+  // 30-minute window, so nothing runs (previously the 60-minute default would
+  // have triggered a late second pass).
+  const late = computeDueSlot({
+    now: new Date("2026-10-17T05:35:00Z"),
+    config: schedule({ times }),
+    lastRunSlot: "2026-10-17T09:00",
+  });
+  assert.equal(late.due, false);
+  assert.equal(late.reason, "already_ran");
+
+  // At 09:05 with nothing run yet, the newest due slot (09:00) wins.
+  const due = computeDueSlot({
+    now: new Date("2026-10-17T05:35:00Z"),
+    config: schedule({ times }),
+    lastRunSlot: "2026-10-17T08:30",
+  });
+  assert.equal(due.due, true);
+  assert.equal(due.slotKey, "2026-10-17T09:00");
 });
 
 test("the same slot never runs twice", () => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
+import { CREDIT_RATING_PACK } from "@/lib/news/news-packs";
 import { SchemaRepairCard } from "./schema-repair-card";
 
 type Health = "healthy" | "warning" | "failed" | "paused";
@@ -49,6 +50,39 @@ type TestResult = {
   sample?: Array<{ title: string; url: string; publishedAt: string | null }>;
   message?: string;
   detail?: string | null;
+};
+
+type PackSourceOutcome = {
+  name: string;
+  url: string;
+  status: "added" | "skipped" | "failed";
+  message?: string;
+};
+
+type PackApplyResult = {
+  success: boolean;
+  pack?: { id: string; title: string };
+  topics?: {
+    ok?: boolean;
+    applied?: boolean;
+    reason?: string;
+    added?: string[];
+    skipped?: string[];
+    truncated?: number;
+    version?: number;
+    total?: number;
+    message?: string;
+  } | null;
+  audienceNote?: { applied: boolean; alreadyPresent: boolean } | null;
+  sources?: {
+    results?: PackSourceOutcome[];
+    added?: number;
+    skipped?: number;
+    failed?: number;
+    message?: string;
+  } | null;
+  warnings?: string[];
+  message?: string;
 };
 
 type FormState = {
@@ -123,6 +157,13 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
   const [importSourceId, setImportSourceId] = useState("");
   const [importBusy, setImportBusy] = useState(false);
   const [importResult, setImportResult] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // One-click domain pack (credit rating news for a rating company)
+  const [packTopics, setPackTopics] = useState(true);
+  const [packSources, setPackSources] = useState(true);
+  const [packAudience, setPackAudience] = useState(true);
+  const [packBusy, setPackBusy] = useState(false);
+  const [packResult, setPackResult] = useState<PackApplyResult | null>(null);
 
   const headers = useCallback((): Record<string, string> => {
     const base: Record<string, string> = { "Content-Type": "application/json" };
@@ -313,6 +354,34 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
     }
   }
 
+  async function handleApplyPack() {
+    if (packBusy) return;
+    setPackBusy(true);
+    setPackResult(null);
+    try {
+      const res = await fetch("/api/admin/news-packs/apply", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          packId: CREDIT_RATING_PACK.id,
+          applyTopics: packTopics,
+          applySources: packSources,
+          applyAudienceNote: packAudience,
+        }),
+      });
+      const data = (await res.json()) as PackApplyResult;
+      setPackResult(data);
+      if (data.success) {
+        setLoading(true);
+        void load();
+      }
+    } catch {
+      setPackResult({ success: false, message: "ارتباط با سرور برقرار نشد." });
+    } finally {
+      setPackBusy(false);
+    }
+  }
+
   async function handleRunDue() {
     await withBusy("run-due", async () => {
       try {
@@ -361,6 +430,136 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         <StatCard label="هشدار" value={summary.warning} tone="warning" />
         <StatCard label="خطا" value={summary.failed} tone="danger" />
       </div>
+
+      <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">بسته خبری اعتبارسنجی (اخبار داخلی)</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{CREDIT_RATING_PACK.description}</p>
+          </div>
+          <div className="flex shrink-0 gap-2 text-xs">
+            <span className="rounded-full bg-white px-3 py-1 font-semibold text-emerald-700">
+              {CREDIT_RATING_PACK.topics.length} موضوع
+            </span>
+            <span className="rounded-full bg-white px-3 py-1 font-semibold text-emerald-700">
+              {CREDIT_RATING_PACK.sources.length} منبع
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-700">
+          <label className="inline-flex cursor-pointer items-center gap-2">
+            <input
+              checked={packTopics}
+              className="h-4 w-4 accent-emerald-600"
+              onChange={(event) => setPackTopics(event.target.checked)}
+              type="checkbox"
+            />
+            افزودن موضوعات و فعال‌سازی فیلتر تمرکز
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-2">
+            <input
+              checked={packSources}
+              className="h-4 w-4 accent-emerald-600"
+              onChange={(event) => setPackSources(event.target.checked)}
+              type="checkbox"
+            />
+            افزودن منابع خبری داخلی (هر منبع قبل از ثبت تست می‌شود)
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-2">
+            <input
+              checked={packAudience}
+              className="h-4 w-4 accent-emerald-600"
+              onChange={(event) => setPackAudience(event.target.checked)}
+              type="checkbox"
+            />
+            افزودن زمینه «شرکت اعتبارسنجی» به پرامپت تحلیل
+          </label>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            disabled={packBusy || (!packTopics && !packSources && !packAudience)}
+            onClick={handleApplyPack}
+            type="button"
+          >
+            {packBusy ? "در حال اعمال و تست منابع…" : "اعمال بسته اعتبارسنجی"}
+          </button>
+          <span className="text-[11px] text-emerald-900/70">
+            موضوعات روی نسخه فعال پیکربندی AI اعمال می‌شوند (نسخه قبلی در تاریخچه می‌ماند).
+          </span>
+        </div>
+
+        {packResult ? (
+          <div
+            className={`mt-3 rounded-xl border px-4 py-3 text-xs leading-6 ${
+              packResult.success
+                ? "border-emerald-200 bg-white text-slate-700"
+                : "border-rose-200 bg-rose-50 text-rose-800"
+            }`}
+          >
+            {!packResult.success ? <p className="font-bold">{packResult.message ?? "اعمال بسته ناموفق بود."}</p> : null}
+
+            {packResult.topics ? (
+              <p>
+                <b>موضوعات:</b>{" "}
+                {packResult.topics.ok === false
+                  ? packResult.topics.message ?? "ناموفق"
+                  : packResult.topics.applied
+                    ? `${packResult.topics.added?.length ?? 0} موضوع اضافه شد، ${packResult.topics.skipped?.length ?? 0} مورد از قبل موجود بود${
+                        packResult.topics.truncated ? `، ${packResult.topics.truncated} مورد به سقف ۳۰ موضوع نرسید` : ""
+                      } (نسخه ${packResult.topics.version ?? "—"}).`
+                    : "همه موضوعات این بسته از قبل روی پیکربندی فعال وجود داشتند."}
+              </p>
+            ) : null}
+
+            {packResult.audienceNote ? (
+              <p>
+                <b>زمینه مخاطب:</b>{" "}
+                {packResult.audienceNote.applied
+                  ? "به پرامپت سیستم اضافه شد."
+                  : "از قبل در پرامپت وجود داشت."}
+              </p>
+            ) : null}
+
+            {packResult.sources ? (
+              <div>
+                <b>منابع:</b>{" "}
+                {packResult.sources.message
+                  ? packResult.sources.message
+                  : `${packResult.sources.added ?? 0} منبع جدید اضافه شد، ${packResult.sources.skipped ?? 0} از قبل موجود بود، ${packResult.sources.failed ?? 0} منبع در دسترس نبود.`}
+                {packResult.sources.results && packResult.sources.results.length > 0 ? (
+                  <ul className="mt-1 space-y-0.5">
+                    {packResult.sources.results.map((item) => (
+                      <li key={`${item.url}-${item.status}`} className="break-words">
+                        <span
+                          className={
+                            item.status === "added"
+                              ? "text-emerald-700"
+                              : item.status === "failed"
+                                ? "text-rose-700"
+                                : "text-slate-500"
+                          }
+                        >
+                          {item.status === "added" ? "✓" : item.status === "failed" ? "✕" : "•"} {item.name}
+                        </span>
+                        {item.status === "failed" && item.message ? ` — ${item.message}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+
+            {packResult.warnings?.map((warning) => (
+              <p className="mt-1 font-semibold text-amber-800" key={warning}>
+                ⚠ {warning}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

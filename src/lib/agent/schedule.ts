@@ -218,6 +218,31 @@ function addDaysToKey(dateKey: string, days: number): string {
   return `${shifted.getUTCFullYear()}-${pad2(shifted.getUTCMonth() + 1)}-${pad2(shifted.getUTCDate())}`;
 }
 
+/**
+ * Grace window that fits the configured cadence.
+ *
+ * A dense schedule (e.g. every 30 minutes) must not keep a missed older slot
+ * runnable for a full hour: at 09:05 both 08:30 (unrun) and 09:00 would match,
+ * and a tick where 09:00 already ran could still trigger a late 08:30 pass.
+ * Capping the window at the smallest gap between slots guarantees at most one
+ * runnable slot per cadence while keeping the generous 60-minute default for
+ * sparse schedules (one or two times a day).
+ */
+export function effectiveGraceMinutes(times: string[], fallback = SCHEDULE_GRACE_MINUTES): number {
+  const normalized = normalizeTimes(times);
+  if (normalized.length < 2) return fallback;
+
+  let minGap = 24 * 60;
+  for (let index = 0; index < normalized.length; index += 1) {
+    const current = timeToMinutes(normalized[index]);
+    const next =
+      index + 1 < normalized.length ? timeToMinutes(normalized[index + 1]) : timeToMinutes(normalized[0]) + 24 * 60;
+    minGap = Math.min(minGap, next - current);
+  }
+
+  return Math.max(1, Math.min(fallback, minGap));
+}
+
 export type DueSlot =
   | { due: true; slotKey: string; slotAt: Date; slotTime: string }
   | { due: false; reason: "disabled" | "no_times" | "not_due" | "already_ran"; nextRunAt: Date | null };
@@ -235,11 +260,12 @@ export function computeDueSlot(args: {
   graceMinutes?: number;
 }): DueSlot {
   const { now, config, lastRunSlot } = args;
-  const grace = args.graceMinutes ?? SCHEDULE_GRACE_MINUTES;
   const times = normalizeTimes(config.times);
 
   if (!config.enabled) return { due: false, reason: "disabled", nextRunAt: null };
   if (times.length === 0) return { due: false, reason: "no_times", nextRunAt: null };
+
+  const grace = args.graceMinutes ?? effectiveGraceMinutes(times);
 
   const parts = getZonedParts(now, config.timezone);
   const dateKey = dateKeyOf(parts);
