@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
+import { SchemaRepairCard } from "./schema-repair-card";
 
 type Health = "healthy" | "warning" | "failed" | "paused";
 
@@ -103,6 +104,13 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [pageMessage, setPageMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [loadFailure, setLoadFailure] = useState<{
+    message: string;
+    hint?: string;
+    detail?: string;
+    code?: string | null;
+    schemaMismatch?: boolean;
+  } | null>(null);
 
   const [form, setForm] = useState<FormState | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
@@ -132,15 +140,32 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         message?: string;
         detail?: string;
         hint?: string;
+        code?: string | null;
+        schemaMismatch?: boolean;
+        schemaSynced?: boolean;
       }>)
       .then((data) => {
         if (data.success) {
           setSources(data.sources ?? []);
           setRuns(data.runs ?? []);
+          if (data.schemaSynced) {
+            setPageMessage({ kind: "ok", text: "ساختار پایگاه داده به‌صورت خودکار همگام‌سازی شد." });
+          }
           // Functional update keeps `load`'s deps stable — a previous version
           // depended on `summary` state, which made every response re-trigger
           // the load effect (an endless fetch loop while the page stayed open).
           setSummary((prev) => data.summary ?? prev);
+          setLoadFailure(null);
+        } else if (data.schemaMismatch) {
+          // Missing table/column: show the error panel WITH the repair button
+          // instead of a one-line message the operator cannot act on.
+          setLoadFailure({
+            message: data.message ?? "بارگذاری منابع ناموفق بود.",
+            hint: data.hint,
+            detail: data.detail,
+            code: data.code,
+            schemaMismatch: true,
+          });
         } else {
           // Surface the real cause + actionable hint (never the old opaque error).
           const parts = [data.message ?? "بارگذاری منابع ناموفق بود."];
@@ -313,6 +338,21 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">منابع خبری</h1>
         <p className="mt-2 text-sm text-slate-500">افزودن، تست، فعال/غیرفعال کردن و دریافت دستی منابع RSS</p>
       </header>
+
+      {loadFailure ? (
+        <SchemaRepairCard
+          adminKey={adminKey}
+          code={loadFailure.code}
+          detail={loadFailure.detail}
+          hint={loadFailure.hint}
+          message={loadFailure.message}
+          onRepaired={() => {
+            setLoading(true);
+            void load();
+          }}
+          schemaMismatch={Boolean(loadFailure.schemaMismatch)}
+        />
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="کل منابع" value={summary.total} />

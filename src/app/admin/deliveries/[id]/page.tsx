@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { isNextProductionBuild } from "@/db";
 import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
 import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
+import { AdminPageErrorShell } from "@/components/admin/admin-page-error-shell";
 import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import { getDeliveryDetail } from "@/lib/delivery/publishing";
 import { publishStatusLabel, publishingStatusTone } from "@/lib/delivery/types";
 import { DeliveryActions } from "@/components/admin/delivery-actions";
@@ -45,7 +47,19 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
   }
 
   const clientKey = adminKeyForClient(access);
-  const detail = await getDeliveryDetail(resolvedParams.id);
+
+  const outcome = await runWithSchemaRepair(() => getDeliveryDetail(resolvedParams.id));
+  if (!outcome.ok) {
+    return (
+      <AdminPageErrorShell
+        adminKey={clientKey}
+        error={outcome.error}
+        message="بارگذاری جزئیات ارسال از پایگاه داده ناموفق بود."
+      />
+    );
+  }
+
+  const detail = outcome.value;
   if (!detail) notFound();
 
   const { delivery, article, analysis, events } = detail;

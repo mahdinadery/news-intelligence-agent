@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { isNextProductionBuild } from "@/db";
+import { AdminDbErrorPanel } from "@/components/admin/admin-db-error-panel";
 import { AdminGateScreen } from "@/components/admin/admin-gate-screen";
 import { AdminKeyQuerySync } from "@/components/admin/admin-key-query-sync";
 import { adminKeyForClient, getAdminPageAccess } from "@/lib/admin/page-access";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import { listAdminDeliveries } from "@/lib/delivery/publishing";
 import { publishStatusLabel, publishingStatusTone } from "@/lib/delivery/types";
 import { Sidebar } from "@/components/sidebar";
@@ -76,10 +78,26 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
 
   const clientKey = adminKeyForClient(access);
 
-  const { rows, total, page, totalPages, stats } = await listAdminDeliveries({
-    ...base,
-    page: Number(first(sp.page) ?? 1) || 1,
-  });
+  const outcome = await runWithSchemaRepair(() =>
+    listAdminDeliveries({
+      ...base,
+      page: Number(first(sp.page) ?? 1) || 1,
+    }),
+  );
+
+  if (!outcome.ok) {
+    return (
+      <Shell>
+        <AdminDbErrorPanel
+          adminKey={clientKey}
+          error={outcome.error}
+          message="بارگذاری فهرست ارسال‌ها از پایگاه داده ناموفق بود."
+        />
+      </Shell>
+    );
+  }
+
+  const { rows, total, page, totalPages, stats } = outcome.value;
 
   return (
     <Shell>

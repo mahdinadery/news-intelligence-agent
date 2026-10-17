@@ -1,10 +1,12 @@
 import { checkAdminAccess } from "@/lib/admin/access";
-import { diagnoseDbError } from "@/lib/admin/db-errors";
+import { dbErrorResponse } from "@/lib/admin/db-error-response";
+import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
 import { isAiConfigured, resolveEffectiveModel } from "@/lib/ai/client";
 import { createAiConfigVersion, getActiveAiConfig, validateAiConfigInput } from "@/lib/ai/config-service";
 import type { AiConfigInput } from "@/lib/ai/config-types";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 /**
  * GET /api/admin/ai-config
@@ -21,8 +23,12 @@ export async function GET(request: Request) {
     return Response.json({ success: false, message: access.reason }, { status: 401 });
   }
 
-  try {
-    const config = await getActiveAiConfig();
+  // If the database predates this table (typical on hosts that never run
+  // `db:ensure`, e.g. Vercel), repair the schema once and retry transparently.
+  const outcome = await runWithSchemaRepair(() => getActiveAiConfig());
+
+  if (outcome.ok) {
+    const config = outcome.value;
     return Response.json({
       success: true,
       config,
@@ -30,21 +36,19 @@ export async function GET(request: Request) {
       // model will actually be used given the config + env fallback chain.
       aiKeyConfigured: isAiConfigured(),
       effectiveModel: resolveEffectiveModel(config.model),
+      // Lets the UI confirm that it self-healed on this request.
+      schemaSynced: outcome.schemaSynced,
     });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.error("[ai-config] failed to load active config:", detail.slice(0, 200));
-    const diagnosis = diagnoseDbError(error);
-    return Response.json(
-      {
-        success: false,
-        message: "خطا در بارگذاری پیکربندی هوش مصنوعی از پایگاه داده.",
-        detail: diagnosis.detail,
-        hint: diagnosis.hint,
-      },
-      { status: diagnosis.status },
-    );
   }
+
+  console.error("[ai-config] failed to load active config:", String(outcome.error).slice(0, 200));
+  return dbErrorResponse(
+    outcome.error,
+    outcome.repair && !outcome.repair.ok
+      ? "خطا در بارگذاری پیکربندی هوش مصنوعی از پایگاه داده (همگام‌سازی خودکار اسکیما هم ناموفق بود)."
+      : "خطا در بارگذاری پیکربندی هوش مصنوعی از پایگاه داده.",
+    outcome.repair,
+  );
 }
 
 type SaveBody = AiConfigInput & { activate?: boolean };
@@ -90,27 +94,26 @@ export async function POST(request: Request) {
     return Response.json({ success: false, message: "پیکربندی نامعتبر است.", errors: validation.errors }, { status: 400 });
   }
 
-  try {
-    const activate = body.activate !== false;
-    const config = await createAiConfigVersion(input, { activate });
+  const activate = body.activate !== false;
+  const outcome = await runWithSchemaRepair(() => createAiConfigVersion(input, { activate }));
+
+  if (outcome.ok) {
+    const config = outcome.value;
     return Response.json({
       success: true,
       config,
       aiKeyConfigured: isAiConfigured(),
       effectiveModel: resolveEffectiveModel(config.model),
+      schemaSynced: outcome.schemaSynced,
     });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.error("[ai-config] failed to save config:", detail.slice(0, 200));
-    const diagnosis = diagnoseDbError(error);
-    return Response.json(
-      {
-        success: false,
-        message: "ذخیره پیکربندی در پایگاه داده ناموفق بود.",
-        detail: diagnosis.detail,
-        hint: diagnosis.hint,
-      },
-      { status: diagnosis.status },
-    );
   }
+
+  console.error("[ai-config] failed to save config:", String(outcome.error).slice(0, 200));
+  return dbErrorResponse(
+    outcome.error,
+    outcome.repair && !outcome.repair.ok
+      ? "ذخیره پیکربندی در پایگاه داده ناموفق بود (همگام‌سازی خودکار اسکیما هم ناموفق بود)."
+      : "ذخیره پیکربندی در پایگاه داده ناموفق بود.",
+    outcome.repair,
+  );
 }
