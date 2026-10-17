@@ -15,6 +15,38 @@ type BaleTestResponse = {
   detail?: string | null;
 };
 
+type BaleCheckStatus = "ok" | "warning" | "error" | "skipped";
+
+type BaleDiagnosticsResponse = {
+  success?: boolean;
+  ready: boolean;
+  checkedAt?: string;
+  chatIdMasked?: string | null;
+  deliveryMode?: string;
+  checks: Array<{
+    id: string;
+    title: string;
+    status: BaleCheckStatus;
+    detail?: string;
+    hint?: string;
+  }>;
+  message?: string;
+};
+
+const CHECK_LABELS: Record<BaleCheckStatus, string> = {
+  ok: "سالم",
+  warning: "هشدار",
+  error: "مشکل",
+  skipped: "بررسی نشد",
+};
+
+const CHECK_TONES: Record<BaleCheckStatus, string> = {
+  ok: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  warning: "bg-amber-50 text-amber-700 ring-amber-200",
+  error: "bg-rose-50 text-rose-700 ring-rose-200",
+  skipped: "bg-slate-100 text-slate-600 ring-slate-200",
+};
+
 const statusLabel: Record<BaleTestStatus, string> = {
   idle: "بررسی نشده",
   sending: "در حال بررسی...",
@@ -48,12 +80,16 @@ const configHint: Record<string, string> = {
 
 type BaleTestCardProps = {
   onTestComplete?: () => void;
+  adminKey?: string;
 };
 
-export function BaleTestCard({ onTestComplete }: BaleTestCardProps) {
+export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProps) {
   const [status, setStatus] = useState<BaleTestStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<BaleDiagnosticsResponse | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
 
   async function handleTest() {
     if (status === "sending") return;
@@ -99,6 +135,44 @@ export function BaleTestCard({ onTestComplete }: BaleTestCardProps) {
     }
   }
 
+  async function handleDiagnostics() {
+    if (diagnosing) return;
+
+    setDiagnosing(true);
+    setDiagnosticsError(null);
+
+    try {
+      const response = await fetch("/api/bale/diagnostics", {
+        cache: "no-store",
+        headers: adminKey ? { "x-admin-key": adminKey } : undefined,
+      });
+
+      let data: BaleDiagnosticsResponse | null = null;
+      try {
+        data = (await response.json()) as BaleDiagnosticsResponse;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok || !data?.success || !Array.isArray(data.checks) || data.checks.length === 0) {
+        setDiagnostics(null);
+        setDiagnosticsError(
+          response.status === 401
+            ? "برای بررسی کانال باید کلید مدیریتی وارد شده باشد (یک‌بار با ?key=... وارد شوید)."
+            : data?.message ?? `بررسی کانال ناموفق بود (HTTP ${response.status}).`,
+        );
+        return;
+      }
+
+      setDiagnostics(data);
+    } catch {
+      setDiagnostics(null);
+      setDiagnosticsError("ارتباط با سرور برقرار نشد.");
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
   return (
     <section
       aria-labelledby="bale-heading"
@@ -127,13 +201,21 @@ export function BaleTestCard({ onTestComplete }: BaleTestCardProps) {
             <h2 id="bale-heading" className="text-base font-bold text-slate-950">
               اتصال به بله
             </h2>
-            <p className="mt-1 text-sm text-slate-500">ارسال یک پیام آزمایشی برای بررسی اتصال</p>
+            <p className="mt-1 text-sm text-slate-500">ارسال پیام آزمایشی و بررسی دسترسی ربات به کانال</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-slate-500">وضعیت بله:</span>
           <StatusBadge tone={statusTone[status]}>{statusLabel[status]}</StatusBadge>
+          <button
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+            disabled={diagnosing}
+            onClick={handleDiagnostics}
+            type="button"
+          >
+            {diagnosing ? "در حال بررسی…" : "بررسی کانال"}
+          </button>
           <button
             className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
               status === "sending"
@@ -178,6 +260,55 @@ export function BaleTestCard({ onTestComplete }: BaleTestCardProps) {
           </p>
         ) : null}
       </div>
+
+      {diagnosticsError ? (
+        <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-6 text-rose-800">
+          {diagnosticsError}
+        </p>
+      ) : null}
+
+      {diagnostics ? (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-bold text-slate-800">نتیجهٔ بررسی کانال</p>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${
+                diagnostics.ready
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-rose-50 text-rose-700 ring-rose-200"
+              }`}
+            >
+              {diagnostics.ready ? "آمادهٔ ارسال" : "نیاز به اصلاح"}
+            </span>
+          </div>
+
+          <ul className="mt-3 space-y-2">
+            {diagnostics.checks.map((check) => (
+              <li className="rounded-lg border border-slate-200 bg-white px-3 py-2" key={check.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-700">{check.title}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${CHECK_TONES[check.status]}`}
+                  >
+                    {CHECK_LABELS[check.status]}
+                  </span>
+                </div>
+                {check.detail ? (
+                  <p className="mt-1 break-words text-[11px] leading-5 text-slate-500">{check.detail}</p>
+                ) : null}
+                {check.hint ? (
+                  <p className="mt-1 text-[11px] leading-5 text-amber-700">راهکار: {check.hint}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+
+          <p className="mt-3 text-[11px] leading-5 text-slate-400">
+            این بررسی پیامی ارسال نمی‌کند؛ برای تأیید نهایی «تست اتصال» را بزنید.
+            {diagnostics.chatIdMasked ? ` مقصد: ${diagnostics.chatIdMasked}` : ""}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }
