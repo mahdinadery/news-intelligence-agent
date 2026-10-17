@@ -51,12 +51,39 @@ test("low scores fail with explicit reasons", () => {
   assert.ok(check.reasons.includes("relevance_below_threshold"));
 });
 
-test("AI recommendation (shouldSend with importance>=40) passes despite low scores", () => {
+test("an AI recommendation can never bypass the score thresholds", () => {
+  // Regression: this used to pass through a `shouldSend === true && importance >= 40`
+  // shortcut, which is how important-but-irrelevant news reached the channel.
   const check = evaluateArticle(
     article({ importanceScore: 45, relevanceScore: 10, noveltyScore: 5, shouldSend: true }),
     rule(),
   );
-  assert.equal(check.matches, true);
+  assert.equal(check.matches, false);
+  assert.ok(check.reasons.includes("relevance_below_threshold"));
+});
+
+test("importance alone is not enough — relevance must pass too", () => {
+  const check = evaluateArticle(article({ importanceScore: 95, relevanceScore: 20 }), rule());
+  assert.equal(check.matches, false);
+  assert.deepEqual(check.reasons, ["relevance_below_threshold"]);
+});
+
+test("relevance alone is not enough — importance must pass too", () => {
+  const check = evaluateArticle(article({ importanceScore: 20, relevanceScore: 95 }), rule());
+  assert.equal(check.matches, false);
+  assert.deepEqual(check.reasons, ["importance_below_threshold"]);
+});
+
+test("all score reasons are reported at once so thresholds can be tuned", () => {
+  const check = evaluateArticle(
+    article({ importanceScore: 30, relevanceScore: 40, noveltyScore: 5 }),
+    rule({ minImportance: 50, minRelevance: 60, minNovelty: 10 }),
+  );
+  assert.deepEqual(check.reasons, [
+    "importance_below_threshold",
+    "relevance_below_threshold",
+    "novelty_below_threshold",
+  ]);
 });
 
 test("requireAiRecommendation blocks when AI said no", () => {
@@ -139,4 +166,5 @@ test("describeRule renders policy summary", () => {
   assert.ok(lines.some((line) => line.includes("روشن")));
   assert.ok(lines.some((line) => line.includes("اقتصاد")));
   assert.ok(lines.some((line) => line.includes("shouldSend")));
+  assert.ok(lines.some((line) => line.includes("AND")));
 });

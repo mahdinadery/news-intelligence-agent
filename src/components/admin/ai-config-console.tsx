@@ -40,6 +40,21 @@ const ALL_TOPIC_PRESETS = [
   ...CREDIT_RATING_PACK.topics.map((topic) => ({ label: topic.label, keywords: [...topic.keywords] })),
 ];
 
+/**
+ * Starter deny-list keywords: the kinds of news a credit-rating audience never
+ * wants. They apply in BOTH filter modes, before the AI stage.
+ */
+const BLOCKED_KEYWORD_PRESETS = [
+  "ورزش",
+  "فوتبال",
+  "لیگ برتر",
+  "سرگرمی",
+  "هنرمندان",
+  "سینما",
+  "حوادث",
+  "تصادف",
+];
+
 type Props = { adminKey: string };
 
 // These two fields are read directly by the existing analysis pipeline
@@ -449,19 +464,47 @@ export function AiConfigConsole({ adminKey }: Props) {
               value={draft.decisionRules.minNoveltyToSend}
             />
           </Field>
-          <Field label="آستانه کلی ارسال">
-            <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-              max={100}
-              min={0}
+          {(draft.decisionRules.combine ?? "all") === "any" ? (
+            <Field label="آستانه کلی ارسال (فقط حالت OR)">
+              <input
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                max={100}
+                min={0}
+                onChange={(event) =>
+                  setDraft({ ...draft, decisionRules: { ...draft.decisionRules, overallSendThreshold: Number(event.target.value) } })
+                }
+                type="number"
+                value={draft.decisionRules.overallSendThreshold}
+              />
+            </Field>
+          ) : null}
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="منطق ترکیب حد نصاب‌ها">
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
               onChange={(event) =>
-                setDraft({ ...draft, decisionRules: { ...draft.decisionRules, overallSendThreshold: Number(event.target.value) } })
+                setDraft({
+                  ...draft,
+                  decisionRules: {
+                    ...draft.decisionRules,
+                    combine: event.target.value === "any" ? "any" : "all",
+                  },
+                })
               }
-              type="number"
-              value={draft.decisionRules.overallSendThreshold}
-            />
+              value={draft.decisionRules.combine ?? "all"}
+            >
+              <option value="all">همهٔ شرط‌ها باید برقرار باشند (AND — پیشنهادی)</option>
+              <option value="any">کافی است یکی برقرار باشد (OR — رفتار قدیمی)</option>
+            </select>
           </Field>
         </div>
+        <p className="mt-2 text-xs leading-6 text-slate-500">
+          در حالت AND، اهمیت بالا هرگز جای مرتبط بودن پایین را نمی‌گیرد؛ خبری که به موضوعات شما مربوط نیست حتی اگر
+          بسیار مهم باشد توصیهٔ ارسال نمی‌گیرد. حالت OR فقط برای سازگاری با تنظیمات قدیمی نگه داشته شده و همان دلیلی
+          است که پیش‌تر خبرهای نامرتبط ارسال می‌شدند.
+        </p>
 
         <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
           <input
@@ -565,6 +608,61 @@ export function AiConfigConsole({ adminKey }: Props) {
               + {preset.label}
             </button>
           ))}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-rose-200/70 bg-rose-50/40 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="text-xs font-bold text-rose-800" htmlFor="blocked-keywords">
+              کلیدواژه‌های ممنوع (این خبرها هرگز ارسال نمی‌شوند)
+            </label>
+            <span className="text-[11px] text-rose-500">در هر دو حالت فیلتر اعمال می‌شود</span>
+          </div>
+          <textarea
+            className="mt-2 w-full resize-y rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm focus:border-rose-400 focus:outline-none"
+            id="blocked-keywords"
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                topicFilter: {
+                  ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER),
+                  blockedKeywords: event.target.value
+                    .split(/[,،\n]/)
+                    .map((keyword) => keyword.trim())
+                    .filter(Boolean),
+                },
+              })
+            }
+            placeholder="مثلاً: ورزش، فوتبال، سرگرمی، حوادث"
+            rows={2}
+            value={(draft.topicFilter?.blockedKeywords ?? []).join("، ")}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-medium text-rose-600">افزودن سریع:</span>
+            {BLOCKED_KEYWORD_PRESETS.map((keyword) => (
+              <button
+                className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-medium text-rose-700 transition-colors hover:bg-rose-50"
+                key={keyword}
+                onClick={() => {
+                  const current = draft.topicFilter?.blockedKeywords ?? [];
+                  if (current.includes(keyword)) return;
+                  setDraft({
+                    ...draft,
+                    topicFilter: {
+                      ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER),
+                      blockedKeywords: [...current, keyword],
+                    },
+                  });
+                }}
+                type="button"
+              >
+                + {keyword}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-rose-500">
+            خبری که یکی از این کلمات را در عنوان یا متن داشته باشد، پیش از تحلیل هوش مصنوعی کنار گذاشته می‌شود
+            (وضعیت «خارج از موضوع») و هیچ‌وقت ارسال نمی‌شود — حتی اگر موضوع دیگری را هم پوشش دهد.
+          </p>
         </div>
 
         <div className="mt-4 space-y-3">

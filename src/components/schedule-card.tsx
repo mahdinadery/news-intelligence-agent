@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildIntervalTimes, detectInterval, intervalLabel } from "@/lib/agent/interval-times";
+import { describeRejectionReasons } from "@/lib/agent/rejection-reasons";
 import { diagnoseRunSummary } from "@/lib/agent/run-diagnosis";
 import { StatusBadge } from "./status-badge";
 
@@ -38,6 +39,7 @@ type RunSummary = {
     skippedDuplicates: number;
     skippedReview: number;
     failed: number;
+    rejected?: Array<{ title: string; reasons: string[] }>;
   } | null;
   errors: string[];
 };
@@ -405,6 +407,25 @@ export function ScheduleCard({
             </ul>
           ) : null}
         </div>
+      ) : null}
+
+      {lastRun?.send?.rejected && lastRun.send.rejected.length > 0 ? (
+        <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-700">
+          <summary className="cursor-pointer font-bold">
+            چرا خبری ارسال نشد؟ ({lastRun.send.rejected.length} نمونه از خبرهای ردشده)
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {lastRun.send.rejected.map((item, index) => (
+              <li className="break-words" key={`${item.title}-${index}`}>
+                • <b>{item.title}</b> — {describeRejectionReasons(item.reasons)}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] leading-5 text-slate-400">
+            برای ارسال، همهٔ حد نصاب‌ها (اهمیت، مرتبط بودن و در صورت تنظیم تازگی) باید هم‌زمان برقرار باشند. حد
+            نصاب‌ها را در «تنظیمات پیشرفته» و کلیدواژه‌های ممنوع را در «پیکربندی AI» تنظیم کنید.
+          </p>
+        </details>
       ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">

@@ -61,13 +61,35 @@ export type TopicFilterOutcome =
   | { verdict: "pass"; reason: "filter_disabled" | "no_effective_topics"; matchedTopics: string[] }
   /** Explicit evaluation against configured topics. */
   | { verdict: "pass"; reason: "matched_topic" | "no_excluded_match"; matchedTopics: string[] }
-  | { verdict: "skip"; reason: "not_in_selected_topics" | "matched_excluded_topic"; matchedTopics: string[] };
+  | {
+      verdict: "skip";
+      reason: "not_in_selected_topics" | "matched_excluded_topic" | "matched_blocked_keyword";
+      matchedTopics: string[];
+      /** Only set for "matched_blocked_keyword" — the deny-list words that hit. */
+      blockedKeywords?: string[];
+    };
+
+/** Enabled topics that actually carry at least one usable keyword. */
+function effectiveTopics(filter: AiTopicFilterConfig): AiTopicRule[] {
+  return (filter.topics ?? []).filter((topic) => topic.enabled && topic.keywords.some((k) => normalizeForMatch(k)));
+}
+
+/** Non-empty deny-list keywords, trimmed for display (matching is normalized). */
+function effectiveBlockedKeywords(filter: AiTopicFilterConfig): string[] {
+  return (filter.blockedKeywords ?? []).map((keyword) => keyword.trim()).filter(Boolean);
+}
 
 /**
  * Evaluates one article against the topic filter.
  *
- * include mode: pass iff at least one enabled topic matches (OR across topics).
- * exclude mode: skip iff at least one enabled topic matches.
+ * Order of evaluation:
+ *   1. the deny-list (`blockedKeywords`) wins in BOTH modes — an article that
+ *      contains a blocked keyword is skipped even when it matches a topic;
+ *   2. include mode: pass iff at least one enabled topic matches (OR across topics);
+ *   3. exclude mode: skip iff at least one enabled topic matches.
+ *
+ * A deny-list-only configuration (no topics) is valid: everything passes unless
+ * a blocked keyword is found.
  */
 export function evaluateTopicFilter(
   article: TopicFilterArticle,
@@ -77,15 +99,22 @@ export function evaluateTopicFilter(
     return { verdict: "pass", reason: "filter_disabled", matchedTopics: [] };
   }
 
-  const effective = (filter.topics ?? []).filter((topic) => topic.enabled && topic.keywords.some((k) => normalizeForMatch(k)));
-  if (effective.length === 0) {
-    // Misconfiguration safety net: never drop news just because topics are empty.
+  const topics = effectiveTopics(filter);
+  const blocked = effectiveBlockedKeywords(filter);
+  if (topics.length === 0 && blocked.length === 0) {
+    // Misconfiguration safety net: never drop news just because nothing is configured.
     return { verdict: "pass", reason: "no_effective_topics", matchedTopics: [] };
   }
 
   const haystack = normalizeForMatch([article.title, article.description, article.content].filter(Boolean).join(" \u2000 "));
+
+  const blockedHits = blocked.filter((keyword) => haystack.includes(normalizeForMatch(keyword)));
+  if (blockedHits.length > 0) {
+    return { verdict: "skip", reason: "matched_blocked_keyword", matchedTopics: [], blockedKeywords: blockedHits };
+  }
+
   const matchedTopics: string[] = [];
-  for (const topic of effective) {
+  for (const topic of topics) {
     if (topicMatches(topic, haystack)) matchedTopics.push(topic.label.trim() || topic.id);
   }
 
@@ -97,6 +126,11 @@ export function evaluateTopicFilter(
       : { verdict: "pass", reason: "no_excluded_match", matchedTopics: [] };
   }
 
+  // Deny-list-only configuration: nothing to require, so unblocked wins pass.
+  if (topics.length === 0) {
+    return { verdict: "pass", reason: "no_excluded_match", matchedTopics: [] };
+  }
+
   return matched
     ? { verdict: "pass", reason: "matched_topic", matchedTopics }
     : { verdict: "skip", reason: "not_in_selected_topics", matchedTopics: [] };
@@ -105,28 +139,7 @@ export function evaluateTopicFilter(
 /** True when the filter would actually narrow anything (used to skip work entirely). */
 export function isTopicFilterActive(filter: AiTopicFilterConfig | null | undefined): boolean {
   if (!filter || !filter.enabled) return false;
-  return (filter.topics ?? []).some((topic) => topic.enabled && topic.keywords.some((k) => normalizeForMatch(k)));
-}
-
-/**
- * Human-readable focus description for the AI prompt, or null when the filter
- * is not active. Keeps the model aware of the operator's topic focus without
- * changing any of the existing analysis output fields.
- */
-export function describeTopicFocus(filter: AiTopicFilterConfig | null | undefined): string | null {
-  if (!filter || !filter.enabled) return null;
-  const effective = (filter.topics ?? []).filter((topic) => topic.enabled && topic.keywords.some((k) => normalizeForMatch(k)));
-  if (effective.length === 0) return null;
-
-  const lines = effective.map((topic) => {
-    const keywords = topic.keywords.map((k) => k.trim()).filter(Boolean).join("، ");
-    return keywords ? `- ${topic.label.trim() || topic.id}: ${keywords}` : `- ${topic.label.trim() || topic.id}`;
-  });
-
-  return [
-    `تمرکز موضوعی فعلی سامانه (حالت ${filter.mode === "exclude" ? "حذف موضوعات زیر" : "تمرکز روی موضوعات زیر"}):`,
-    ...lines,
-  ].join("\n");
+  return effectiveTopics(filter).length > 0 || effectiveBlockedKeywords(filter).length > 0;
 }
 
 /** Preset topic suggestions offered by the admin UI (labels + starter keywords). */

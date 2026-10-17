@@ -117,9 +117,16 @@ export type RuleCheck = {
 
 /**
  * Evaluates one analyzed article against the rule.
- * An analyzed article passes if:
- * 1) It explicitly has AI shouldSend=true OR meets minImportance & minRelevance scores,
- * 2) And matches any configured category filter.
+ *
+ * STRICT AND SEMANTICS — an article is sent only when every configured minimum
+ * is met (importance, relevance, and novelty when it is above zero) and the
+ * optional category/`shouldSend` restrictions pass.
+ *
+ * There is deliberately NO `shouldSend === true` shortcut: the previous
+ * implementation sent any AI-recommended article with importance >= 40 even
+ * when its relevance score was near zero, which is exactly how off-topic news
+ * reached the channel. A high importance score must never compensate for low
+ * relevance.
  */
 export function evaluateArticle(article: NewsRow, rule: AutoSendRule): RuleCheck {
   const reasons: string[] = [];
@@ -128,23 +135,18 @@ export function evaluateArticle(article: NewsRow, rule: AutoSendRule): RuleCheck
     return { matches: false, reasons: ["not_analyzed"] };
   }
 
-  // If requireAiRecommendation is explicitly enabled, require shouldSend===true
-  if (rule.requireAiRecommendation && article.shouldSend !== true) {
-    reasons.push("ai_no_recommendation");
-  }
-
   const importance = article.importanceScore ?? 0;
   const relevance = article.relevanceScore ?? 0;
   const novelty = article.noveltyScore ?? 0;
 
-  // If AI explicitly recommended sending (shouldSend = true), or scores meet thresholds
-  const meetsScores = importance >= rule.minImportance && relevance >= rule.minRelevance && novelty >= rule.minNovelty;
-  const aiRecommended = article.shouldSend === true && importance >= 40;
+  if (importance < rule.minImportance) reasons.push("importance_below_threshold");
+  if (relevance < rule.minRelevance) reasons.push("relevance_below_threshold");
+  if (novelty < rule.minNovelty) reasons.push("novelty_below_threshold");
 
-  if (!meetsScores && !aiRecommended) {
-    if (importance < rule.minImportance) reasons.push("importance_below_threshold");
-    if (relevance < rule.minRelevance) reasons.push("relevance_below_threshold");
-    if (novelty < rule.minNovelty) reasons.push("novelty_below_threshold");
+  // An explicit AI veto is only enforced when the operator opted in; otherwise
+  // the numeric thresholds above are the single source of truth.
+  if (rule.requireAiRecommendation && article.shouldSend !== true) {
+    reasons.push("ai_no_recommendation");
   }
 
   if (rule.categories && !rule.categories.includes((article.category ?? "").trim())) {
@@ -164,6 +166,7 @@ export function describeRule(rule: AutoSendRule): string[] {
     `مقصد خودکار: ${destinationLabel}`,
     `حداقل اهمیت: ${rule.minImportance}٪`,
     `حداقل مرتبط بودن: ${rule.minRelevance}٪`,
+    "منطق ارسال: همهٔ حد نصاب‌ها باید هم‌زمان برقرار باشند (AND)",
   ];
 
   if (rule.minNovelty > 0) lines.push(`حداقل تازگی: ${rule.minNovelty}٪`);
