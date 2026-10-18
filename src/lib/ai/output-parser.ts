@@ -19,9 +19,25 @@ export type ParsedAiOutput = {
   mainEvent: string | null;
   /** One-line "why it matters for the audience" — null when the model omitted it. */
   whyItMatters: string | null;
+  /** Persian names of banks/companies/institutions mentioned — null when omitted. */
+  entities: string[] | null;
   shouldSend: boolean;
   reason: string;
 };
+
+/** Normalizes an AI "entities" field (string[] or comma-separated string). */
+export function coerceEntities(value: unknown): string[] | null {
+  const raw: string[] = Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : typeof value === "string"
+      ? value.split(/[,،\n]/)
+      : [];
+  const cleaned = raw
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length >= 2 && entry.length <= 80)
+    .slice(0, 12);
+  return cleaned.length > 0 ? [...new Set(cleaned)] : null;
+}
 
 function clampScore(value: unknown, fallback = 0): number {
   const num = Number(value);
@@ -58,6 +74,7 @@ export function parseAiOutput(rawText: string, outputSchema: AiOutputSchema): Pa
     novelty: clampScore(parsed.novelty),
     mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
     whyItMatters: typeof parsed.whyItMatters === "string" && parsed.whyItMatters.trim() ? parsed.whyItMatters.trim() : null,
+    entities: coerceEntities(parsed.entities),
     shouldSend: Boolean(parsed.shouldSend),
     reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
   };
@@ -150,6 +167,7 @@ export function validateAiOutputAgainstSchema(
       novelty: clampScore(parsed.novelty),
       mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
       whyItMatters: typeof parsed.whyItMatters === "string" && parsed.whyItMatters.trim() ? parsed.whyItMatters.trim() : null,
+      entities: coerceEntities(parsed.entities),
       shouldSend: Boolean(parsed.shouldSend),
       reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
     },

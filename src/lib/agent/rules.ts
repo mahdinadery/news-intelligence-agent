@@ -10,6 +10,11 @@
  */
 
 import type { NewsRow } from "@/db/schema";
+
+// Mirrors CORROBORATION_BONUS in src/lib/news/corroboration.ts — kept inline on
+// purpose: this module is imported by the Node test runner, which cannot
+// resolve runtime `@/` imports (type-only imports are erased and fine).
+const CORROBORATION_BONUS = 10;
 import type { AiAutoSendPolicy } from "@/lib/ai/config-types";
 import type { DeliveryTarget } from "@/lib/delivery/types";
 
@@ -135,7 +140,17 @@ export function evaluateArticle(article: NewsRow, rule: AutoSendRule): RuleCheck
     return { matches: false, reasons: ["not_analyzed"] };
   }
 
-  const importance = article.importanceScore ?? 0;
+  // Phase 3 (#9): a "no" from the two-stage relevance grader is a hard veto —
+  // borderline relevance must never slip through on a high importance score.
+  if (article.relevanceGrade === "rejected") {
+    reasons.push("grader_rejected");
+    return { matches: false, reasons };
+  }
+
+  // Phase 3 (#10): multi-source confirmation gives a small importance bonus
+  // (relevance is NEVER touched — the AND rule stays strict).
+  const importance =
+    (article.importanceScore ?? 0) + ((article.corroborationCount ?? 0) >= 2 ? CORROBORATION_BONUS : 0);
   const relevance = article.relevanceScore ?? 0;
   const novelty = article.noveltyScore ?? 0;
 

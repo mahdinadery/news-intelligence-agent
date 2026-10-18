@@ -11,6 +11,7 @@ export const REJECTION_REASON_LABELS: Record<string, string> = {
   relevance_below_threshold: "مرتبط بودن کمتر از حد نصاب",
   novelty_below_threshold: "تازگی کمتر از حد نصاب",
   ai_no_recommendation: "هوش مصنوعی ارسال را توصیه نکرده است",
+  grader_rejected: "ارزیاب دوم: واقعاً مرتبط نیست (گریدر دومرحله‌ای)",
   category_excluded: "دستهٔ خبر در فهرست مجاز نیست",
   pending_manual_review: "در انتظار تأیید دستی است",
 };

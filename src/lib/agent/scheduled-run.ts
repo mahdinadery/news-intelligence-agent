@@ -167,6 +167,8 @@ async function sendBulletin(
       url: item.url,
       importanceScore: item.importanceScore,
       publishedAt: item.publishedAt,
+      corroborated: (item.corroborationCount ?? 0) >= 2,
+      entityTags: item.entityTags ?? [],
     })),
     generatedAt: new Date(),
     timezone: config.timezone,

@@ -24,8 +24,24 @@ function formatImportance(score: number | null): string {
   return `${clamped} از ۱۰۰ (${label})`;
 }
 
-export function buildNewsMessage(article: NewsRow): string {
+/**
+ * Optional Phase 3 extras (corroboration / entities / related stories) — the
+ * caller resolves them from the DB; this function stays pure and testable.
+ */
+export type MessageExtras = {
+  /** Distinct sources also carrying this event (multi-source confirmation). */
+  corroborationSources?: string[];
+  /** Persian entity names (banks/companies/institutions) from the AI output. */
+  entityTags?: string[];
+  /** Titles of previously delivered related stories (follow-ups). */
+  relatedTitles?: string[];
+};
+
+export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): string {
   const why = article.whyItMatters?.trim();
+  const entities = (extras.entityTags ?? article.entityTags ?? []).slice(0, 6).join("، ");
+  const others = (extras.corroborationSources ?? []).slice(0, 4).join("، ");
+  const related = (extras.relatedTitles ?? []).slice(0, 2);
   return [
     "📰 عنوان خبر",
     "",
@@ -34,6 +50,9 @@ export function buildNewsMessage(article: NewsRow): string {
     "خلاصه:",
     compact(article.summary, MAX_SUMMARY_LENGTH),
     ...(why ? ["", "چرا مهم است:", compact(why, 300)] : []),
+    ...(entities ? ["", "نهادها:", entities] : []),
+    ...(others ? ["", `تأییدشده توسط ${Math.max(2, (extras.corroborationSources ?? []).length + 1)} منبع: ${others}`] : []),
+    ...related.flatMap((title) => ["", "مرتبط با:", compact(title, 140)]),
     "",
     "دسته:",
     compact(article.category, 60),

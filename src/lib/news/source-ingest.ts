@@ -19,8 +19,9 @@ import { db } from "@/db";
 import { ingestionRuns, news, newsSources, type NewsSourceRow } from "@/db/schema";
 import { readActiveOperationalSettings } from "@/lib/ai/config-service";
 import type { AiTopicFilterConfig } from "@/lib/ai/config-types";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { canonicalizeUrl } from "./canonical-url";
+import { similarityKeyOf } from "./corroboration";
 import { normalizeContent, normalizeTitle } from "./normalize";
 import { fetchFeed, parseFeed, type NewsFetchResult, type NormalizedNews } from "./rss";
 import { evaluateTopicFilter, isTopicGateActive } from "./topic-filter";
@@ -169,6 +170,7 @@ function buildValues(candidate: Candidate, source: NewsSourceRow | null, default
     imageUrl: item.imageUrl,
     normalizedTitle: normalizeTitle(item.title),
     normalizedContent: normalizeContent(item.content, item.description),
+    similarityKey: similarityKeyOf(item.title) || null,
     fetchedAt: new Date(),
   };
 }
@@ -241,24 +243,88 @@ async function storeCandidates(
     }
   }
 
+  // Phase 3 (#10): every stored row (fresh/filtered/duplicate) participates in
+  // its event cluster — refresh the distinct-source counts for all of them.
+  await updateCorroborationCounts(
+    [...fresh, ...filtered, ...duplicateRefs.map((ref) => ref.candidate)].map(
+      (candidate) => similarityKeyOf(candidate.item.title),
+    ),
+  );
+
   return { created, filteredCreated, duplicateRowsStored, newArticleIds };
+}
+
+/**
+ * Phase 3 (#10): refresh `corroboration_count` for every recent row sharing a
+ * similarity key — the count is the number of DISTINCT sources carrying the
+ * event in the last 72h. Best-effort; a failure never blocks ingestion.
+ */
+async function updateCorroborationCounts(keys: string[]): Promise<void> {
+  const unique = [...new Set(keys.filter(Boolean))];
+  const windowStart = new Date(Date.now() - 72 * 60 * 60 * 1000);
+
+  for (const key of unique) {
+    try {
+      const rows = await db
+        .select({ id: news.id, source: news.source })
+        .from(news)
+        .where(and(eq(news.similarityKey, key), gte(news.createdAt, windowStart)));
+      if (rows.length < 2) continue;
+
+      const distinctSources = new Set(rows.map((row) => row.source)).size;
+      await db
+        .update(news)
+        .set({ corroborationCount: distinctSources, updatedAt: new Date() })
+        .where(inArray(news.id, rows.map((row) => row.id)));
+    } catch (error) {
+      console.error("[corroboration] update failed:", String(error).slice(0, 160));
+    }
+  }
 }
 
 /** Stage: split candidates into fresh items vs. matches of already-stored news. */
 async function partitionDuplicates(
   candidates: Candidate[],
+  sourceName: string,
 ): Promise<{
   fresh: Candidate[];
   duplicateRefs: Array<{ candidate: Candidate; originalId: string }>;
 }> {
   const { byCanonical, byExternalId } = await findExistingMatches(candidates);
+
+  // Phase 3 (#8): a re-fetch of the same story (same similarity key AND same
+  // source, within 48h) is a near-duplicate — better than title equality.
+  // The same key on a DIFFERENT source is corroboration, not a duplicate.
+  const bySimilarity = new Map<string, string>();
+  const keyed = candidates.filter((candidate) => similarityKeyOf(candidate.item.title));
+  for (let index = 0; index < keyed.length; index += CHUNK_SIZE) {
+    const chunk = keyed.slice(index, index + CHUNK_SIZE);
+    const keys = chunk.map((candidate) => similarityKeyOf(candidate.item.title));
+    const rows = await db
+      .select({ id: news.id, similarityKey: news.similarityKey })
+      .from(news)
+      .where(
+        and(
+          inArray(news.similarityKey, keys),
+          eq(news.source, sourceName),
+          gte(news.createdAt, new Date(Date.now() - 48 * 60 * 60 * 1000)),
+        ),
+      );
+    for (const row of rows) {
+      if (row.similarityKey && !bySimilarity.has(row.similarityKey)) {
+        bySimilarity.set(row.similarityKey, row.id);
+      }
+    }
+  }
+
   const fresh: Candidate[] = [];
   const duplicateRefs: Array<{ candidate: Candidate; originalId: string }> = [];
 
   for (const candidate of candidates) {
     const matchByCanonical = byCanonical.get(candidate.canonical);
     const matchByExternal = candidate.item.externalId ? byExternalId.get(candidate.item.externalId) : undefined;
-    const originalId = matchByCanonical ?? matchByExternal;
+    const matchBySimilarity = bySimilarity.get(similarityKeyOf(candidate.item.title));
+    const originalId = matchByCanonical ?? matchByExternal ?? matchBySimilarity;
 
     if (originalId) {
       duplicateRefs.push({ candidate, originalId });
@@ -294,7 +360,7 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
 
   try {
     const candidates = dedupeWithinBatch(toCandidates(fetched.items, source.maxItemsPerFetch));
-    const { fresh, duplicateRefs } = await partitionDuplicates(candidates);
+    const { fresh, duplicateRefs } = await partitionDuplicates(candidates, source.name);
 
     // Cheap topic gate BEFORE anything AI-related: filtered rows are stored as
     // SKIPPED_OFFTOPIC and excluded from newArticleIds (the AI work queue).
@@ -469,7 +535,7 @@ export async function ingestSearchItems(
   sourceName: string,
 ): Promise<PipelineReport> {
   const candidates = dedupeWithinBatch(toCandidates(items, Math.max(items.length, 1)));
-  const { fresh, duplicateRefs } = await partitionDuplicates(candidates);
+  const { fresh, duplicateRefs } = await partitionDuplicates(candidates, sourceName);
 
   // Same cheap topic gate as feeds — search results can be off-topic noise.
   const topicFilter = await loadTopicFilter();
