@@ -244,6 +244,31 @@ async function storeCandidates(
   return { created, filteredCreated, duplicateRowsStored, newArticleIds };
 }
 
+/** Stage: split candidates into fresh items vs. matches of already-stored news. */
+async function partitionDuplicates(
+  candidates: Candidate[],
+): Promise<{
+  fresh: Candidate[];
+  duplicateRefs: Array<{ candidate: Candidate; originalId: string }>;
+}> {
+  const { byCanonical, byExternalId } = await findExistingMatches(candidates);
+  const fresh: Candidate[] = [];
+  const duplicateRefs: Array<{ candidate: Candidate; originalId: string }> = [];
+
+  for (const candidate of candidates) {
+    const matchByCanonical = byCanonical.get(candidate.canonical);
+    const matchByExternal = candidate.item.externalId ? byExternalId.get(candidate.item.externalId) : undefined;
+    const originalId = matchByCanonical ?? matchByExternal;
+
+    if (originalId) {
+      duplicateRefs.push({ candidate, originalId });
+    } else {
+      fresh.push(candidate);
+    }
+  }
+  return { fresh, duplicateRefs };
+}
+
 /**
  * Full ingestion for one registered source, with run log + health updates.
  * Never throws; the returned report doubles as the "Fetch Now" result summary.
@@ -269,22 +294,7 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
 
   try {
     const candidates = dedupeWithinBatch(toCandidates(fetched.items, source.maxItemsPerFetch));
-    const { byCanonical, byExternalId } = await findExistingMatches(candidates);
-
-    const fresh: Candidate[] = [];
-    const duplicateRefs: Array<{ candidate: Candidate; originalId: string }> = [];
-
-    for (const candidate of candidates) {
-      const matchByCanonical = byCanonical.get(candidate.canonical);
-      const matchByExternal = candidate.item.externalId ? byExternalId.get(candidate.item.externalId) : undefined;
-      const originalId = matchByCanonical ?? matchByExternal;
-
-      if (originalId) {
-        duplicateRefs.push({ candidate, originalId });
-      } else {
-        fresh.push(candidate);
-      }
-    }
+    const { fresh, duplicateRefs } = await partitionDuplicates(candidates);
 
     // Cheap topic gate BEFORE anything AI-related: filtered rows are stored as
     // SKIPPED_OFFTOPIC and excluded from newArticleIds (the AI work queue).
@@ -314,7 +324,7 @@ export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineR
       null,
       null,
     );
-    await updateSourceAfterSuccess(source.id, itemsFound, created + filteredCreated, duplicates);
+    await updateSourceAfterSuccess(source.id, itemsFound, created + filteredCreated, duplicates, newestPublishedAtOf(fetched.items));
 
     return {
       ok: true,
@@ -394,7 +404,13 @@ export async function ingestViaPipeline(): Promise<
         null,
         null,
       );
-      await updateSourceAfterSuccess(matchingSource.id, fetched.items.length, created + filteredCreated, duplicates);
+      await updateSourceAfterSuccess(
+        matchingSource.id,
+        fetched.items.length,
+        created + filteredCreated,
+        duplicates,
+        newestPublishedAtOf(fetched.items),
+      );
     }
 
     return {
@@ -441,6 +457,44 @@ export async function testFeedWithoutStoring(url: string, maxItems = 5): Promise
  * legacy env source so nothing regresses. Keeps the single-source response
  * shape (totals) while the per-source detail rides along in `bySource`.
  */
+/**
+ * Ingests search results (coverage-gap search) exactly like a feed fetch:
+ * canonical dedupe against ALL stored news, then the topic gate, then store.
+ * `sourceId` stays null and the `source` label is the fixed search label.
+ * No ingestion_runs row is written (there is no registered source to attach
+ * it to) — the scheduled-run summary reports the counts instead.
+ */
+export async function ingestSearchItems(
+  items: NormalizedNews[],
+  sourceName: string,
+): Promise<PipelineReport> {
+  const candidates = dedupeWithinBatch(toCandidates(items, Math.max(items.length, 1)));
+  const { fresh, duplicateRefs } = await partitionDuplicates(candidates);
+
+  // Same cheap topic gate as feeds — search results can be off-topic noise.
+  const topicFilter = await loadTopicFilter();
+  const { pass, skip } = partitionByTopic(fresh, topicFilter);
+
+  const { created, filteredCreated, newArticleIds } = await storeCandidates(
+    pass,
+    duplicateRefs,
+    skip,
+    null,
+    { sourceName },
+  );
+
+  return {
+    ok: true,
+    itemsFound: items.length,
+    itemsCreated: created,
+    itemsFiltered: filteredCreated,
+    newArticleIds,
+    duplicates: Math.max(candidates.length - created - filteredCreated, 0),
+    skippedMalformed: 0,
+    feedSourceName: sourceName,
+  };
+}
+
 export async function ingestAllActiveSources(): Promise<
   | {
       ok: true;
@@ -709,7 +763,24 @@ async function recordRun(
   }
 }
 
-async function updateSourceAfterSuccess(sourceId: string, itemsFound: number, created: number, duplicates: number): Promise<void> {
+/** Newest `publishedAt` in a fetched batch, or null when the feed carries none. */
+function newestPublishedAtOf(items: Array<{ publishedAt: Date | null }>): Date | null {
+  let newest: Date | null = null;
+  for (const item of items) {
+    if (item.publishedAt && (!newest || item.publishedAt.getTime() > newest.getTime())) {
+      newest = item.publishedAt;
+    }
+  }
+  return newest;
+}
+
+async function updateSourceAfterSuccess(
+  sourceId: string,
+  itemsFound: number,
+  created: number,
+  duplicates: number,
+  newestPublishedAt: Date | null = null,
+): Promise<void> {
   const now = new Date();
   try {
     await db
@@ -718,6 +789,11 @@ async function updateSourceAfterSuccess(sourceId: string, itemsFound: number, cr
         lastSuccessAt: now,
         lastAttemptAt: now,
         lastError: null,
+        // Feed-health snapshot of THIS fetch (Phase 1): zero items or a very old
+        // newest item means "reachable but dead feed" — computeSourceHealth
+        // downgrades these to a warning even though the HTTP fetch succeeded.
+        lastItemCount: itemsFound,
+        lastNewestPublishedAt: newestPublishedAt,
         // Cumulative counters, computed in SQL so concurrent paths cannot clobber each other.
         totalFetched: sql`${newsSources.totalFetched} + ${itemsFound}`,
         totalAccepted: sql`${newsSources.totalAccepted} + ${created}`,

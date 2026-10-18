@@ -49,6 +49,13 @@ export type AgentScheduleConfig = {
   maxAnalyze: number;
   /** Upper bound of articles sent in one scheduled run. */
   maxSend: number;
+  /**
+   * Coverage-gap search: when a pass has nothing to send, search news feeds for
+   * the coverage topics and push the results through the normal pipeline.
+   */
+  gapSearchEnabled: boolean;
+  /** Manual search queries (newline-separated in the UI). null => derive from topics. */
+  gapSearchQueries: string[] | null;
 };
 
 export type ScheduleIngestSummary = {
@@ -87,6 +94,19 @@ export type ScheduleSendSummary = {
   rejected?: ScheduleSendRejection[];
 };
 
+/** Result of the optional coverage-gap search phase of one pass. */
+export type ScheduleGapSummary = {
+  ran: boolean;
+  /** Why it did not run ("already_sent" | "cooldown" | "no_queries" | "all_fetches_failed"), null on success. */
+  reason: string | null;
+  /** Root-cause detail when the phase failed. */
+  detail?: string;
+  queries: string[];
+  found: number;
+  analyzed: number;
+  sent: number;
+};
+
 /** Result of one scheduled (or manually forced) full pass, stored on the row. */
 export type AgentRunSummary = {
   ok: boolean;
@@ -98,6 +118,8 @@ export type AgentRunSummary = {
   ingest: ScheduleIngestSummary | null;
   analysis: ScheduleAnalysisSummary | null;
   send: ScheduleSendSummary | null;
+  /** Present when the coverage-gap search feature is enabled. */
+  gapSearch?: ScheduleGapSummary | null;
   errors: string[];
 };
 
@@ -112,6 +134,8 @@ export const DEFAULT_AGENT_SCHEDULE: AgentScheduleConfig = {
   requireAiRecommendation: false,
   maxAnalyze: 8,
   maxSend: 10,
+  gapSearchEnabled: false,
+  gapSearchQueries: null,
 };
 
 export type TimeParts = {
@@ -387,7 +411,23 @@ export function coerceScheduleConfig(raw: Record<string, unknown> | null | undef
     ),
     maxAnalyze: clampInt(source.maxAnalyze, DEFAULT_AGENT_SCHEDULE.maxAnalyze, 1, 30),
     maxSend: clampInt(source.maxSend, DEFAULT_AGENT_SCHEDULE.maxSend, 1, 50),
+    gapSearchEnabled: readBool(source.gapSearchEnabled, DEFAULT_AGENT_SCHEDULE.gapSearchEnabled),
+    gapSearchQueries: coerceGapQueries(source.gapSearchQueries),
   };
+}
+
+/** Accepts a JSON array or a newline-separated string of manual search queries. */
+function coerceGapQueries(value: unknown): string[] | null {
+  const raw: string[] = Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : typeof value === "string"
+      ? value.split(/\r?\n/)
+      : [];
+  const cleaned = raw
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.length <= 200)
+    .slice(0, 5);
+  return cleaned.length > 0 ? cleaned : null;
 }
 
 export type ScheduleValidation =

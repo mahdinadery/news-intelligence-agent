@@ -54,6 +54,11 @@ export const newsSources = pgTable(
     totalFetched: integer("total_fetched").notNull().default(0),
     totalAccepted: integer("total_accepted").notNull().default(0),
     totalDuplicates: integer("total_duplicates").notNull().default(0),
+    // Health snapshot of the LAST successful fetch (Phase 1 feed health):
+    // "200 OK with zero items" and "feed of month-old news" are both unhealthy
+    // even though the fetch itself succeeded.
+    lastItemCount: integer("last_item_count"),
+    lastNewestPublishedAt: timestamp("last_newest_published_at", { withTimezone: true, mode: "date" }),
 
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -117,6 +122,8 @@ export const news = pgTable(
     analysisReason: text("analysis_reason"),
     analyzedAt: timestamp("analyzed_at", { withTimezone: true, mode: "date" }),
     mainEvent: text("main_event"),
+    /** One-line "why this matters for the audience" (Phase 1). Nullable until analyzed. */
+    whyItMatters: text("why_it_matters"),
     // Snapshot of which AI config version produced the current analysis.
     aiConfigVersion: integer("ai_config_version"),
   },
@@ -158,6 +165,7 @@ export const aiAnalyses = pgTable(
     relevance: integer("relevance"),
     novelty: integer("novelty"),
     mainEvent: text("main_event"),
+    whyItMatters: text("why_it_matters"),
     shouldSend: boolean("should_send"),
     reason: text("reason"),
     errorMessage: text("error_message"),
@@ -349,6 +357,12 @@ export const agentSchedules = pgTable("agent_schedules", {
   lastRunAt: timestamp("last_run_at", { withTimezone: true, mode: "date" }),
   lastRunSlot: text("last_run_slot"),
   lastResult: jsonb("last_result").$type<AgentRunSummary | null>(),
+  // Targeted coverage-gap search (Phase 1): when a pass finds nothing to send,
+  // search the web for the configured topic keywords and feed results through
+  // the same gate. `lastGapSearchAt` implements the cooldown between searches.
+  gapSearchEnabled: boolean("gap_search_enabled").notNull().default(false),
+  gapSearchQueries: jsonb("gap_search_queries").notNull().$type<string[]>().default(sql`'[]'::jsonb`),
+  lastGapSearchAt: timestamp("last_gap_search_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });

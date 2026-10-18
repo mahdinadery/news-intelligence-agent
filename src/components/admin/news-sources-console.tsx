@@ -25,7 +25,10 @@ type SourceView = {
   totalFetched: number;
   totalAccepted: number;
   totalDuplicates: number;
+  lastItemCount: number | null;
+  lastNewestPublishedAt: string | null;
   health: Health;
+  healthDetail: string | null;
 };
 
 type RunView = {
@@ -150,6 +153,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [fetchReports, setFetchReports] = useState<Record<string, string>>({});
+  const [probeBusy, setProbeBusy] = useState(false);
 
   // Manual RSS/XML import (for geo-blocked Iranian hosts)
   const [importOpen, setImportOpen] = useState(false);
@@ -222,6 +226,33 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         setLoading(false);
       });
   }, [headers]);
+
+  const handleProbeAll = useCallback(() => {
+    setProbeBusy(true);
+    setPageMessage(null);
+    fetch("/api/admin/news-sources/probe", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({}),
+    })
+      .then((res) => res.json() as Promise<{ success: boolean; summary?: { total: number; ok: number; failed: number }; message?: string }>)
+      .then((data) => {
+        if (data.success && data.summary) {
+          const { total, ok, failed } = data.summary;
+          setPageMessage({
+            kind: failed > 0 ? "err" : "ok",
+            text: `بررسی سلامت ${total} فید: ${ok} سالم${failed > 0 ? `، ${failed} ناسالم (جزئیات در ستون «سلامت»)}` : ""}.`,
+          });
+        } else {
+          setPageMessage({ kind: "err", text: data.message ?? "بررسی سلامت فیدها ناموفق بود." });
+        }
+      })
+      .catch(() => setPageMessage({ kind: "err", text: "بررسی سلامت فیدها ناموفق بود." }))
+      .finally(() => {
+        setProbeBusy(false);
+        void load();
+      });
+  }, [headers, load]);
 
   useEffect(() => {
     void load();
@@ -422,6 +453,20 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           schemaMismatch={Boolean(loadFailure.schemaMismatch)}
         />
       ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-500">
+          بررسی سلامت، فید هر منبع را بی‌آنکه خبری ذخیره شود می‌گیرد و وضعیت «سالم/خالی/کهنه/ناسالم» را به‌روز می‌کند.
+        </p>
+        <button
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          disabled={probeBusy}
+          onClick={handleProbeAll}
+          type="button"
+        >
+          {probeBusy ? "در حال بررسی..." : "بررسی سلامت فیدها"}
+        </button>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="کل منابع" value={summary.total} />
@@ -746,6 +791,15 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
                   </td>
                   <td className="p-3">
                     <StatusBadge tone={HEALTH_TONE[source.health]}>{HEALTH_LABEL[source.health]}</StatusBadge>
+                    {source.healthDetail ? (
+                      <p className="mt-1 max-w-[220px] text-[11px] leading-5 text-amber-600">{source.healthDetail}</p>
+                    ) : null}
+                    {source.lastItemCount !== null ? (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        آخرین دریافت: {source.lastItemCount} آیتم
+                        {source.lastNewestPublishedAt ? ` · تازه‌ترین خبر: ${formatTime(source.lastNewestPublishedAt)}` : ""}
+                      </p>
+                    ) : null}
                     {source.errorCount > 0 ? <p className="mt-1 text-[11px] text-rose-500">خطاهای متوالی/کل: {source.errorCount}</p> : null}
                     {source.lastError ? (
                       <p className="mt-1 max-w-[220px] truncate text-[11px] text-slate-400" title={source.lastError}>

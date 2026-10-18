@@ -25,6 +25,7 @@ function formatImportance(score: number | null): string {
 }
 
 export function buildNewsMessage(article: NewsRow): string {
+  const why = article.whyItMatters?.trim();
   return [
     "📰 عنوان خبر",
     "",
@@ -32,6 +33,7 @@ export function buildNewsMessage(article: NewsRow): string {
     "",
     "خلاصه:",
     compact(article.summary, MAX_SUMMARY_LENGTH),
+    ...(why ? ["", "چرا مهم است:", compact(why, 300)] : []),
     "",
     "دسته:",
     compact(article.category, 60),

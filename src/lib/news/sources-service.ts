@@ -65,6 +65,9 @@ export function validateSourceInput(input: Partial<SourceInput>): SourceValidati
   };
 }
 
+/** A feed whose newest item is older than this is "reachable but dead". */
+const STALE_CONTENT_MS = 72 * 60 * 60 * 1000;
+
 export function computeSourceHealth(source: NewsSourceRow, now = Date.now()): SourceHealth {
   if (!source.active) return "paused";
 
@@ -81,7 +84,56 @@ export function computeSourceHealth(source: NewsSourceRow, now = Date.now()): So
   const lastAttemptFailed = Boolean(source.lastAttemptAt && source.lastAttemptAt.getTime() > source.lastSuccessAt.getTime());
   if (sinceSuccess > staleMs || lastAttemptFailed) return "warning";
 
+  // "200 OK" is not enough: an empty feed or one whose newest item is days old
+  // never produces news, so it must show up as unhealthy (Phase 1 feed health).
+  if (source.lastItemCount === 0) return "warning";
+  if (source.lastNewestPublishedAt && now - source.lastNewestPublishedAt.getTime() > STALE_CONTENT_MS) return "warning";
+
   return "healthy";
+}
+
+function relativeTime(from: Date, now: number): string {
+  const minutes = Math.max(0, Math.round((now - from.getTime()) / 60_000));
+  if (minutes < 60) return `${minutes} دقیقه پیش`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} ساعت پیش`;
+  return `${Math.round(hours / 24)} روز پیش`;
+}
+
+/**
+ * Human-readable Persian reason for the health badge (null when healthy), so
+ * the operator knows WHAT to fix — not just that something is off.
+ */
+export function computeSourceHealthDetail(source: NewsSourceRow, now = Date.now()): string | null {
+  const health = computeSourceHealth(source, now);
+  if (health === "paused") return "منبع غیرفعال است.";
+  if (!source.active) return null;
+
+  if (!source.lastSuccessAt) {
+    return source.lastAttemptAt
+      ? `هرگز با موفقیت دریافت نشده است. آخرین خطا: ${source.lastError ?? "نامشخص"}`
+      : "هنوز هیچ دریافتی انجام نشده است.";
+  }
+
+  const sinceSuccess = now - source.lastSuccessAt.getTime();
+  const staleMs = Math.max(source.fetchIntervalMinutes, 30) * 60_000 * 3;
+  if (sinceSuccess > staleMs * 4) {
+    return `آخرین دریافت موفق ${relativeTime(source.lastSuccessAt, now)} بوده است${source.lastError ? `؛ آخرین خطا: ${source.lastError}` : ""}`;
+  }
+  const lastAttemptFailed = Boolean(source.lastAttemptAt && source.lastAttemptAt.getTime() > source.lastSuccessAt.getTime());
+  if (lastAttemptFailed) {
+    return `آخرین تلاش ناموفق بود: ${source.lastError ?? "نامشخص"}`;
+  }
+  if (sinceSuccess > staleMs) {
+    return `آخرین دریافت موفق ${relativeTime(source.lastSuccessAt, now)} بوده است.`;
+  }
+  if (source.lastItemCount === 0) {
+    return "فید پاسخ داد اما هیچ آیتمی نداشت (فید خالی).";
+  }
+  if (source.lastNewestPublishedAt && now - source.lastNewestPublishedAt.getTime() > STALE_CONTENT_MS) {
+    return `تازه‌ترین خبر فید ${relativeTime(source.lastNewestPublishedAt, now)} منتشر شده است (فید کهنه).`;
+  }
+  return null;
 }
 
 export type AdminSourceView = {
@@ -102,7 +154,13 @@ export type AdminSourceView = {
   totalFetched: number;
   totalAccepted: number;
   totalDuplicates: number;
+  /** Items parsed in the last successful fetch (null = never recorded). */
+  lastItemCount: number | null;
+  /** Newest publishedAt seen in the last successful fetch. */
+  lastNewestPublishedAt: string | null;
   health: SourceHealth;
+  /** Persian explanation of a non-healthy state, null when healthy. */
+  healthDetail: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -126,7 +184,10 @@ function toView(source: NewsSourceRow): AdminSourceView {
     totalFetched: source.totalFetched,
     totalAccepted: source.totalAccepted,
     totalDuplicates: source.totalDuplicates,
+    lastItemCount: source.lastItemCount ?? null,
+    lastNewestPublishedAt: source.lastNewestPublishedAt ? source.lastNewestPublishedAt.toISOString() : null,
     health: computeSourceHealth(source),
+    healthDetail: computeSourceHealthDetail(source),
     createdAt: source.createdAt.toISOString(),
     updatedAt: source.updatedAt.toISOString(),
   };

@@ -11,7 +11,8 @@
  */
 
 import { db } from "@/db";
-import { deliveries, news } from "@/db/schema";
+import { agentSchedules, deliveries, news } from "@/db/schema";
+import { readActiveOperationalSettings } from "@/lib/ai/config-service";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { expandTargets } from "@/lib/delivery/types";
 import {
@@ -20,17 +21,21 @@ import {
   recoverStaleProcessing,
   selectAnalysisBacklog,
 } from "@/lib/news/analysis-queue";
-import { ingestAllActiveSources } from "@/lib/news/source-ingest";
-import { and, desc, eq, inArray, isNotNull, notExists, sql } from "drizzle-orm";
+import { deriveGapQueries, buildSearchUrl, MAX_GAP_QUERIES } from "@/lib/news/gap-search";
+import { fetchFeed, type NormalizedNews } from "@/lib/news/rss";
+import { ingestAllActiveSources, ingestSearchItems } from "@/lib/news/source-ingest";
+import { and, asc, desc, eq, inArray, isNotNull, notExists, sql } from "drizzle-orm";
 import { runAutoDeliveryPass } from "./index";
 import type { AutoSendRule } from "./rules";
 import type {
   AgentRunSummary,
   AgentScheduleConfig,
   ScheduleAnalysisSummary,
+  ScheduleGapSummary,
   ScheduleIngestSummary,
   ScheduleSendSummary,
 } from "./schedule";
+import { markGapSearchRun } from "./schedule-store";
 
 /** Root-cause-first, secret-free text (drizzle hides the real error in `cause`). */
 function errorText(error: unknown): string {
@@ -87,6 +92,110 @@ export async function selectSendCandidates(
     .limit(config.maxSend);
 
   return rows.map((row) => row.id);
+}
+
+/** Gap-search runs at most this often (the operator's target cadence is ~30min). */
+const GAP_SEARCH_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+
+/** Upper bound of gap items stored/analyzed per run. */
+const GAP_SEARCH_MAX_ITEMS = 5;
+
+/**
+ * Coverage-gap search phase (roadmap Phase 1 #2). Runs ONLY when the pass sent
+ * nothing, so it can never crowd out real coverage. Best-effort by design:
+ * failures are summarized, never thrown at the pass.
+ */
+async function runGapSearchPhase(
+  config: AgentScheduleConfig,
+  alreadySent: number,
+): Promise<ScheduleGapSummary> {
+  const base: ScheduleGapSummary = {
+    ran: false,
+    reason: null,
+    queries: [],
+    found: 0,
+    analyzed: 0,
+    sent: 0,
+  };
+
+  if (alreadySent > 0) return { ...base, reason: "already_sent" };
+
+  try {
+    // Cooldown against the singleton row, so back-to-back manual runs don't
+    // hammer the search provider.
+    const [row] = await db
+      .select({ at: agentSchedules.lastGapSearchAt })
+      .from(agentSchedules)
+      .orderBy(asc(agentSchedules.createdAt))
+      .limit(1);
+    const lastAt = row?.at ? new Date(row.at).getTime() : 0;
+    if (lastAt > 0 && Date.now() - lastAt < GAP_SEARCH_COOLDOWN_MS) {
+      return { ...base, reason: "cooldown" };
+    }
+
+    const settings = await readActiveOperationalSettings();
+    const coverageKeywords =
+      settings?.topicFilter?.topics
+        ?.filter((topic) => topic.enabled)
+        .flatMap((topic) => topic.keywords) ?? [];
+    const queries = deriveGapQueries(coverageKeywords, config.gapSearchQueries, MAX_GAP_QUERIES);
+    if (queries.length === 0) return { ...base, reason: "no_queries" };
+
+    const template = process.env.NEWS_SEARCH_URL_TEMPLATE?.trim() || null;
+    const collected: NormalizedNews[] = [];
+    let successfulFetches = 0;
+
+    for (const query of queries) {
+      try {
+        const result = await fetchFeed(buildSearchUrl(query, template));
+        if (result.ok) {
+          successfulFetches += 1;
+          collected.push(...result.items);
+        }
+      } catch {
+        // One broken provider response must not stop the other queries.
+      }
+    }
+
+    if (successfulFetches === 0) {
+      await markGapSearchRun();
+      return { ...base, reason: "all_fetches_failed", queries };
+    }
+
+    const limited = collected.slice(0, GAP_SEARCH_MAX_ITEMS);
+    const report = await ingestSearchItems(limited, "جست‌وجوی هدفمند");
+
+    let analyzed = 0;
+    let sent = 0;
+    if (report.newArticleIds.length > 0) {
+      // The topic gate already ran at store time; analyze only the fresh gap
+      // items, then deliver with the SAME strict rule as the scheduled pass.
+      const results = await analyzeSequentially(report.newArticleIds.slice(0, GAP_SEARCH_MAX_ITEMS));
+      analyzed = results.filter((item) => item.ok).length;
+
+      const candidates = await selectSendCandidates(config);
+      const gapCandidates = candidates.filter((id) => report.newArticleIds.includes(id));
+      if (gapCandidates.length > 0) {
+        const delivery = await runAutoDeliveryPass({
+          newsIds: gapCandidates,
+          rule: scheduleToRule(config),
+        });
+        sent = delivery.sent;
+      }
+    }
+
+    await markGapSearchRun();
+    return {
+      ran: true,
+      reason: null,
+      queries,
+      found: report.itemsFound,
+      analyzed,
+      sent,
+    };
+  } catch (error) {
+    return { ...base, reason: "all_fetches_failed", detail: errorText(error) };
+  }
 }
 
 let activeRun = false;
@@ -220,6 +329,25 @@ async function executeScheduledPass(args: {
     errors.push(`ارسال خودکار: ${detail}`);
   }
 
+  // 4) Coverage-gap search — only when this pass sent nothing and the feature
+  //    is enabled. Feeds its results through the same analyze + strict send.
+  let gapSearch: ScheduleGapSummary | null = null;
+  if (args.config.gapSearchEnabled) {
+    try {
+      gapSearch = await runGapSearchPhase(args.config, send.sent);
+    } catch (error) {
+      gapSearch = {
+        ran: false,
+        reason: "all_fetches_failed",
+        queries: [],
+        found: 0,
+        analyzed: 0,
+        sent: 0,
+      };
+      errors.push(`جست‌وجوی هدفمند: ${errorText(error)}`);
+    }
+  }
+
   const finishedAt = new Date();
 
   return {
@@ -232,6 +360,7 @@ async function executeScheduledPass(args: {
     ingest,
     analysis,
     send,
+    gapSearch,
     errors: errors.slice(0, 10),
   };
 }

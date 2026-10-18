@@ -19,6 +19,8 @@ type ScheduleConfig = {
   requireAiRecommendation: boolean;
   maxAnalyze: number;
   maxSend: number;
+  gapSearchEnabled: boolean;
+  gapSearchQueries: string[];
 };
 
 type RunSummary = {
@@ -40,6 +42,15 @@ type RunSummary = {
     skippedReview: number;
     failed: number;
     rejected?: Array<{ title: string; reasons: string[] }>;
+  } | null;
+  gapSearch?: {
+    ran: boolean;
+    reason: string | null;
+    detail?: string;
+    queries: string[];
+    found: number;
+    analyzed: number;
+    sent: number;
   } | null;
   errors: string[];
 };
@@ -118,7 +129,14 @@ function defaultConfig(): ScheduleConfig {
     requireAiRecommendation: false,
     maxAnalyze: 8,
     maxSend: 10,
+    gapSearchEnabled: false,
+    gapSearchQueries: [],
   };
+}
+
+/** API rows may carry null for the manual query list; the form keeps arrays. */
+function normalizeLoadedConfig(config: ScheduleConfig): ScheduleConfig {
+  return { ...config, gapSearchQueries: config.gapSearchQueries ?? [] };
 }
 
 export function ScheduleCard({
@@ -146,7 +164,7 @@ export function ScheduleCard({
       .then((response) => response.json() as Promise<ApiResponse>)
       .then((data) => {
         if (data.success && data.config) {
-          setConfig(data.config);
+          setConfig(normalizeLoadedConfig(data.config));
           setStatus(data.status ?? null);
           setBaleReady(Boolean(data.destinationsReady?.bale));
           setBaleMissing(data.baleMissing ?? []);
@@ -214,7 +232,7 @@ export function ScheduleCard({
         return;
       }
 
-      if (data.config) setConfig(data.config);
+      if (data.config) setConfig(normalizeLoadedConfig(data.config));
       setStatus(data.status ?? null);
       setMessage({ kind: "ok", text: "زمان‌بندی ذخیره شد. اجرای خودکار از نوبت بعدی فعال است." });
     } catch {
@@ -383,6 +401,13 @@ export function ScheduleCard({
                 <span className="mx-1 text-slate-300">·</span>
                 <span className={lastRun.ok ? "text-emerald-700" : "text-amber-700"}>
                   {lastRun.send?.sent ?? 0} ارسال / {lastRun.analysis?.analyzed ?? 0} تحلیل
+                  {lastRun.gapSearch ? (
+                    <span className="mr-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                      {lastRun.gapSearch.ran
+                        ? `جست‌وجوی هدفمند: ${lastRun.gapSearch.found} یافت / ${lastRun.gapSearch.analyzed} تحلیل / ${lastRun.gapSearch.sent} ارسال`
+                        : `جست‌وجوی هدفمند اجرا نشد (${lastRun.gapSearch.reason ?? "—"}${lastRun.gapSearch.detail ? `: ${lastRun.gapSearch.detail}` : ""})`}
+                    </span>
+                  ) : null}
                 </span>
               </>
             ) : (
@@ -610,6 +635,46 @@ export function ScheduleCard({
               {config.maxAnalyze} تحلیل و {config.maxSend} ارسال در هر نوبت.
             </p>
           )}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 p-4">
+          <h3 className="text-sm font-bold text-slate-800">جست‌وجوی هدفمند (پر کردن شکاف پوشش)</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            وقتی در یک نوبت هیچ خبری ارسال نشود، بازو خودش دنبال موضوعات پوشش می‌گردد، نتایج را از همان فیلتر
+            موضوعی و قانون سخت‌گیرانهٔ ارسال عبور می‌دهد و فقط خبرهای واجد شرایط را می‌فرستد. حداکثر ۵ آیتم در هر
+            نوبت، با وقفهٔ حداقل ۳ ساعت بین جست‌وجوها.
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-slate-600">
+            <input
+              checked={config.gapSearchEnabled}
+              className="mt-0.5 h-4 w-4 accent-sky-600"
+              onChange={(event) => setConfig({ ...config, gapSearchEnabled: event.target.checked })}
+              type="checkbox"
+            />
+            <span>وقتی خبری برای ارسال نبود، جست‌وجوی هدفمند انجام شود.</span>
+          </label>
+          {config.gapSearchEnabled ? (
+            <label className="mt-3 block text-xs leading-5 text-slate-600">
+              <span className="mb-1 block font-medium text-slate-700">
+                عبارت‌های جست‌وجو (هر خط یک عبارت؛ خالی = برداشت خودکار از موضوعات پوشش)
+              </span>
+              <textarea
+                className="min-h-[84px] w-full rounded-lg border border-slate-200 p-2 font-mono text-[12px] focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-200"
+                dir="rtl"
+                onChange={(event) =>
+                  setConfig({
+                    ...config,
+                    gapSearchQueries: event.target.value
+                      .split(/\r?\n/)
+                      .map((line) => line.trim())
+                      .filter(Boolean),
+                  })
+                }
+                placeholder={"رتبه‌بندی اعتباری / اعتبارسنجی"}
+                value={config.gapSearchQueries.join("\n")}
+              />
+            </label>
+          ) : null}
         </div>
       </div>
 

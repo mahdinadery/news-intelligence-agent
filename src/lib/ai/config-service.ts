@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { aiConfigurations, type AiConfigurationRow } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import {
+  AI_FEATURE_ORDER,
   DEFAULT_AUTO_SEND_POLICY,
   DEFAULT_CONFIG_NAME,
   DEFAULT_DECISION_RULES,
@@ -29,7 +30,31 @@ import {
   type AiTopicFilterConfig,
 } from "./config-types";
 
+/**
+ * Additive normalization for rows written before newer feature keys existed:
+ * a missing `whyItMatters` (or any later key) is filled from the defaults, and
+ * missing output-schema entries are appended, so older configurations start
+ * producing new optional fields without re-saving them. Never overrides an
+ * operator's own values — even disabled ones.
+ */
+function withMissingConfigParts(
+  features: ActiveAiConfig["features"],
+  outputSchema: ActiveAiConfig["outputSchema"],
+): { features: ActiveAiConfig["features"]; outputSchema: ActiveAiConfig["outputSchema"] } {
+  const mergedFeatures = { ...features };
+  for (const key of AI_FEATURE_ORDER) {
+    if (!mergedFeatures[key]) mergedFeatures[key] = { ...DEFAULT_FEATURES[key] };
+  }
+  const known = new Set(outputSchema.map((field) => field.name));
+  const mergedSchema = [...outputSchema];
+  for (const field of DEFAULT_OUTPUT_SCHEMA) {
+    if (!known.has(field.name)) mergedSchema.push({ ...field });
+  }
+  return { features: mergedFeatures, outputSchema: mergedSchema };
+}
+
 function toActiveConfig(row: AiConfigurationRow): ActiveAiConfig {
+  const normalized = withMissingConfigParts(row.features, row.outputSchema);
   return {
     id: row.id,
     name: row.name,
@@ -39,9 +64,9 @@ function toActiveConfig(row: AiConfigurationRow): ActiveAiConfig {
     audienceFocus: row.audienceFocus ?? "",
     temperature: row.temperature,
     maxTokens: row.maxTokens,
-    features: row.features,
+    features: normalized.features,
     decisionRules: row.decisionRules,
-    outputSchema: row.outputSchema,
+    outputSchema: normalized.outputSchema,
     publishingTemplate: row.publishingTemplate ?? "",
     // Rows written before these columns existed read as null -> safe defaults.
     topicFilter: row.topicFilter ?? DEFAULT_TOPIC_FILTER,
