@@ -380,6 +380,9 @@ export const agentSchedules = pgTable("agent_schedules", {
   bulletinTimes: jsonb("bulletin_times").notNull().$type<string[]>().default(sql`'["08:00","14:00"]'::jsonb`),
   lastBulletinSlot: text("last_bulletin_slot"),
   lastBulletinAt: timestamp("last_bulletin_at", { withTimezone: true, mode: "date" }),
+  // Liveness heartbeat: stamped on EVERY external-cron tick call (even no-ops),
+  // so the dashboard can show whether GitHub Actions is actually firing.
+  lastTickAt: timestamp("last_tick_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });

@@ -67,6 +67,9 @@ export async function GET() {
       lastResult: record.lastResult,
       lastBulletinAt: record.lastBulletinAt ? record.lastBulletinAt.toISOString() : null,
       lastBulletinSlot: record.lastBulletinSlot,
+      lastTickAt: record.lastTickAt ? record.lastTickAt.toISOString() : null,
+      // No tick for 15+ minutes => the GitHub Actions cron is not firing.
+      cronStale: !record.lastTickAt || Date.now() - record.lastTickAt.getTime() > 15 * 60 * 1000,
       nextBulletinAt: (() => {
         const bulletinNext = computeNextBulletinRun({ now: new Date(), config: record });
         return bulletinNext ? bulletinNext.at.toISOString() : null;

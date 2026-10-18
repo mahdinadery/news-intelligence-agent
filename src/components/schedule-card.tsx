@@ -78,6 +78,8 @@ type ApiResponse = {
     lastResult: RunSummary | null;
     dueReason?: string;
     running?: boolean;
+    lastTickAt?: string | null;
+    cronStale?: boolean;
   };
   destinationsReady?: { local: boolean; bale: boolean };
   baleMissing?: string[];
@@ -174,13 +176,20 @@ export function ScheduleCard({
   const [lastRun, setLastRun] = useState<RunSummary | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [timesEditing, setTimesEditing] = useState(false);
+  // Auto-save bookkeeping («کلیک = اعمال») — declared early because `load`
+  // hydrates it.
+  const [hydrated, setHydrated] = useState(false);
+  const [lastSavedJson, setLastSavedJson] = useState<string | null>(null);
 
   const load = useCallback(() => {
     return fetch("/api/agent/scheduler", { cache: "no-store" })
       .then((response) => response.json() as Promise<ApiResponse>)
       .then((data) => {
         if (data.success && data.config) {
-          setConfig(normalizeLoadedConfig(data.config));
+          const normalized = normalizeLoadedConfig(data.config);
+          setLastSavedJson(JSON.stringify(normalized));
+          setHydrated(true);
+          setConfig(normalized);
           setStatus(data.status ?? null);
           setBaleReady(Boolean(data.destinationsReady?.bale));
           setBaleMissing(data.baleMissing ?? []);
@@ -223,39 +232,71 @@ export function ScheduleCard({
     setConfig((prev) => ({ ...prev, times: prev.times.filter((_, i) => i !== index) }));
   }
 
+  // ── Auto-save («کلیک = اعمال») ──────────────────────────────────────────
+  // Every change is persisted shortly after the last edit, so settings survive
+  // a page refresh even if the operator never presses the save button.
+  // `persist` takes the snapshot as a parameter so its memoization stays stable
+  // (react-hooks compiler rules require this shape).
+  const persist = useCallback(
+    async (snapshot: ScheduleConfig, silent: boolean) => {
+      setSaving(true);
+      if (!silent) setMessage(null);
+
+      try {
+        const response = await fetch("/api/agent/scheduler", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders(adminKey) },
+          body: JSON.stringify(snapshot),
+        });
+        const data = (await response.json()) as ApiResponse;
+
+        if (!response.ok || !data.success) {
+          const details = data.errors?.length ? ` — ${data.errors.join(" · ")}` : "";
+          setMessage({
+            kind: "err",
+            text:
+              response.status === 401
+                ? "برای ذخیرهٔ زمان‌بندی باید کلید مدیریتی را وارد کرده باشید. یک‌بار با ?key=... وارد داشبورد شوید یا از صفحه «پیکربندی AI» کلید را وارد کنید."
+                : `${data.message ?? "ذخیره زمان‌بندی ناموفق بود."}${details}`,
+          });
+          return;
+        }
+
+        if (data.config) {
+          const normalized = normalizeLoadedConfig(data.config);
+          setLastSavedJson(JSON.stringify(normalized));
+          setConfig(normalized);
+        }
+        setStatus(data.status ?? null);
+        if (silent) {
+          setMessage(null);
+        } else {
+          setMessage({ kind: "ok", text: "زمان‌بندی ذخیره شد. اجرای خودکار از نوبت بعدی فعال است." });
+        }
+      } catch {
+        setMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد؛ ذخیره انجام نشد." });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [adminKey],
+  );
+
+  useEffect(() => {
+    if (!hydrated) return;
+    // Nothing changed since the last save (e.g. server echo) => skip.
+    if (lastSavedJson !== null && JSON.stringify(config) === lastSavedJson) return;
+    const timer = setTimeout(() => {
+      void persist(config, true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [config, hydrated, lastSavedJson, persist]);
+
+  const dirty = hydrated && lastSavedJson !== null && JSON.stringify(config) !== lastSavedJson;
+
   async function handleSave() {
     if (saving) return;
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      const response = await fetch("/api/agent/scheduler", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders(adminKey) },
-        body: JSON.stringify(config),
-      });
-      const data = (await response.json()) as ApiResponse;
-
-      if (!response.ok || !data.success) {
-        const details = data.errors?.length ? ` — ${data.errors.join(" · ")}` : "";
-        setMessage({
-          kind: "err",
-          text:
-            response.status === 401
-              ? "برای تغییر زمان‌بندی باید کلید مدیریتی را وارد کرده باشید. یک‌بار با ?key=... وارد داشبورد شوید یا از صفحه «پیکربندی AI» کلید را وارد کنید."
-              : `${data.message ?? "ذخیره زمان‌بندی ناموفق بود."}${details}`,
-        });
-        return;
-      }
-
-      if (data.config) setConfig(normalizeLoadedConfig(data.config));
-      setStatus(data.status ?? null);
-      setMessage({ kind: "ok", text: "زمان‌بندی ذخیره شد. اجرای خودکار از نوبت بعدی فعال است." });
-    } catch {
-      setMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });
-    } finally {
-      setSaving(false);
-    }
+    await persist(config, false);
   }
 
   const [bulletinRunning, setBulletinRunning] = useState(false);
@@ -390,6 +431,15 @@ export function ScheduleCard({
           >
             {saving ? "در حال ذخیره…" : "ذخیره زمان‌بندی"}
           </button>
+          <span className={`text-xs ${dirty ? "text-amber-600" : "text-emerald-600"}`}>
+            {saving
+              ? "در حال ذخیره…"
+              : dirty
+                ? "تغییرات به‌صورت خودکار ذخیره می‌شوند…"
+                : lastSavedJson
+                  ? "همهٔ تغییرات ذخیره شد ✓"
+                  : ""}
+          </span>
         </div>
       </div>
 
@@ -404,6 +454,42 @@ export function ScheduleCard({
           {message.text}
         </p>
       ) : null}
+
+      <div
+        className={`mt-4 rounded-xl border p-4 ${
+          status?.cronStale ? "border-amber-200 bg-amber-50" : "border-sky-100 bg-sky-50/50"
+        }`}
+      >
+        <p className="text-sm font-bold text-slate-800">⏱️ کار پیوسته بدون باز بودن صفحه</p>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          این سامانه روی سرور اجرا می‌شود؛ کرون GitHub Actions هر ۵ دقیقه سرور را صدا می‌زند و ارسال‌ها بدون باز بودن
+          این صفحه انجام می‌شوند. وضعیت زیر ثابت می‌کند کرون واقعاً در حال تماس است.
+        </p>
+        <p className="mt-2 text-xs leading-5">
+          {status?.lastTickAt ? (
+            <span className={status.cronStale ? "font-bold text-amber-700" : "text-emerald-700"}>
+              ضربان کرون: آخرین تماس {formatInZone(status.lastTickAt, config.timezone)}
+              {status.cronStale ? " — بیش از ۱۵ دقیقه بی‌تماس!" : " ✓"}
+            </span>
+          ) : (
+            <span className="font-bold text-amber-700">هنوز هیچ تماسی از کرون خارجی ثبت نشده است.</span>
+          )}
+        </p>
+        {status?.cronStale ? (
+          <p className="mt-2 text-xs leading-5 text-amber-800">
+            برای فعال‌سازی: در مخزن GitHub ← Settings ← Secrets and variables ← Actions دو متغیر{" "}
+            <code className="rounded bg-white px-1 font-mono text-[10px]" dir="ltr">
+              APP_URL
+            </code>{" "}
+            (آدرس Render بدون انتهای <code dir="ltr">/</code>) و{" "}
+            <code className="rounded bg-white px-1 font-mono text-[10px]" dir="ltr">
+              ADMIN_ACCESS_KEY
+            </code>{" "}
+            را ست کنید و در تب Actions ورک‌فلوی «Scheduled auto-publish» را فعال نگه دارید. توجه: GitHub پس از حدود ۶۰
+            روز فعالیت‌نبودن مخزن، cron‌های زمان‌بندی‌شده را خودکار غیرفعال می‌کند.
+          </p>
+        ) : null}
+      </div>
 
       <div className="mt-5 grid gap-4 border-t border-slate-100 pt-4 lg:grid-cols-3">
         <div className="rounded-xl bg-slate-50 p-3.5">
