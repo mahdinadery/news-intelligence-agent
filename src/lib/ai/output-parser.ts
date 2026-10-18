@@ -17,6 +17,8 @@ export type ParsedAiOutput = {
   relevance: number;
   novelty: number;
   mainEvent: string | null;
+  /** One-line "why it matters for the audience" — null when the model omitted it. */
+  whyItMatters: string | null;
   shouldSend: boolean;
   reason: string;
 };
@@ -55,6 +57,7 @@ export function parseAiOutput(rawText: string, outputSchema: AiOutputSchema): Pa
     relevance: clampScore(parsed.relevance),
     novelty: clampScore(parsed.novelty),
     mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
+    whyItMatters: typeof parsed.whyItMatters === "string" && parsed.whyItMatters.trim() ? parsed.whyItMatters.trim() : null,
     shouldSend: Boolean(parsed.shouldSend),
     reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
   };
@@ -146,6 +149,7 @@ export function validateAiOutputAgainstSchema(
       relevance: clampScore(parsed.relevance),
       novelty: clampScore(parsed.novelty),
       mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
+      whyItMatters: typeof parsed.whyItMatters === "string" && parsed.whyItMatters.trim() ? parsed.whyItMatters.trim() : null,
       shouldSend: Boolean(parsed.shouldSend),
       reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
     },

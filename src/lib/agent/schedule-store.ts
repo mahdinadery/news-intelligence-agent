@@ -26,6 +26,8 @@ export type AgentScheduleRecord = AgentScheduleConfig & {
   lastRunAt: Date | null;
   lastRunSlot: string | null;
   lastResult: AgentRunSummary | null;
+  /** When the coverage-gap search last ran (cooldown input). */
+  lastGapSearchAt: Date | null;
 };
 
 function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
@@ -34,6 +36,7 @@ function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
     lastRunAt: row.lastRunAt ?? null,
     lastRunSlot: row.lastRunSlot ?? null,
     lastResult: row.lastResult ?? null,
+    lastGapSearchAt: row.lastGapSearchAt ?? null,
     ...coerceScheduleConfig({
       enabled: row.enabled,
       timezone: row.timezone,
@@ -45,6 +48,8 @@ function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
       requireAiRecommendation: row.requireAiRecommendation,
       maxAnalyze: row.maxAnalyze,
       maxSend: row.maxSend,
+      gapSearchEnabled: row.gapSearchEnabled,
+      gapSearchQueries: row.gapSearchQueries,
     }),
   };
 }
@@ -54,6 +59,7 @@ const FALLBACK: AgentScheduleRecord = {
   lastRunAt: null,
   lastRunSlot: null,
   lastResult: null,
+  lastGapSearchAt: null,
   ...DEFAULT_AGENT_SCHEDULE,
 };
 
@@ -69,6 +75,9 @@ function valuesFor(config: AgentScheduleConfig) {
     requireAiRecommendation: config.requireAiRecommendation,
     maxAnalyze: config.maxAnalyze,
     maxSend: config.maxSend,
+    gapSearchEnabled: config.gapSearchEnabled,
+    // jsonb column (notNull, defaults to []): pass the array directly.
+    gapSearchQueries: config.gapSearchQueries ?? [],
     updatedAt: new Date(),
   };
 }
@@ -151,6 +160,21 @@ export async function claimSlot(id: string | null, slotKey: string): Promise<boo
   } catch (error) {
     console.error("[schedule] claim failed:", String(error).slice(0, 200));
     return false;
+  }
+}
+
+/**
+ * Stamps the coverage-gap search cooldown on the singleton row. Best-effort:
+ * a failure here must never abort a run that already produced results.
+ */
+export async function markGapSearchRun(): Promise<void> {
+  try {
+    await db
+      .update(agentSchedules)
+      .set({ lastGapSearchAt: new Date(), updatedAt: new Date() })
+      .where(sql`true`);
+  } catch (error) {
+    console.error("[schedule] gap-stamp failed:", String(error).slice(0, 200));
   }
 }
 

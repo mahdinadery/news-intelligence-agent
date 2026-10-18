@@ -20,6 +20,7 @@ export type AiFeatureKey =
   | "relevance"
   | "novelty"
   | "mainEvent"
+  | "whyItMatters"
   | "shouldSend"
   | "reason";
 
@@ -207,6 +208,7 @@ export const AI_FEATURE_ORDER: AiFeatureKey[] = [
   "relevance",
   "novelty",
   "mainEvent",
+  "whyItMatters",
   "shouldSend",
   "reason",
 ];
@@ -218,6 +220,7 @@ export const AI_FEATURE_LABELS: Record<AiFeatureKey, string> = {
   relevance: "امتیاز مرتبط بودن",
   novelty: "امتیاز تازگی",
   mainEvent: "رویداد اصلی",
+  whyItMatters: "چرا مهم است",
   shouldSend: "پیشنهاد ارسال",
   reason: "دلیل ارسال",
 };
@@ -267,6 +270,11 @@ export const DEFAULT_FEATURES: AiFeaturesConfig = {
     enabled: true,
     instruction: "رویداد یا تحول اصلی توصیف‌شده در مقاله را در یک جمله کوتاه فارسی مشخص کن.",
   },
+  whyItMatters: {
+    enabled: true,
+    instruction:
+      "در یک جمله کوتاه فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است. اگر خبر برای مخاطب مهم نیست، بنویس «برای مخاطب هدف اهمیت مشخصی ندارد».",
+  },
   shouldSend: {
     enabled: true,
     instruction: "مشخص کن که آیا این خبر باید به کانال هدف ارسال شود یا نه.",
@@ -296,6 +304,7 @@ export const DEFAULT_OUTPUT_SCHEMA: AiOutputSchema = [
   { name: "relevance", enabled: true, description: "امتیاز مرتبط بودن", required: true, type: "number", min: 0, max: 100 },
   { name: "novelty", enabled: true, description: "امتیاز تازگی", required: true, type: "number", min: 0, max: 100 },
   { name: "mainEvent", enabled: true, description: "رویداد اصلی", required: false, type: "string" },
+  { name: "whyItMatters", enabled: true, description: "چرا برای مخاطب مهم است", required: false, type: "string" },
   { name: "shouldSend", enabled: true, description: "پیشنهاد ارسال", required: true, type: "boolean" },
   { name: "reason", enabled: true, description: "دلیل تصمیم ارسال", required: true, type: "string" },
 ];
@@ -310,6 +319,9 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 {title}
 
 {summary}
+
+چرا مهم است:
+{whyItMatters}
 
 رویداد اصلی:
 {mainEvent}

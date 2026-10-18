@@ -22,6 +22,7 @@ export const PUBLISHING_TEMPLATE_VARS = [
   "relevanceScore",
   "noveltyScore",
   "mainEvent",
+  "whyItMatters",
   "sourceName",
   "originalUrl",
   "publishedAt",
@@ -34,6 +35,9 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 {title}
 
 {summary}
+
+چرا مهم است:
+{whyItMatters}
 
 رویداد اصلی:
 {mainEvent}
@@ -66,6 +70,8 @@ function value(varName: PublishingTemplateVar, article: NewsRow): string {
     }
     case "mainEvent":
       return article.mainEvent ?? "—";
+    case "whyItMatters":
+      return article.whyItMatters ?? "—";
     case "sourceName":
       return article.source;
     case "originalUrl":

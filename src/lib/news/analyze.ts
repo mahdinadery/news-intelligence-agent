@@ -41,6 +41,7 @@ async function recordAnalysisHistory(input: {
     relevance: number;
     novelty: number;
     mainEvent: string | null;
+    whyItMatters: string | null;
     shouldSend: boolean;
     reason: string;
   } | null;
@@ -58,6 +59,7 @@ async function recordAnalysisHistory(input: {
       importance: input.analysis?.importance ?? null,
       relevance: input.analysis?.relevance ?? null,
       novelty: input.analysis?.novelty ?? null,
+      whyItMatters: input.analysis?.whyItMatters ?? null,
       mainEvent: input.analysis?.mainEvent ?? null,
       shouldSend: input.analysis?.shouldSend ?? null,
       reason: input.analysis?.reason ?? null,
@@ -157,7 +159,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
     };
   }
 
-  const { summary, category, importance, relevance, novelty, mainEvent, shouldSend, reason } = result.analysis;
+  const { summary, category, importance, relevance, novelty, mainEvent, whyItMatters, shouldSend, reason } = result.analysis;
 
   try {
     const [updated] = await db
@@ -169,6 +171,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
         relevanceScore: relevance,
         noveltyScore: novelty,
         mainEvent,
+        whyItMatters,
         shouldSend,
         analysisReason: reason,
         analyzedAt: new Date(),
@@ -197,7 +200,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       configurationVersion: config.version,
       model: result.model ?? resolveEffectiveModel(config.model),
       status: "success",
-      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, shouldSend, reason },
+      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, shouldSend, reason },
     });
 
     return { ok: true, newsItem: updated };
