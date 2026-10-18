@@ -5,6 +5,7 @@ import {
   CREDIT_RATING_PACK,
   NEWS_PACKS,
   appendAudienceNote,
+  mergeBlockedKeywords,
   getNewsPack,
   mergePackTopics,
   normalizeSourceUrl,
@@ -141,4 +142,40 @@ test("appendAudienceNote adds the company context exactly once", () => {
   const second = appendAudienceNote(first.prompt, CREDIT_RATING_PACK);
   assert.equal(second.alreadyPresent, true);
   assert.equal(second.prompt, first.prompt);
+});
+
+// ── Deny-list merge + tightened keywords ───────────────────────────────────────
+
+test("pack ships a deny-list of off-topic keywords", () => {
+  assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("ورزش"));
+  assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("حوادث"));
+});
+
+test("mergeBlockedKeywords appends only new keywords", () => {
+  const first = mergeBlockedKeywords(["ورزش"], CREDIT_RATING_PACK);
+  assert.ok(first.added.includes("حوادث"));
+  assert.ok(first.skipped.includes("ورزش"));
+  assert.equal(first.blockedKeywords[0], "ورزش");
+
+  const second = mergeBlockedKeywords(first.blockedKeywords, CREDIT_RATING_PACK);
+  assert.deepEqual(second.added, []);
+  assert.equal(second.blockedKeywords.length, first.blockedKeywords.length);
+});
+
+test("mergeBlockedKeywords ignores letter variants and blanks", () => {
+  const result = mergeBlockedKeywords(["فوتبال"], {
+    ...CREDIT_RATING_PACK,
+    blockedKeywords: ["فوتبال", "  ", "فوتبال"],
+  });
+  assert.deepEqual(result.added, []);
+});
+
+test("credit pack no longer carries generic economy keywords that leak unrelated news", () => {
+  const all = CREDIT_RATING_PACK.topics.flatMap((topic) => topic.keywords);
+  for (const broad of ["مالیات", "تورم", "بودجه", "وام", "تسهیلات", "بدهی", "بیمه"]) {
+    assert.equal(all.includes(broad), false, `«${broad}» should not be a pack keyword`);
+  }
+  for (const narrow of ["تسهیلات بانکی", "بیمه اعتبار", "کسری بودجه", "بدهی دولت"]) {
+    assert.ok(all.includes(narrow), `«${narrow}» should stay`);
+  }
 });

@@ -295,6 +295,7 @@ export const aiConfigurations = pgTable(
     // Empty string => defer to AI_API_MODEL / AI_MODEL env vars (backward compatible).
     model: text("model").notNull().default(""),
     systemPrompt: text("system_prompt").notNull(),
+    audienceFocus: text("audience_focus"),
     temperature: real("temperature").notNull().default(0.2),
     maxTokens: integer("max_tokens").notNull().default(3000),
     // Record<AiFeatureKey, AiFeatureConfig> — see src/lib/ai/config-types.ts

@@ -20,27 +20,59 @@ import type {
 } from "./config-types";
 
 /**
+ * Who this product is for, and therefore what "relevant" means when the model
+ * scores `relevance`. Used whenever the operator left `audienceFocus` empty.
+ *
+ * Deliberately self-contained in this module (see the note below) — the admin
+ * console imports this constant for its placeholder text.
+ */
+export const DEFAULT_AUDIENCE_FOCUS =
+  "مخاطب هدف این سامانه یک شرکت اعتبارسنجی است. «مرتبط بودن» فقط یعنی ارتباط مستقیم و روشن خبر با یکی از این حوزه‌ها: " +
+  "اعتبارسنجی و رتبه‌بندی اعتباری، ریسک اعتباری و نکول، سلامت مالی و اعتباری بانک‌ها و شرکت‌ها، بازار بدهی و تأمین مالی، " +
+  "و مقررات ناظر بر اعتبار و رتبه‌بندی در ایران.";
+
+/** Hard relevance rules appended to every prompt after the audience focus. */
+const AUDIENCE_RELEVANCE_RULES = [
+  "قوانین قطعی امتیاز مرتبط بودن (relevance):",
+  "- «مرتبط بودن» فقط ارتباط واقعی خبر با مخاطب و حوزه‌های بالا است؛ «مهم بودن» یا «اقتصادی بودن» خبر به‌تنهایی مرتبط بودن نیست.",
+  "- هر خبری که پیوند روشنی با این حوزه‌ها ندارد (پروژه‌های شهری و عمرانی، مالیات‌ها و عوارض عمومی، قیمت و تورم روزمره، ورزش، سرگرمی، حوادث، و اخبار عمومی بین‌المللی بدون پیوند با اعتبارسنجی ایران) باید relevance زیر ۳۰ و shouldSend=false بگیرد، حتی اگر importance بالای ۸۰ باشد.",
+];
+
+/**
  * Prompt-side description of the operator's topic focus and deny-list.
  *
  * Deliberately self-contained (no imports besides the type above): the Node
  * test runner imports this module directly, so it must stay dependency-free at
- * runtime. Matching itself lives in src/lib/news/topic-filter.ts.
+ * runtime. Matching itself lives in src/lib/news/topic-filter.ts — callers pass
+ * its BASELINE_BLOCKED_KEYWORDS in as `baselineBlocked` so the prompt copy and
+ * the matching copy never drift.
  */
-export function describeTopicFocus(filter: AiTopicFilterConfig | null | undefined): string | null {
-  if (!filter || !filter.enabled) return null;
+export function describeTopicFocus(
+  filter: AiTopicFilterConfig | null | undefined,
+  baselineBlocked: readonly string[] = [],
+): string | null {
+  const baseline = baselineBlocked.map((keyword) => keyword.trim()).filter(Boolean);
+  const filterActive = Boolean(filter && filter.enabled);
 
-  const topics = (filter.topics ?? []).filter(
-    (topic) => topic.enabled && topic.keywords.some((keyword) => (keyword ?? "").trim()),
-  );
-  const blocked = (filter.blockedKeywords ?? []).map((keyword) => (keyword ?? "").trim()).filter(Boolean);
+  const topics = filterActive
+    ? (filter!.topics ?? []).filter((topic) => topic.enabled && topic.keywords.some((keyword) => (keyword ?? "").trim()))
+    : [];
+  const blocked = filterActive ? (filter!.blockedKeywords ?? []).map((keyword) => (keyword ?? "").trim()).filter(Boolean) : [];
 
-  if (topics.length === 0 && blocked.length === 0) return null;
+  if (topics.length === 0 && blocked.length === 0 && baseline.length === 0) return null;
 
   const lines: string[] = [];
 
+  if (baseline.length > 0) {
+    lines.push(
+      "کلیدواژه‌های ممنوع همیشگی (هر خبری که این‌ها را داشته باشد نامرتبط است و باید relevance پایین و shouldSend=false بگیرد):",
+      `- ${baseline.join("، ")}`,
+    );
+  }
+
   if (topics.length > 0) {
     lines.push(
-      filter.mode === "exclude"
+      filter?.mode === "exclude"
         ? "موضوعاتی که باید نامرتبط تلقی شوند و امتیاز مرتبط بودن پایین بگیرند:"
         : "تمرکز موضوعی فعلی سامانه (فقط اخبار مرتبط با این موضوعات):",
     );
@@ -62,6 +94,8 @@ export function describeTopicFocus(filter: AiTopicFilterConfig | null | undefine
 
 export type PromptableConfig = {
   systemPrompt: string;
+  /** Who the audience is + what "relevant" means. Empty/missing => DEFAULT_AUDIENCE_FOCUS. */
+  audienceFocus?: string;
   features: AiFeaturesConfig;
   decisionRules: AiDecisionRules;
   outputSchema: AiOutputSchema;
@@ -148,13 +182,19 @@ function buildDecisionRulesSection(config: PromptableConfig): string {
 export function buildAIAnalysisPrompt(
   config: PromptableConfig,
   article: ArticleInput,
+  options?: { baselineBlockedKeywords?: readonly string[] },
 ): { systemPrompt: string; userPrompt: string; enabledFields: string[] } {
   const { template, enabledFields } = buildOutputContract(config);
   const decisionSection = buildDecisionRulesSection(config);
-  const topicSection = describeTopicFocus(config.topicFilter);
+  const topicSection = describeTopicFocus(config.topicFilter, options?.baselineBlockedKeywords);
+
+  const audienceFocus = config.audienceFocus?.trim() || DEFAULT_AUDIENCE_FOCUS;
+  const audienceSection = [`تعریف مخاطب و ملاک امتیاز مرتبط بودن (relevance):`, audienceFocus, ...AUDIENCE_RELEVANCE_RULES].join("\n");
 
   const systemPrompt = [
     config.systemPrompt.trim(),
+    "",
+    audienceSection,
     "",
     "دستورالعمل‌های تحلیل (فقط فیلدهای زیر را در خروجی بگنجان):",
     template,

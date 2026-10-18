@@ -38,6 +38,8 @@ export type NewsPack = {
   audienceNote?: string;
   /** Substring used to detect that audienceNote is already applied. */
   audienceMarker?: string;
+  /** Merged additively into the config deny-list when topics are applied. */
+  blockedKeywords?: string[];
   topics: NewsPackTopic[];
   sources: NewsPackSource[];
 };
@@ -59,6 +61,7 @@ export const CREDIT_RATING_PACK: NewsPack = {
   audienceNote:
     "مخاطب هدف این سامانه یک شرکت اعتبارسنجی است؛ اهمیت، مرتبط بودن و توصیه ارسال هر خبر را از منظر ریسک اعتباری ناشران، رتبه‌بندی اعتباری، سلامت مالی بانک‌ها و شرکت‌ها و وضعیت بازار بدهی ایران ارزیابی کن.",
   audienceMarker: "مخاطب هدف این سامانه یک شرکت اعتبارسنجی است",
+  blockedKeywords: ["ورزش", "فوتبال", "لیگ برتر", "سرگرمی", "هنرمندان", "سینما", "حوادث", "تصادف"],
   topics: [
     {
       id: "rating-core",
@@ -93,8 +96,6 @@ export const CREDIT_RATING_PACK: NewsPack = {
         "مطالبات غیرجاری",
         "چک برگشتی",
         "ورشکستگی",
-        "بدهی",
-        "بدهکار",
         "تسویه بدهی",
         "default risk",
       ],
@@ -107,9 +108,7 @@ export const CREDIT_RATING_PACK: NewsPack = {
         "بانک مرکزی",
         "بانکداری",
         "شبکه بانکی",
-        "تسهیلات",
         "تسهیلات بانکی",
-        "وام",
         "نرخ سود",
         "سپرده",
         "کفایت سرمایه",
@@ -148,11 +147,6 @@ export const CREDIT_RATING_PACK: NewsPack = {
         "شورای عالی بورس",
         "بیمه مرکزی",
         "وزارت امور اقتصادی و دارایی",
-        "بخشنامه",
-        "آیین‌نامه",
-        "آیین نامه",
-        "دستورالعمل",
-        "مصوبه",
         "مجوز فعالیت",
         "نظارت بانکی",
         "کمیته ریسک",
@@ -163,9 +157,6 @@ export const CREDIT_RATING_PACK: NewsPack = {
       label: "اقتصاد کلان ایران",
       enabled: true,
       keywords: [
-        "تورم",
-        "بودجه",
-        "مالیات",
         "تولید ناخالص داخلی",
         "رشد اقتصادی",
         "کسری بودجه",
@@ -198,11 +189,9 @@ export const CREDIT_RATING_PACK: NewsPack = {
       label: "بیمه، ضمانت و لیزینگ",
       enabled: true,
       keywords: [
-        "بیمه",
         "بیمه اعتبار",
         "ضمانت‌نامه",
         "ضمانت نامه",
-        "ضمانت",
         "لیزینگ",
         "شرکت لیزینگ",
         "صندوق ضمانت",
@@ -377,4 +366,41 @@ export function appendAudienceNote(
     prompt: `${systemPrompt.trimEnd()}\n\n${pack.audienceNote}`.trim(),
     alreadyPresent: false,
   };
+}
+
+export type BlockedKeywordsMergeResult = {
+  blockedKeywords: string[];
+  /** Keywords that were actually appended. */
+  added: string[];
+  /** Keywords already present (same normalized form). */
+  skipped: string[];
+};
+
+/**
+ * Adds the pack's deny-list keywords to the configuration's `blockedKeywords`
+ * without mutating the input. Comparison ignores case, ZWNJ and letter variants.
+ */
+export function mergeBlockedKeywords(
+  existing: readonly string[],
+  pack: NewsPack,
+): BlockedKeywordsMergeResult {
+  const blockedKeywords = existing.map((keyword) => keyword.trim()).filter(Boolean);
+  const seen = new Set(blockedKeywords.map(normalizeTopicLabel));
+  const added: string[] = [];
+  const skipped: string[] = [];
+
+  for (const raw of pack.blockedKeywords ?? []) {
+    const keyword = raw.trim();
+    if (!keyword) continue;
+    const key = normalizeTopicLabel(keyword);
+    if (seen.has(key)) {
+      skipped.push(keyword);
+      continue;
+    }
+    seen.add(key);
+    blockedKeywords.push(keyword);
+    added.push(keyword);
+  }
+
+  return { blockedKeywords, added, skipped };
 }

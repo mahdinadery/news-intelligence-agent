@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAIAnalysisPrompt } from "../src/lib/ai/prompt-builder.ts";
+import { DEFAULT_AUDIENCE_FOCUS, buildAIAnalysisPrompt, describeTopicFocus } from "../src/lib/ai/prompt-builder.ts";
 
 const features = {
   summary: { enabled: true, instruction: "خلاصه بنویس." },
@@ -100,4 +100,56 @@ test("only enabled features appear in the output contract", () => {
   assert.match(systemPrompt, /"summary"/);
   assert.match(systemPrompt, /"shouldSend"/);
   assert.doesNotMatch(systemPrompt, /"importance"/);
+});
+
+// ── Audience focus & relevance anchor ─────────────────────────────────────────
+
+test("default audience focus anchors relevance to the credit-rating audience", () => {
+  const { systemPrompt } = buildAIAnalysisPrompt(config(), article);
+  assert.ok(systemPrompt.includes("تعریف مخاطب و ملاک امتیاز مرتبط بودن"));
+  assert.ok(systemPrompt.includes(DEFAULT_AUDIENCE_FOCUS));
+  assert.ok(systemPrompt.includes("شرکت اعتبارسنجی"));
+  // Hard rules: importance never compensates for low relevance.
+  assert.ok(systemPrompt.includes("relevance زیر ۳۰"));
+  assert.ok(systemPrompt.includes("باید relevance پایین و shouldSend=false بگیرد") || systemPrompt.includes("shouldSend=false بگیرد"));
+});
+
+test("custom audience focus replaces the default", () => {
+  const { systemPrompt } = buildAIAnalysisPrompt(
+    config({ audienceFocus: "مخاطب هدف، تحلیلگران بازار سرمایه هستند." }),
+    article,
+  );
+  assert.ok(systemPrompt.includes("مخاطب هدف، تحلیلگران بازار سرمایه هستند."));
+  assert.ok(!systemPrompt.includes(DEFAULT_AUDIENCE_FOCUS));
+  // The hard relevance rules are present for every audience.
+  assert.ok(systemPrompt.includes("قوانین قطعی امتیاز مرتبط بودن"));
+});
+
+test("blank audience focus falls back to the default", () => {
+  const { systemPrompt } = buildAIAnalysisPrompt(config({ audienceFocus: "   " }), article);
+  assert.ok(systemPrompt.includes(DEFAULT_AUDIENCE_FOCUS));
+});
+
+test("baseline deny-list keywords are described in the prompt when passed in", () => {
+  const { systemPrompt } = buildAIAnalysisPrompt(config(), article, {
+    baselineBlockedKeywords: ["ورزش", "حوادث"],
+  });
+  assert.ok(systemPrompt.includes("کلیدواژه‌های ممنوع همیشگی"));
+  assert.ok(systemPrompt.includes("ورزش، حوادث"));
+});
+
+test("prompt without any topic focus omits the topic section but keeps the audience block", () => {
+  const { systemPrompt } = buildAIAnalysisPrompt(config(), article);
+  assert.ok(!systemPrompt.includes("تمرکز موضوعی فعلی سامانه"));
+  assert.ok(systemPrompt.includes("تعریف مخاطب و ملاک امتیاز مرتبط بودن"));
+});
+
+test("describeTopicFocus combines baseline and config deny-lists", () => {
+  const text = describeTopicFocus(
+    { enabled: true, mode: "include", topics: [], blockedKeywords: ["قیمت ارز"] },
+    ["ورزش"],
+  );
+  assert.ok(text.includes("کلیدواژه‌های ممنوع همیشگی"));
+  assert.ok(text.includes("ورزش"));
+  assert.ok(text.includes("قیمت ارز"));
 });

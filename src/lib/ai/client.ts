@@ -12,6 +12,7 @@
  * prompt text.
  */
 
+import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { buildAIAnalysisPrompt, type ArticleInput } from "./prompt-builder";
 import { parseAiOutput, type ParsedAiOutput } from "./output-parser";
 import { callAiChatCompletion, resolveEffectiveModel, type CompletionErrorKind } from "./completion";
@@ -43,10 +44,22 @@ export async function runAiAnalysis(
   article: ArticleInput,
   config: Pick<
     ActiveAiConfig,
-    "systemPrompt" | "features" | "decisionRules" | "outputSchema" | "model" | "temperature" | "maxTokens" | "topicFilter"
+    | "systemPrompt"
+    | "audienceFocus"
+    | "features"
+    | "decisionRules"
+    | "outputSchema"
+    | "model"
+    | "temperature"
+    | "maxTokens"
+    | "topicFilter"
   >,
 ): Promise<AiAnalysisResult> {
-  const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(config, article);
+  // BASELINE_BLOCKED_KEYWORDS lives in topic-filter.ts (matching side); passing
+  // it in keeps prompt-builder.ts dependency-free for the Node test runner.
+  const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(config, article, {
+    baselineBlockedKeywords: BASELINE_BLOCKED_KEYWORDS,
+  });
 
   const completion = await callAiChatCompletion({
     systemPrompt,

@@ -20,6 +20,8 @@ import {
   type AiTopicFilterConfig,
   type ActiveAiConfig,
 } from "@/lib/ai/config-types";
+import { DEFAULT_AUDIENCE_FOCUS } from "@/lib/ai/prompt-builder";
+import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { PUBLISHING_TEMPLATE_VARS, findUnknownTemplateVars } from "@/lib/delivery/template";
 import { CREDIT_RATING_PACK } from "@/lib/news/news-packs";
 import { TOPIC_PRESETS } from "@/lib/news/topic-filter";
@@ -69,6 +71,7 @@ function buildDraft(
     | "provider"
     | "model"
     | "systemPrompt"
+    | "audienceFocus"
     | "temperature"
     | "maxTokens"
     | "features"
@@ -84,6 +87,7 @@ function buildDraft(
     provider: config.provider,
     model: config.model,
     systemPrompt: config.systemPrompt,
+    audienceFocus: config.audienceFocus ?? "",
     temperature: config.temperature,
     maxTokens: config.maxTokens,
     features: config.features,
@@ -101,6 +105,7 @@ function defaultDraft(): AiConfigInput {
     provider: "openai-compatible",
     model: DEFAULT_MODEL_PLACEHOLDER,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    audienceFocus: "",
     temperature: DEFAULT_TEMPERATURE,
     maxTokens: DEFAULT_MAX_TOKENS,
     features: DEFAULT_FEATURES,
@@ -384,6 +389,23 @@ export function AiConfigConsole({ adminKey }: Props) {
           rows={8}
           value={draft.systemPrompt}
         />
+
+        <div className="mt-5">
+          <h3 className="text-sm font-bold text-slate-900">تمرکز مخاطب (ملاک امتیاز مرتبط بودن)</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            مشخص کنید خبر «مرتبط» یعنی چه. اگر خالی بماند، تعریف پیش‌فرض استفاده می‌شود: مخاطب هدف،{" "}
+            <b>شرکت اعتبارسنجی</b> است و فقط اخبار اعتبارسنجی/رتبه‌بندی اعتباری/ریسک اعتباری مرتبط محسوب می‌شوند. این
+            متن همراه قوانین قطعی («خبر بی‌ربط باید relevance زیر ۳۰ بگیرد، حتی اگر بسیار مهم باشد») به همهٔ درخواست‌های
+            تحلیل اضافه می‌شود — پس از ذخیره، روی همهٔ نسخه‌ها اثر دارد.
+          </p>
+          <textarea
+            className="mt-2 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-6 text-slate-800 focus:border-blue-400 focus:outline-none"
+            onChange={(event) => setDraft({ ...draft, audienceFocus: event.target.value })}
+            placeholder={DEFAULT_AUDIENCE_FOCUS}
+            rows={3}
+            value={draft.audienceFocus ?? ""}
+          />
+        </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <input
             className="w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
@@ -662,6 +684,10 @@ export function AiConfigConsole({ adminKey }: Props) {
           <p className="mt-2 text-[11px] leading-5 text-rose-500">
             خبری که یکی از این کلمات را در عنوان یا متن داشته باشد، پیش از تحلیل هوش مصنوعی کنار گذاشته می‌شود
             (وضعیت «خارج از موضوع») و هیچ‌وقت ارسال نمی‌شود — حتی اگر موضوع دیگری را هم پوشش دهد.
+          </p>
+          <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50/60 px-3 py-2 text-[11px] leading-5 text-rose-600">
+            <b>کلیدواژه‌های ممنوع همیشگی</b> (در کد، حتی وقتی این فیلتر غیرفعال است):{" "}
+            {BASELINE_BLOCKED_KEYWORDS.join("، ")}. این فهرست کوچک و ثابت است و نیازی به تنظیم ندارد.
           </p>
         </div>
 

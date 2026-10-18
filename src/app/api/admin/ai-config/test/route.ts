@@ -2,6 +2,7 @@ import { checkAdminAccess } from "@/lib/admin/access";
 import { callAiChatCompletion } from "@/lib/ai/completion";
 import { getActiveAiConfig, validateAiConfigInput } from "@/lib/ai/config-service";
 import type { AiConfigInput } from "@/lib/ai/config-types";
+import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { buildAIAnalysisPrompt } from "@/lib/ai/prompt-builder";
 import { validateAiOutputAgainstSchema } from "@/lib/ai/output-parser";
 import { db } from "@/db";
@@ -139,7 +140,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(configForPrompt, article);
+  const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(configForPrompt, article, {
+    baselineBlockedKeywords: BASELINE_BLOCKED_KEYWORDS,
+  });
 
   const completion = await callAiChatCompletion({
     systemPrompt,

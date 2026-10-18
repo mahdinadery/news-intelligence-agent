@@ -10,6 +10,7 @@ import type { AiConfigInput } from "@/lib/ai/config-types";
 import {
   appendAudienceNote,
   getNewsPack,
+  mergeBlockedKeywords,
   mergePackTopics,
   NEWS_PACKS,
 } from "@/lib/news/news-packs";
@@ -109,13 +110,20 @@ export async function POST(request: Request) {
       const merged = applyTopics
         ? mergePackTopics(active.topicFilter?.topics ?? [], pack)
         : { topics: active.topicFilter?.topics ?? [], added: [], skipped: [], truncated: 0 };
+      const mergedBlocked = applyTopics
+        ? mergeBlockedKeywords(active.topicFilter?.blockedKeywords ?? [], pack)
+        : {
+            blockedKeywords: active.topicFilter?.blockedKeywords ?? [],
+            added: [],
+            skipped: [],
+          };
       const audience = applyAudienceNote
         ? appendAudienceNote(active.systemPrompt, pack)
         : { prompt: active.systemPrompt, alreadyPresent: true };
 
       response.audienceNote = { applied: !audience.alreadyPresent, alreadyPresent: audience.alreadyPresent };
 
-      const topicsApplied = merged.added.length > 0;
+      const topicsApplied = merged.added.length > 0 || mergedBlocked.added.length > 0;
       if (!topicsApplied && audience.alreadyPresent) {
         if (applyTopics) {
           response.topics = {
@@ -142,7 +150,12 @@ export async function POST(request: Request) {
           outputSchema: active.outputSchema,
           publishingTemplate: active.publishingTemplate,
           topicFilter: applyTopics
-            ? { enabled: true, mode: "include", topics: merged.topics }
+            ? {
+                enabled: true,
+                mode: "include",
+                topics: merged.topics,
+                blockedKeywords: mergedBlocked.blockedKeywords,
+              }
             : active.topicFilter,
           autoSendPolicy: active.autoSendPolicy,
         };
