@@ -11,8 +11,11 @@
  */
 
 import { db } from "@/db";
-import { agentSchedules, deliveries, news } from "@/db/schema";
+import { agentSchedules, deliveries, news, type NewsRow } from "@/db/schema";
 import { readActiveOperationalSettings } from "@/lib/ai/config-service";
+import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
+import { sendBulletinDelivery } from "@/lib/delivery";
+import { buildBulletinMessage, MAX_BULLETIN_ITEMS, pickBulletinItems } from "@/lib/delivery/bulletin";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { expandTargets } from "@/lib/delivery/types";
 import {
@@ -24,18 +27,19 @@ import {
 import { deriveGapQueries, buildSearchUrl, MAX_GAP_QUERIES } from "@/lib/news/gap-search";
 import { fetchFeed, type NormalizedNews } from "@/lib/news/rss";
 import { ingestAllActiveSources, ingestSearchItems } from "@/lib/news/source-ingest";
-import { and, asc, desc, eq, inArray, isNotNull, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, notExists, sql } from "drizzle-orm";
 import { runAutoDeliveryPass } from "./index";
-import type { AutoSendRule } from "./rules";
+import { evaluateArticle, type AutoSendRule } from "./rules";
 import type {
   AgentRunSummary,
   AgentScheduleConfig,
   ScheduleAnalysisSummary,
+  ScheduleBulletinSummary,
   ScheduleGapSummary,
   ScheduleIngestSummary,
   ScheduleSendSummary,
 } from "./schedule";
-import { markGapSearchRun } from "./schedule-store";
+import { markBulletinSent, markGapSearchRun } from "./schedule-store";
 
 /** Root-cause-first, secret-free text (drizzle hides the real error in `cause`). */
 function errorText(error: unknown): string {
@@ -94,6 +98,137 @@ export async function selectSendCandidates(
   return rows.map((row) => row.id);
 }
 
+/**
+ * Rule-matching, never-delivered articles ranked for the digest (top 5).
+ * Same strict AND rule as per-item sends — a bulletin can never smuggle in an
+ * article that would fail the single-message path.
+ */
+async function selectBulletinCandidates(config: AgentScheduleConfig): Promise<NewsRow[]> {
+  const rule = scheduleToRule(config);
+  const ids = await selectSendCandidates({ ...config, maxSend: 50 });
+  if (ids.length === 0) return [];
+  const rows = await db.select().from(news).where(inArray(news.id, ids));
+  const matching = rows.filter((row) => evaluateArticle(row, rule).matches);
+  return pickBulletinItems(matching, MAX_BULLETIN_ITEMS);
+}
+
+/** "both" mode: items already sent to the destination since the last bulletin. */
+async function selectRecapItems(config: AgentScheduleConfig): Promise<NewsRow[]> {
+  const targets = expandTargets(config.destination);
+  const [row] = await db
+    .select({ at: agentSchedules.lastBulletinAt })
+    .from(agentSchedules)
+    .orderBy(asc(agentSchedules.createdAt))
+    .limit(1);
+  // First recap ever => last day.
+  const since = row?.at ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const sentRows = await db
+    .select({ id: deliveries.newsId })
+    .from(deliveries)
+    .where(
+      and(
+        eq(deliveries.status, "sent"),
+        inArray(deliveries.destination, targets),
+        gte(deliveries.sentAt, since),
+      ),
+    )
+    .orderBy(desc(deliveries.sentAt))
+    .limit(20);
+
+  const ids = [...new Set(sentRows.map((entry) => entry.id))].slice(0, MAX_BULLETIN_ITEMS);
+  if (ids.length === 0) return [];
+  const rows = await db.select().from(news).where(inArray(news.id, ids));
+  return pickBulletinItems(rows, MAX_BULLETIN_ITEMS);
+}
+
+/** Builds the digest (AI intro + minimal columns) and sends it as ONE message. */
+async function sendBulletin(
+  config: AgentScheduleConfig,
+  items: NewsRow[],
+  options: { recordRows: boolean; trigger: "schedule" | "manual" },
+): Promise<ScheduleBulletinSummary> {
+  const intro = await synthesizeBulletinBrief(
+    items.map((item) => ({
+      title: item.title,
+      oneLiner: item.summary,
+      whyItMatters: item.whyItMatters,
+    })),
+    {},
+  );
+
+  const text = buildBulletinMessage({
+    intro,
+    items: items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      oneLiner: item.summary,
+      whyItMatters: item.whyItMatters,
+      url: item.url,
+      importanceScore: item.importanceScore,
+      publishedAt: item.publishedAt,
+    })),
+    generatedAt: new Date(),
+    timezone: config.timezone,
+  });
+
+  const result = await sendBulletinDelivery({
+    text,
+    newsIds: items.map((item) => item.id),
+    target: config.destination,
+    trigger: options.trigger === "schedule" ? "auto" : "manual",
+    recordRows: options.recordRows,
+  });
+
+  if (!result.ok) {
+    return { attempted: true, sent: false, itemCount: items.length, reason: "delivery_failed" };
+  }
+
+  await markBulletinSent();
+  return { attempted: true, sent: true, itemCount: items.length, reason: null };
+}
+
+/**
+ * Bulletin pass: pick qualifying items (or recap what was sent), fall back to a
+ * coverage-gap search when the channel would otherwise be silent, then send one
+ * digest message. `publishMode: "both"` uses the recap selection.
+ */
+async function runBulletinPhase(
+  config: AgentScheduleConfig,
+  trigger: "schedule" | "manual",
+): Promise<{ summary: ScheduleBulletinSummary; gapSearch?: ScheduleGapSummary | null }> {
+  if (config.publishMode === "both") {
+    const recaps = await selectRecapItems(config);
+    if (recaps.length === 0) {
+      return { summary: { attempted: true, sent: false, itemCount: 0, reason: "nothing_new" } };
+    }
+    return { summary: await sendBulletin(config, recaps, { recordRows: false, trigger }) };
+  }
+
+  // "bulletin" mode — or a manual digest run from any mode.
+  let items = await selectBulletinCandidates(config);
+  let gapSearch: ScheduleGapSummary | null = null;
+
+  if (items.length === 0 && config.gapSearchEnabled) {
+    // Nothing qualifying: search the coverage gaps NOW so the digest is not
+    // silently skipped (analyze only — delivery is the digest's job).
+    gapSearch = await runGapSearchPhase(config, 0, false);
+    if (gapSearch.ran) items = await selectBulletinCandidates(config);
+  }
+
+  if (items.length === 0) {
+    return {
+      summary: { attempted: true, sent: false, itemCount: 0, reason: "no_qualifying_items" },
+      gapSearch,
+    };
+  }
+
+  return {
+    summary: await sendBulletin(config, items, { recordRows: true, trigger }),
+    gapSearch,
+  };
+}
+
 /** Gap-search runs at most this often (the operator's target cadence is ~30min). */
 const GAP_SEARCH_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 
@@ -108,6 +243,8 @@ const GAP_SEARCH_MAX_ITEMS = 5;
 async function runGapSearchPhase(
   config: AgentScheduleConfig,
   alreadySent: number,
+  /** false = ingest+analyze only (bulletin mode holds delivery for the digest). */
+  deliver: boolean,
 ): Promise<ScheduleGapSummary> {
   const base: ScheduleGapSummary = {
     ran: false,
@@ -173,14 +310,16 @@ async function runGapSearchPhase(
       const results = await analyzeSequentially(report.newArticleIds.slice(0, GAP_SEARCH_MAX_ITEMS));
       analyzed = results.filter((item) => item.ok).length;
 
-      const candidates = await selectSendCandidates(config);
-      const gapCandidates = candidates.filter((id) => report.newArticleIds.includes(id));
-      if (gapCandidates.length > 0) {
-        const delivery = await runAutoDeliveryPass({
-          newsIds: gapCandidates,
-          rule: scheduleToRule(config),
-        });
-        sent = delivery.sent;
+      if (deliver) {
+        const candidates = await selectSendCandidates(config);
+        const gapCandidates = candidates.filter((id) => report.newArticleIds.includes(id));
+        if (gapCandidates.length > 0) {
+          const delivery = await runAutoDeliveryPass({
+            newsIds: gapCandidates,
+            rule: scheduleToRule(config),
+          });
+          sent = delivery.sent;
+        }
       }
     }
 
@@ -210,6 +349,8 @@ export async function runScheduledPass(args: {
   config: AgentScheduleConfig;
   trigger: "schedule" | "manual";
   slotKey?: string | null;
+  /** "bulletin" builds/sends the digest instead of per-item messages. */
+  passKind?: "regular" | "bulletin";
 }): Promise<AgentRunSummary> {
   activeRun = true;
   try {
@@ -223,6 +364,7 @@ async function executeScheduledPass(args: {
   config: AgentScheduleConfig;
   trigger: "schedule" | "manual";
   slotKey?: string | null;
+  passKind?: "regular" | "bulletin";
 }): Promise<AgentRunSummary> {
   const startedAt = new Date();
   const errors: string[] = [];
@@ -284,38 +426,24 @@ async function executeScheduledPass(args: {
     errors.push(`تحلیل اخبار: ${detail}`);
   }
 
-  // 3) Send everything analyzed and not yet delivered to this destination.
-  try {
-    const candidates = await selectSendCandidates(args.config);
-    const result = await runAutoDeliveryPass({
-      newsIds: candidates,
-      rule: scheduleToRule(args.config),
-    });
+  // 3) Delivery — per-item messages, or held for the digest, depending on the
+  //    pass kind and the configured publish mode.
+  let gapSearch: ScheduleGapSummary | null = null;
+  let bulletin: ScheduleBulletinSummary | null = null;
 
-    send = {
-      enabled: result.enabled,
-      destination: result.destination,
-      considered: result.considered,
-      matched: result.matched,
-      sent: result.sent,
-      skippedDuplicates: result.skippedDuplicates,
-      skippedReview: result.skippedReview,
-      failed: result.failed,
-      // Keep a few rejected candidates with their reasons so the operator can
-      // see WHY a news item was not sent instead of guessing at the thresholds.
-      rejected: result.items
-        .filter((item) => item.outcome === "not_matched" || item.outcome === "skipped_review")
-        .slice(0, 5)
-        .map((item) => ({ title: item.title, reasons: item.reasons ?? [] })),
-    };
-
-    for (const item of result.items) {
-      if (item.outcome === "failed" && item.errors?.length) {
-        errors.push(`${item.title}: ${item.errors.join(" | ")}`);
-      }
+  if (args.passKind === "bulletin") {
+    // Digest pass: everything analyzed above goes through the same strict
+    // rule, then out as ONE bulletin message.
+    try {
+      const outcome = await runBulletinPhase(args.config, args.trigger);
+      bulletin = outcome.summary;
+      gapSearch = outcome.gapSearch ?? null;
+    } catch (error) {
+      bulletin = { attempted: true, sent: false, itemCount: 0, reason: "delivery_failed" };
+      errors.push(`بولتن: ${errorText(error)}`);
     }
-  } catch (error) {
-    const detail = errorText(error);
+  } else if (args.config.publishMode === "bulletin") {
+    // hold_all: nothing goes out per-item; the next bulletin carries it.
     send = {
       enabled: true,
       destination: args.config.destination,
@@ -325,26 +453,70 @@ async function executeScheduledPass(args: {
       skippedDuplicates: 0,
       skippedReview: 0,
       failed: 0,
+      heldForBulletin: true,
     };
-    errors.push(`ارسال خودکار: ${detail}`);
-  }
-
-  // 4) Coverage-gap search — only when this pass sent nothing and the feature
-  //    is enabled. Feeds its results through the same analyze + strict send.
-  let gapSearch: ScheduleGapSummary | null = null;
-  if (args.config.gapSearchEnabled) {
+  } else {
+    // single | both — send everything analyzed and not yet delivered.
     try {
-      gapSearch = await runGapSearchPhase(args.config, send.sent);
-    } catch (error) {
-      gapSearch = {
-        ran: false,
-        reason: "all_fetches_failed",
-        queries: [],
-        found: 0,
-        analyzed: 0,
-        sent: 0,
+      const candidates = await selectSendCandidates(args.config);
+      const result = await runAutoDeliveryPass({
+        newsIds: candidates,
+        rule: scheduleToRule(args.config),
+      });
+
+      send = {
+        enabled: result.enabled,
+        destination: result.destination,
+        considered: result.considered,
+        matched: result.matched,
+        sent: result.sent,
+        skippedDuplicates: result.skippedDuplicates,
+        skippedReview: result.skippedReview,
+        failed: result.failed,
+        // Keep a few rejected candidates with their reasons so the operator can
+        // see WHY a news item was not sent instead of guessing at the thresholds.
+        rejected: result.items
+          .filter((item) => item.outcome === "not_matched" || item.outcome === "skipped_review")
+          .slice(0, 5)
+          .map((item) => ({ title: item.title, reasons: item.reasons ?? [] })),
       };
-      errors.push(`جست‌وجوی هدفمند: ${errorText(error)}`);
+
+      for (const item of result.items) {
+        if (item.outcome === "failed" && item.errors?.length) {
+          errors.push(`${item.title}: ${item.errors.join(" | ")}`);
+        }
+      }
+    } catch (error) {
+      const detail = errorText(error);
+      send = {
+        enabled: true,
+        destination: args.config.destination,
+        considered: 0,
+        matched: 0,
+        sent: 0,
+        skippedDuplicates: 0,
+        skippedReview: 0,
+        failed: 0,
+      };
+      errors.push(`ارسال خودکار: ${detail}`);
+    }
+
+    // 4) Coverage-gap search — only when this pass sent nothing and the feature
+    //    is enabled (bulletin passes handle their own silence inside the phase).
+    if (args.config.gapSearchEnabled) {
+      try {
+        gapSearch = await runGapSearchPhase(args.config, send.sent, true);
+      } catch (error) {
+        gapSearch = {
+          ran: false,
+          reason: "all_fetches_failed",
+          queries: [],
+          found: 0,
+          analyzed: 0,
+          sent: 0,
+        };
+        errors.push(`جست‌وجوی هدفمند: ${errorText(error)}`);
+      }
     }
   }
 
@@ -361,6 +533,7 @@ async function executeScheduledPass(args: {
     analysis,
     send,
     gapSearch,
+    bulletin,
     errors: errors.slice(0, 10),
   };
 }

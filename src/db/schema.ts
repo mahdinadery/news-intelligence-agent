@@ -363,6 +363,13 @@ export const agentSchedules = pgTable("agent_schedules", {
   gapSearchEnabled: boolean("gap_search_enabled").notNull().default(false),
   gapSearchQueries: jsonb("gap_search_queries").notNull().$type<string[]>().default(sql`'[]'::jsonb`),
   lastGapSearchAt: timestamp("last_gap_search_at", { withTimezone: true, mode: "date" }),
+  // Publishing format (Phase 2): "single" (current per-item messages),
+  // "bulletin" (digest at fixed hours; everything waits), or "both".
+  publishMode: text("publish_mode").notNull().default("single"),
+  // Local HH:MM times the bulletin is published at (independent of `times`).
+  bulletinTimes: jsonb("bulletin_times").notNull().$type<string[]>().default(sql`'["08:00","14:00"]'::jsonb`),
+  lastBulletinSlot: text("last_bulletin_slot"),
+  lastBulletinAt: timestamp("last_bulletin_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });

@@ -172,6 +172,80 @@ export async function sendNewsDelivery(
   return { ok: true, message, results };
 }
 
+export type BulletinSendResult = {
+  ok: boolean;
+  results: DestinationResult[];
+  /** Per-news delivery rows written (newsId x destination on success). */
+  recordedFor: string[];
+};
+
+/**
+ * Sends ONE digest text to the selected destination(s) and records a delivery
+ * row per covered news item (so later single sends / bulletins skip them).
+ *
+ * A bulletin is a single provider message: one failing provider never blocks
+ * the sibling, exactly like per-item sends. Never throws.
+ */
+export async function sendBulletinDelivery(params: {
+  text: string;
+  newsIds: string[];
+  target: DeliveryTarget;
+  trigger: SendTrigger;
+  /**
+   * false for "both"-mode recaps: the covered items already have delivery rows
+   * from their per-item sends — the digest is a wrap-up, not a second delivery.
+   */
+  recordRows?: boolean;
+}): Promise<BulletinSendResult> {
+  const { text, newsIds, target, trigger } = params;
+  const recordRows = params.recordRows ?? true;
+  const destinations = target === "both" ? DESTINATIONS : [target];
+
+  const results: DestinationResult[] = [];
+  const recordedFor: string[] = [];
+
+  for (const destination of destinations) {
+    let outcome: ProviderOutcome;
+    try {
+      outcome = await PROVIDERS[destination](text);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      outcome = { ok: false, providerMessageId: null, errorMessage: detail.slice(0, 200) };
+    }
+
+    const status: DeliveryStatus = outcome.ok ? "sent" : "failed";
+    results.push({
+      destination,
+      status,
+      ok: outcome.ok,
+      errorMessage: outcome.errorMessage,
+    });
+
+    if (!outcome.ok || !recordRows) continue;
+
+    for (const newsId of newsIds) {
+      try {
+        await persistAttempt({
+          newsId,
+          destination,
+          status,
+          message: text,
+          errorMessage: null,
+          trigger,
+          providerMessageId: outcome.providerMessageId,
+        });
+        recordedFor.push(newsId);
+      } catch (error) {
+        // The digest DID go out — a log failure must not flip the verdict.
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("[bulletin] delivery log failed:", detail.slice(0, 160));
+      }
+    }
+  }
+
+  return { ok: results.some((result) => result.ok), results, recordedFor };
+}
+
 export type DeliveryState = {
   local: "sent" | "failed" | null;
   bale: "sent" | "failed" | null;

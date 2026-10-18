@@ -1,7 +1,9 @@
 import { checkAdminAccess } from "@/lib/admin/access";
 import { getBaleConfigStatus } from "@/lib/bale/client";
 import {
+  computeDueBulletinSlot,
   computeDueSlot,
+  computeNextBulletinRun,
   computeNextRun,
   coerceScheduleConfig,
   describeSchedule,
@@ -50,6 +52,10 @@ export async function GET() {
       requireAiRecommendation: record.requireAiRecommendation,
       maxAnalyze: record.maxAnalyze,
       maxSend: record.maxSend,
+      gapSearchEnabled: record.gapSearchEnabled,
+      gapSearchQueries: record.gapSearchQueries,
+      publishMode: record.publishMode,
+      bulletinTimes: record.bulletinTimes,
     },
     status: {
       persisted: Boolean(record.id),
@@ -59,6 +65,12 @@ export async function GET() {
       lastRunAt: record.lastRunAt ? record.lastRunAt.toISOString() : null,
       lastRunSlot: record.lastRunSlot,
       lastResult: record.lastResult,
+      lastBulletinAt: record.lastBulletinAt ? record.lastBulletinAt.toISOString() : null,
+      lastBulletinSlot: record.lastBulletinSlot,
+      nextBulletinAt: (() => {
+        const bulletinNext = computeNextBulletinRun({ now: new Date(), config: record });
+        return bulletinNext ? bulletinNext.at.toISOString() : null;
+      })(),
       dueReason: due.due ? "due" : due.reason,
       running: isScheduledRunInProgress(),
     },
@@ -130,9 +142,10 @@ export async function PUT(request: Request) {
 }
 
 /**
- * POST /api/agent/scheduler — run the full pass right now (manual catch-up).
- * The schedule's own thresholds/destination are used; the daily slot is left
- * untouched so the next scheduled run still happens.
+ * POST /api/agent/scheduler — run a pass right now (manual catch-up).
+ * Body `{ "kind": "bulletin" }` builds/sends the digest immediately (the
+ * dashboard's «ارسال فوری بولتن» button); anything else runs the regular
+ * fetch→analyze→send pass. The scheduled slots are left untouched.
  */
 export async function POST(request: Request) {
   const access = checkAdminAccess(request);
@@ -147,9 +160,17 @@ export async function POST(request: Request) {
     );
   }
 
+  let passKind: "regular" | "bulletin" = "regular";
+  try {
+    const body = (await request.json()) as { kind?: string } | null;
+    if (body?.kind === "bulletin") passKind = "bulletin";
+  } catch {
+    // Empty/non-JSON body => regular pass (the common manual button).
+  }
+
   const record = await readScheduleRecord();
   const config = coerceScheduleConfig(record);
-  const summary = await runScheduledPass({ config, trigger: "manual", slotKey: null });
+  const summary = await runScheduledPass({ config, trigger: "manual", slotKey: null, passKind });
 
   await recordRunResult(record.id, summary);
 

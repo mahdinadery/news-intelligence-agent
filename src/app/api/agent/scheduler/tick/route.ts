@@ -1,6 +1,17 @@
 import { checkAdminAccess } from "@/lib/admin/access";
-import { computeDueSlot, computeNextRun, coerceScheduleConfig } from "@/lib/agent/schedule";
-import { claimSlot, readScheduleRecord, recordRunResult } from "@/lib/agent/schedule-store";
+import {
+  computeDueBulletinSlot,
+  computeDueSlot,
+  computeNextBulletinRun,
+  computeNextRun,
+  coerceScheduleConfig,
+} from "@/lib/agent/schedule";
+import {
+  claimBulletinSlot,
+  claimSlot,
+  readScheduleRecord,
+  recordRunResult,
+} from "@/lib/agent/schedule-store";
 import { isScheduledRunInProgress, runScheduledPass } from "@/lib/agent/scheduled-run";
 
 export const dynamic = "force-dynamic";
@@ -35,15 +46,18 @@ export async function POST(request: Request) {
   const now = new Date();
 
   const due = computeDueSlot({ now, config, lastRunSlot: record.lastRunSlot });
+  const bulletinDue = computeDueBulletinSlot({ now, config, lastBulletinSlot: record.lastBulletinSlot });
 
-  if (!due.due) {
+  if (!due.due && !bulletinDue.due) {
     const next = computeNextRun({ now, config });
+    const nextBulletin = computeNextBulletinRun({ now, config });
     return Response.json({
       success: true,
       ran: false,
       reason: due.reason,
       nextRunAt: next?.at.toISOString() ?? null,
       nextRunSlot: next?.slotKey ?? null,
+      nextBulletinAt: nextBulletin?.at.toISOString() ?? null,
       message:
         due.reason === "disabled"
           ? "زمان‌بندی خودکار خاموش است."
@@ -58,8 +72,41 @@ export async function POST(request: Request) {
       success: true,
       ran: false,
       reason: "in_progress",
-      slotKey: due.slotKey,
+      slotKey: due.due ? due.slotKey : bulletinDue.due ? bulletinDue.slotKey : null,
       message: "یک اجرا در حال انجام است.",
+    });
+  }
+
+  // Bulletin slot first when due: the digest is time-critical; the per-item
+  // pass (ingest+analyze) still runs right after for the next slot.
+  if (bulletinDue.due) {
+    const claimed = await claimBulletinSlot(record.id, bulletinDue.slotKey);
+    if (claimed) {
+      const bulletinSummary = await runScheduledPass({
+        config,
+        trigger: "schedule",
+        slotKey: bulletinDue.slotKey,
+        passKind: "bulletin",
+      });
+      await recordRunResult(record.id, bulletinSummary);
+      return Response.json({
+        success: true,
+        ran: true,
+        passKind: "bulletin",
+        slotKey: bulletinDue.slotKey,
+        summary: bulletinSummary,
+      });
+    }
+  }
+
+  if (!due.due) {
+    // Only the bulletin was due and it is already claimed.
+    return Response.json({
+      success: true,
+      ran: false,
+      reason: "already_claimed",
+      slotKey: bulletinDue.due ? bulletinDue.slotKey : null,
+      message: "این نوبت توسط درخواست دیگری آغاز شده است.",
     });
   }
 

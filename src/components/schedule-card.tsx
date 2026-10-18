@@ -8,6 +8,8 @@ import { StatusBadge } from "./status-badge";
 
 type Destination = "local" | "bale" | "both";
 
+type PublishMode = "single" | "bulletin" | "both";
+
 type ScheduleConfig = {
   enabled: boolean;
   timezone: string;
@@ -21,6 +23,8 @@ type ScheduleConfig = {
   maxSend: number;
   gapSearchEnabled: boolean;
   gapSearchQueries: string[];
+  publishMode: PublishMode;
+  bulletinTimes: string[];
 };
 
 type RunSummary = {
@@ -51,6 +55,12 @@ type RunSummary = {
     found: number;
     analyzed: number;
     sent: number;
+  } | null;
+  bulletin?: {
+    attempted: boolean;
+    sent: boolean;
+    itemCount: number;
+    reason: string | null;
   } | null;
   errors: string[];
 };
@@ -131,12 +141,18 @@ function defaultConfig(): ScheduleConfig {
     maxSend: 10,
     gapSearchEnabled: false,
     gapSearchQueries: [],
+    publishMode: "single",
+    bulletinTimes: ["08:00", "14:00"],
   };
 }
 
 /** API rows may carry null for the manual query list; the form keeps arrays. */
 function normalizeLoadedConfig(config: ScheduleConfig): ScheduleConfig {
-  return { ...config, gapSearchQueries: config.gapSearchQueries ?? [] };
+  return {
+    ...config,
+    gapSearchQueries: config.gapSearchQueries ?? [],
+    bulletinTimes: config.bulletinTimes ?? ["08:00", "14:00"],
+  };
 }
 
 export function ScheduleCard({
@@ -239,6 +255,47 @@ export function ScheduleCard({
       setMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });
     } finally {
       setSaving(false);
+    }
+  }
+
+  const [bulletinRunning, setBulletinRunning] = useState(false);
+
+  async function handleRunBulletin() {
+    if (bulletinRunning) return;
+    setBulletinRunning(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/agent/scheduler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(adminKey) },
+        body: JSON.stringify({ kind: "bulletin" }),
+      });
+      const data = (await response.json()) as ApiResponse;
+
+      if (!response.ok || !data.success || !data.summary) {
+        setMessage({
+          kind: "err",
+          text:
+            response.status === 401
+              ? "ارسال بولتن به کلید مدیریتی نیاز دارد (یک‌بار با ?key=... وارد شوید)."
+              : data.message ?? "ارسال بولتن ناموفق بود.",
+        });
+        return;
+      }
+
+      setLastRun(data.summary);
+      const bulletin = data.summary.bulletin;
+      setMessage({
+        kind: bulletin?.sent ? "ok" : "err",
+        text: bulletin?.sent
+          ? `بولتن با ${bulletin.itemCount} خبر ارسال شد.`
+          : `بولتن ارسال نشد (${bulletin?.reason ?? "—"}).`,
+      });
+    } catch {
+      setMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });
+    } finally {
+      setBulletinRunning(false);
     }
   }
 
@@ -401,6 +458,13 @@ export function ScheduleCard({
                 <span className="mx-1 text-slate-300">·</span>
                 <span className={lastRun.ok ? "text-emerald-700" : "text-amber-700"}>
                   {lastRun.send?.sent ?? 0} ارسال / {lastRun.analysis?.analyzed ?? 0} تحلیل
+                  {lastRun.bulletin ? (
+                    <span className="mr-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                      {lastRun.bulletin.sent
+                        ? `بولتن: ${lastRun.bulletin.itemCount} خبر ارسال شد`
+                        : `بولتن ارسال نشد (${lastRun.bulletin.reason ?? "—"})`}
+                    </span>
+                  ) : null}
                   {lastRun.gapSearch ? (
                     <span className="mr-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
                       {lastRun.gapSearch.ran
@@ -674,6 +738,82 @@ export function ScheduleCard({
                 value={config.gapSearchQueries.join("\n")}
               />
             </label>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 p-4">
+          <h3 className="text-sm font-bold text-slate-800">حالت انتشار</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            «بولتن»: همهٔ خبرهای واجد شرایط منتظر می‌مانند و سرِ ساعت‌های تعیین‌شده در یک پیام گواردیجست می‌شوند
+            (عنوان + یک‌خطی + چرا مهم + لینک، با یک جمع‌بندی از هوش مصنوعی). «هر دو»: تک‌پیام‌ها فوری می‌روند و بولتن،
+            جمع‌بندی همان خبرها در ساعت‌های بولتن است.
+          </p>
+
+          <label className="mt-3 block text-xs leading-5 text-slate-600">
+            <span className="mb-1 block font-medium text-slate-700">نحوهٔ انتشار در کانال</span>
+            <select
+              className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-200"
+              onChange={(event) => setConfig({ ...config, publishMode: event.target.value as PublishMode })}
+              value={config.publishMode}
+            >
+              <option value="single">تک‌پیام (رفتار فعلی)</option>
+              <option value="bulletin">فقط بولتن (همه منتظر بولتن می‌مانند)</option>
+              <option value="both">هر دو (تک‌پیام فوری + بولتن جمع‌بندی)</option>
+            </select>
+          </label>
+
+          {config.publishMode !== "single" ? (
+            <div className="mt-3">
+              <span className="mb-1 block text-xs font-medium text-slate-700">
+                ساعت‌های انتشار بولتن (به وقت {config.timezone})
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {config.bulletinTimes.map((time, index) => (
+                  <span key={index} className="flex items-center gap-1">
+                    <input
+                      className="w-[72px] rounded-lg border border-slate-200 p-1.5 text-center font-mono text-xs focus:border-sky-300 focus:outline-none"
+                      dir="ltr"
+                      onChange={(event) => {
+                        const next = [...config.bulletinTimes];
+                        next[index] = event.target.value;
+                        setConfig({ ...config, bulletinTimes: next });
+                      }}
+                      value={time}
+                    />
+                    <button
+                      aria-label="حذف ساعت"
+                      className="rounded px-1.5 py-0.5 text-xs text-rose-500 hover:bg-rose-50"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          bulletinTimes: config.bulletinTimes.filter((_, i) => i !== index),
+                        })
+                      }
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <button
+                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  disabled={config.bulletinTimes.length >= 12}
+                  onClick={() => setConfig({ ...config, bulletinTimes: [...config.bulletinTimes, "12:00"] })}
+                  type="button"
+                >
+                  + افزودن ساعت
+                </button>
+              </div>
+
+              <button
+                className="mt-3 rounded-lg bg-sky-600 px-3 py-2 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                disabled={bulletinRunning}
+                onClick={handleRunBulletin}
+                type="button"
+              >
+                {bulletinRunning ? "در حال ارسال بولتن..." : "ارسال فوری بولتن"}
+              </button>
+            </div>
           ) : null}
         </div>
       </div>

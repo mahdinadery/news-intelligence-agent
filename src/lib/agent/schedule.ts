@@ -34,6 +34,11 @@ export const SCHEDULE_TIMEZONES = [
  */
 export const SCHEDULE_GRACE_MINUTES = 60;
 
+/** How the channel receives news: per-item messages, a digest, or both. */
+export type PublishMode = "single" | "bulletin" | "both";
+
+export const PUBLISH_MODES: PublishMode[] = ["single", "bulletin", "both"];
+
 export type AgentScheduleConfig = {
   enabled: boolean;
   /** IANA timezone the `times` are interpreted in. */
@@ -56,6 +61,10 @@ export type AgentScheduleConfig = {
   gapSearchEnabled: boolean;
   /** Manual search queries (newline-separated in the UI). null => derive from topics. */
   gapSearchQueries: string[] | null;
+  /** Publishing format: per-item messages, bulletin digest at fixed hours, or both. */
+  publishMode: PublishMode;
+  /** Bulletin local times "HH:MM" (used when publishMode includes bulletin). */
+  bulletinTimes: string[];
 };
 
 export type ScheduleIngestSummary = {
@@ -92,6 +101,18 @@ export type ScheduleSendSummary = {
   failed: number;
   /** Up to a handful of rejected candidates, so thresholds can be tuned from real data. */
   rejected?: ScheduleSendRejection[];
+  /** true in bulletin mode: items were held for the digest, not dropped. */
+  heldForBulletin?: boolean;
+};
+
+/** Result of the bulletin phase (digest build + send). */
+export type ScheduleBulletinSummary = {
+  attempted: boolean;
+  sent: boolean;
+  /** How many news items were packed into the digest. */
+  itemCount: number;
+  /** Why it was skipped ("no_qualifying_items" | "nothing_new" | "delivery_failed"), null on success. */
+  reason: string | null;
 };
 
 /** Result of the optional coverage-gap search phase of one pass. */
@@ -120,6 +141,8 @@ export type AgentRunSummary = {
   send: ScheduleSendSummary | null;
   /** Present when the coverage-gap search feature is enabled. */
   gapSearch?: ScheduleGapSummary | null;
+  /** Present on bulletin passes (or any pass where the digest was built). */
+  bulletin?: ScheduleBulletinSummary | null;
   errors: string[];
 };
 
@@ -136,6 +159,8 @@ export const DEFAULT_AGENT_SCHEDULE: AgentScheduleConfig = {
   maxSend: 10,
   gapSearchEnabled: false,
   gapSearchQueries: null,
+  publishMode: "single",
+  bulletinTimes: ["08:00", "14:00"],
 };
 
 export type TimeParts = {
@@ -338,6 +363,86 @@ export function computeDueSlot(args: {
 }
 
 /**
+ * Bulletin twin of `computeDueSlot`: a bulletin slot (`YYYY-MM-DDTHH:MM` of a
+ * `bulletinTimes` entry) is runnable within its grace window and not yet
+ * claimed in `lastBulletinSlot`. Only active when the publish mode includes
+ * bulletins ("bulletin" or "both").
+ */
+export function computeDueBulletinSlot(args: {
+  now: Date;
+  config: Pick<AgentScheduleConfig, "enabled" | "timezone" | "bulletinTimes" | "publishMode">;
+  lastBulletinSlot?: string | null;
+  graceMinutes?: number;
+}): DueSlot {
+  const { now, config, lastBulletinSlot } = args;
+  const times = normalizeTimes(config.bulletinTimes);
+  const modeWantsBulletin = config.publishMode === "bulletin" || config.publishMode === "both";
+
+  if (!config.enabled || !modeWantsBulletin) return { due: false, reason: "disabled", nextRunAt: null };
+  if (times.length === 0) return { due: false, reason: "no_times", nextRunAt: null };
+
+  const grace = args.graceMinutes ?? effectiveGraceMinutes(times);
+  const parts = getZonedParts(now, config.timezone);
+  const dateKey = dateKeyOf(parts);
+  const nowMinutes = parts.hour * 60 + parts.minute;
+
+  let match: { slotKey: string; slotTime: string; minutes: number } | null = null;
+  let alreadyRan = false;
+
+  for (const time of times) {
+    const minutes = timeToMinutes(time);
+    if (nowMinutes < minutes || nowMinutes >= minutes + grace) continue;
+
+    const slotKey = `B${dateKey}T${time}`;
+    if (lastBulletinSlot === slotKey) {
+      alreadyRan = true;
+      continue;
+    }
+    if (!match || minutes > match.minutes) match = { slotKey, slotTime: time, minutes };
+  }
+
+  const next = computeNextBulletinRun({ now, config });
+
+  if (match) {
+    return {
+      due: true,
+      slotKey: match.slotKey,
+      slotTime: match.slotTime,
+      slotAt: zonedTimeToUtc(dateKey, match.slotTime, config.timezone),
+    };
+  }
+
+  return {
+    due: false,
+    reason: alreadyRan ? "already_ran" : "not_due",
+    nextRunAt: next?.at ?? null,
+  };
+}
+
+/** First bulletin slot strictly after `now` (14-day lookahead). */
+export function computeNextBulletinRun(args: {
+  now: Date;
+  config: Pick<AgentScheduleConfig, "timezone" | "bulletinTimes">;
+}): { at: Date; slotKey: string; time: string } | null {
+  const times = normalizeTimes(args.config.bulletinTimes);
+  if (times.length === 0) return null;
+
+  const todayKey = dateKeyOf(getZonedParts(args.now, args.config.timezone));
+
+  for (let dayOffset = 0; dayOffset < 14; dayOffset += 1) {
+    const dateKey = addDaysToKey(todayKey, dayOffset);
+    for (const time of times) {
+      const at = zonedTimeToUtc(dateKey, time, args.config.timezone);
+      if (at.getTime() > args.now.getTime()) {
+        return { at, slotKey: `B${dateKey}T${time}`, time };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * First configured slot strictly after `now` (looks up to 14 days ahead).
  */
 export function computeNextRun(args: {
@@ -413,6 +518,10 @@ export function coerceScheduleConfig(raw: Record<string, unknown> | null | undef
     maxSend: clampInt(source.maxSend, DEFAULT_AGENT_SCHEDULE.maxSend, 1, 50),
     gapSearchEnabled: readBool(source.gapSearchEnabled, DEFAULT_AGENT_SCHEDULE.gapSearchEnabled),
     gapSearchQueries: coerceGapQueries(source.gapSearchQueries),
+    publishMode: PUBLISH_MODES.includes(source.publishMode as PublishMode)
+      ? (source.publishMode as PublishMode)
+      : DEFAULT_AGENT_SCHEDULE.publishMode,
+    bulletinTimes: normalizeTimes(source.bulletinTimes ?? DEFAULT_AGENT_SCHEDULE.bulletinTimes),
   };
 }
 
@@ -456,6 +565,12 @@ export function validateScheduleInput(raw: unknown): ScheduleValidation {
     }
     if (config.enabled && normalized.length === 0) {
       errors.push("برای فعال‌سازی زمان‌بندی، حداقل یک زمان ارسال لازم است.");
+    }
+    if (
+      (config.publishMode === "bulletin" || config.publishMode === "both") &&
+      config.bulletinTimes.length === 0
+    ) {
+      errors.push("برای حالت بولتن، حداقل یک ساعت انتشار بولتن لازم است.");
     }
     // Duplicates are harmless and silently removed by normalizeTimes().
     config.times = normalized;
