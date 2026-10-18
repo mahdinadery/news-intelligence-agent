@@ -24,6 +24,7 @@ import {
   recoverStaleProcessing,
   selectAnalysisBacklog,
 } from "@/lib/news/analysis-queue";
+import { collapseEventGroups } from "@/lib/news/corroboration";
 import { deriveGapQueries, buildSearchUrl, MAX_GAP_QUERIES } from "@/lib/news/gap-search";
 import { fetchFeed, type NormalizedNews } from "@/lib/news/rss";
 import { ingestAllActiveSources, ingestSearchItems } from "@/lib/news/source-ingest";
@@ -64,6 +65,11 @@ export function scheduleToRule(config: AgentScheduleConfig): AutoSendRule {
  * Analyzed articles that were never successfully sent to this pass's
  * destination(s), newest first. Already-delivered articles are excluded at the
  * SQL level so the batch is not wasted re-checking them.
+ *
+ * Multi-source rule («یک خبر انتخاب شود»): same-event copies (shared
+ * similarity key) collapse to ONE representative — the highest-importance
+ * copy — and an event whose ANY copy was already delivered is skipped entirely
+ * (the channel must never receive the same story twice).
  */
 export async function selectSendCandidates(
   config: Pick<AgentScheduleConfig, "destination" | "maxSend">,
@@ -71,7 +77,12 @@ export async function selectSendCandidates(
   const targets = expandTargets(config.destination);
 
   const rows = await db
-    .select({ id: news.id })
+    .select({
+      id: news.id,
+      similarityKey: news.similarityKey,
+      importanceScore: news.importanceScore,
+      publishedAt: news.publishedAt,
+    })
     .from(news)
     .where(
       and(
@@ -93,9 +104,39 @@ export async function selectSendCandidates(
       ),
     )
     .orderBy(desc(sql`coalesce(${news.publishedAt}, ${news.createdAt})`))
-    .limit(config.maxSend);
+    // Over-fetch: collapsing same-event copies frees slots for other events.
+    .limit(Math.max(config.maxSend * 3, 30));
 
-  return rows.map((row) => row.id);
+  // Event-level exclusion: if ANY same-key copy was already delivered to these
+  // targets, the event is old news for this channel.
+  const keys = [...new Set(rows.map((row) => (row.similarityKey ?? "").trim()).filter(Boolean))];
+  const deliveredKeys = new Set<string>();
+  if (keys.length > 0) {
+    const sentRows = await db
+      .select({ key: news.similarityKey })
+      .from(news)
+      .innerJoin(deliveries, eq(deliveries.newsId, news.id))
+      .where(
+        and(
+          eq(deliveries.status, "sent"),
+          inArray(deliveries.destination, targets),
+          inArray(news.similarityKey, keys),
+        ),
+      )
+      .limit(50);
+    for (const row of sentRows) {
+      if (row.key) deliveredKeys.add(row.key);
+    }
+  }
+
+  const fresh = rows.filter((row) => {
+    const key = (row.similarityKey ?? "").trim();
+    return !key || !deliveredKeys.has(key);
+  });
+
+  // One representative per event (highest importance, newest on ties).
+  const collapsed = collapseEventGroups(fresh);
+  return collapsed.slice(0, config.maxSend).map((row) => row.id);
 }
 
 /**
@@ -136,10 +177,11 @@ async function selectRecapItems(config: AgentScheduleConfig): Promise<NewsRow[]>
     .orderBy(desc(deliveries.sentAt))
     .limit(20);
 
-  const ids = [...new Set(sentRows.map((entry) => entry.id))].slice(0, MAX_BULLETIN_ITEMS);
+  const ids = [...new Set(sentRows.map((entry) => entry.id))].slice(0, 20);
   if (ids.length === 0) return [];
   const rows = await db.select().from(news).where(inArray(news.id, ids));
-  return pickBulletinItems(rows, MAX_BULLETIN_ITEMS);
+  // Same-event copies collapse to one digest entry.
+  return pickBulletinItems(collapseEventGroups(rows), MAX_BULLETIN_ITEMS);
 }
 
 /** Builds the digest (AI intro + minimal columns) and sends it as ONE message. */
@@ -148,6 +190,33 @@ async function sendBulletin(
   items: NewsRow[],
   options: { recordRows: boolean; trigger: "schedule" | "manual" },
 ): Promise<ScheduleBulletinSummary> {
+  // Batch lookup of other outlets carrying each corroborated item's event —
+  // the digest lists them under the chosen story.
+  const sourceNamesByKey = new Map<string, string[]>();
+  const keys = [...new Set(items.map((item) => (item.similarityKey ?? "").trim()).filter(Boolean))];
+  if (keys.length > 0) {
+    try {
+      const siblingRows = await db
+        .select({ key: news.similarityKey, source: news.source })
+        .from(news)
+        .where(
+          and(
+            inArray(news.similarityKey, keys),
+            gte(news.createdAt, new Date(Date.now() - 72 * 60 * 60 * 1000)),
+          ),
+        )
+        .limit(40);
+      for (const row of siblingRows) {
+        if (!row.key) continue;
+        const list = sourceNamesByKey.get(row.key) ?? [];
+        if (!list.includes(row.source)) list.push(row.source);
+        sourceNamesByKey.set(row.key, list);
+      }
+    } catch {
+      // Best-effort: the badge alone still marks the item as corroborated.
+    }
+  }
+
   const intro = await synthesizeBulletinBrief(
     items.map((item) => ({
       title: item.title,
@@ -168,6 +237,9 @@ async function sendBulletin(
       importanceScore: item.importanceScore,
       publishedAt: item.publishedAt,
       corroborated: (item.corroborationCount ?? 0) >= 2,
+      corroborationSources: ((sourceNamesByKey.get((item.similarityKey ?? "").trim()) ?? []) as string[]).filter(
+        (source) => source !== item.source,
+      ),
       entityTags: item.entityTags ?? [],
     })),
     generatedAt: new Date(),

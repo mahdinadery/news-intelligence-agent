@@ -98,3 +98,28 @@ test("pickBulletinItems: never exceeds MAX_BULLETIN_ITEMS", () => {
   assert.equal(pickBulletinItems(many).length, MAX_BULLETIN_ITEMS);
   assert.equal(pickBulletinItems(many, 2).length, 2);
 });
+
+test("buildBulletinMessage: corroborated item lists the other outlets", () => {
+  const text = buildBulletinMessage({
+    intro: null,
+    items: [
+      item({
+        corroborated: true,
+        corroborationSources: ["ایسنا", "مهر"],
+      }),
+    ],
+    generatedAt: new Date("2026-10-18T12:00:00Z"),
+    timezone: "Asia/Tehran",
+  });
+  assert.ok(text.includes("تأییدشده توسط ۳ منبع: ایسنا، مهر"));
+});
+
+test("buildBulletinMessage: corroborated without names still shows the badge", () => {
+  const text = buildBulletinMessage({
+    intro: null,
+    items: [item({ corroborated: true })],
+    generatedAt: new Date("2026-10-18T12:00:00Z"),
+    timezone: "Asia/Tehran",
+  });
+  assert.ok(text.includes("تأییدشده توسط چند منبع ✓"));
+});
