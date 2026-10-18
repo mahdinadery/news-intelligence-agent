@@ -9,6 +9,7 @@ import {
 import {
   claimBulletinSlot,
   claimSlot,
+  markTickSeen,
   readScheduleRecord,
   recordRunResult,
 } from "@/lib/agent/schedule-store";
@@ -40,6 +41,11 @@ export async function POST(request: Request) {
   if (!access.authorized) {
     return Response.json({ success: false, message: access.reason }, { status: 401 });
   }
+
+  // Liveness heartbeat FIRST: the dashboard shows "the cron is alive" even
+  // when no slot is due — this is what proves the channel runs without the
+  // operator's browser being open.
+  await markTickSeen();
 
   const record = await readScheduleRecord();
   const config = coerceScheduleConfig(record);

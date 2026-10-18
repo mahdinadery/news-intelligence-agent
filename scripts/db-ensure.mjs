@@ -264,6 +264,7 @@ const STEPS = [
   { name: "column agent_schedules.bulletin_times", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "bulletin_times" jsonb DEFAULT '["08:00","14:00"]'::jsonb NOT NULL` },
   { name: "column agent_schedules.last_bulletin_slot", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "last_bulletin_slot" text` },
   { name: "column agent_schedules.last_bulletin_at", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "last_bulletin_at" timestamp with time zone` },
+  { name: "column agent_schedules.last_tick_at", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "last_tick_at" timestamp with time zone` },
   { name: "column ai_configurations.topic_filter", sql: `ALTER TABLE "ai_configurations" ADD COLUMN IF NOT EXISTS "topic_filter" jsonb` },
   { name: "column ai_configurations.auto_send_policy", sql: `ALTER TABLE "ai_configurations" ADD COLUMN IF NOT EXISTS "auto_send_policy" jsonb` },
   { name: "column agent_schedules.max_analyze", sql: `ALTER TABLE "agent_schedules" ADD COLUMN IF NOT EXISTS "max_analyze" integer DEFAULT 8 NOT NULL` },

@@ -32,6 +32,8 @@ export type AgentScheduleRecord = AgentScheduleConfig & {
   lastBulletinSlot: string | null;
   /** When the last bulletin was actually published. */
   lastBulletinAt: Date | null;
+  /** When the external cron last called the tick route (liveness heartbeat). */
+  lastTickAt: Date | null;
 };
 
 function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
@@ -43,6 +45,7 @@ function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
     lastGapSearchAt: row.lastGapSearchAt ?? null,
     lastBulletinSlot: row.lastBulletinSlot ?? null,
     lastBulletinAt: row.lastBulletinAt ?? null,
+    lastTickAt: row.lastTickAt ?? null,
     ...coerceScheduleConfig({
       enabled: row.enabled,
       timezone: row.timezone,
@@ -70,6 +73,7 @@ const FALLBACK: AgentScheduleRecord = {
   lastGapSearchAt: null,
   lastBulletinSlot: null,
   lastBulletinAt: null,
+  lastTickAt: null,
   ...DEFAULT_AGENT_SCHEDULE,
 };
 
@@ -193,6 +197,22 @@ export async function claimBulletinSlot(id: string | null, slotKey: string): Pro
   } catch (error) {
     console.error("[schedule] bulletin-claim failed:", String(error).slice(0, 200));
     return false;
+  }
+}
+
+/**
+ * Liveness heartbeat: stamped on EVERY tick call (even no-ops) so the
+ * dashboard can show whether the external cron is actually firing — the
+ * difference between «running while my page is closed» and silent inactivity.
+ */
+export async function markTickSeen(): Promise<void> {
+  try {
+    await db
+      .update(agentSchedules)
+      .set({ lastTickAt: new Date(), updatedAt: new Date() })
+      .where(sql`true`);
+  } catch (error) {
+    console.error("[schedule] tick-stamp failed:", String(error).slice(0, 200));
   }
 }
 

@@ -180,7 +180,12 @@ export function isValidTime(value: unknown): value is string {
 /** "8:5" → "08:05"; invalid values are dropped. */
 export function normalizeTime(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim();
+  // Users type «۱۴:۳۰» / «١٤:٣٠» — map Persian and Arabic-Indic digits to ASCII
+  // first so valid times are never dropped silently.
+  const asciiDigits = value
+    .replace(/[\u06F0-\u06F9]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660));
+  const trimmed = asciiDigits.trim();
   const match = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
   if (!match) return null;
   const hour = Number(match[1]);

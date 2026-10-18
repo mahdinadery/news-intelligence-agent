@@ -10,6 +10,7 @@ import {
   effectiveGraceMinutes,
   getZonedParts,
   isValidTimeZone,
+  normalizeTime,
   normalizeTimes,
   validateScheduleInput,
   zonedTimeToUtc,
@@ -220,4 +221,16 @@ test("describeSchedule is Persian and reflects the state", () => {
   const lines = describeSchedule(schedule({ times: ["08:00", "20:00"] }));
   assert.match(lines[0], /08:00 و 20:00/);
   assert.match(lines[1], /بله/);
+});
+
+test("normalizeTime accepts Persian and Arabic-Indic digits", () => {
+  assert.equal(normalizeTime("۱۴:۳۰"), "14:30");
+  assert.equal(normalizeTime("٠٨:٠٥"), "08:05");
+  assert.equal(normalizeTime(" ۹:۰۵ "), "09:05");
+  // Mixed digits also work (keyboard layouts do this).
+  assert.equal(normalizeTime("1۴:3۰"), "14:30");
+});
+
+test("normalizeTimes keeps Persian-digit entries instead of dropping them", () => {
+  assert.deepEqual(normalizeTimes(["۸:۰۰", "۱۴:۳۰", "۱۴:۳۰"]), ["08:00", "14:30"]);
 });
