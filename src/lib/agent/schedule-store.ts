@@ -28,6 +28,10 @@ export type AgentScheduleRecord = AgentScheduleConfig & {
   lastResult: AgentRunSummary | null;
   /** When the coverage-gap search last ran (cooldown input). */
   lastGapSearchAt: Date | null;
+  /** Last claimed bulletin slot (idempotency, like lastRunSlot). */
+  lastBulletinSlot: string | null;
+  /** When the last bulletin was actually published. */
+  lastBulletinAt: Date | null;
 };
 
 function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
@@ -37,6 +41,8 @@ function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
     lastRunSlot: row.lastRunSlot ?? null,
     lastResult: row.lastResult ?? null,
     lastGapSearchAt: row.lastGapSearchAt ?? null,
+    lastBulletinSlot: row.lastBulletinSlot ?? null,
+    lastBulletinAt: row.lastBulletinAt ?? null,
     ...coerceScheduleConfig({
       enabled: row.enabled,
       timezone: row.timezone,
@@ -50,6 +56,8 @@ function toRecord(row: AgentScheduleRow): AgentScheduleRecord {
       maxSend: row.maxSend,
       gapSearchEnabled: row.gapSearchEnabled,
       gapSearchQueries: row.gapSearchQueries,
+      publishMode: row.publishMode,
+      bulletinTimes: row.bulletinTimes,
     }),
   };
 }
@@ -60,6 +68,8 @@ const FALLBACK: AgentScheduleRecord = {
   lastRunSlot: null,
   lastResult: null,
   lastGapSearchAt: null,
+  lastBulletinSlot: null,
+  lastBulletinAt: null,
   ...DEFAULT_AGENT_SCHEDULE,
 };
 
@@ -78,6 +88,8 @@ function valuesFor(config: AgentScheduleConfig) {
     gapSearchEnabled: config.gapSearchEnabled,
     // jsonb column (notNull, defaults to []): pass the array directly.
     gapSearchQueries: config.gapSearchQueries ?? [],
+    publishMode: config.publishMode,
+    bulletinTimes: config.bulletinTimes,
     updatedAt: new Date(),
   };
 }
@@ -160,6 +172,39 @@ export async function claimSlot(id: string | null, slotKey: string): Promise<boo
   } catch (error) {
     console.error("[schedule] claim failed:", String(error).slice(0, 200));
     return false;
+  }
+}
+
+/**
+ * Bulletin twin of `claimSlot` — claims `B{date}T{HH:MM}` so overlapping ticks
+ * can never publish the same bulletin twice.
+ */
+export async function claimBulletinSlot(id: string | null, slotKey: string): Promise<boolean> {
+  if (!id) return true;
+
+  try {
+    const claimed = await db
+      .update(agentSchedules)
+      .set({ lastBulletinSlot: slotKey, updatedAt: new Date() })
+      .where(and(eq(agentSchedules.id, id), sql`${agentSchedules.lastBulletinSlot} IS DISTINCT FROM ${slotKey}`))
+      .returning({ id: agentSchedules.id });
+
+    return claimed.length > 0;
+  } catch (error) {
+    console.error("[schedule] bulletin-claim failed:", String(error).slice(0, 200));
+    return false;
+  }
+}
+
+/** Stamps when a bulletin was actually published (for "both" recaps). */
+export async function markBulletinSent(): Promise<void> {
+  try {
+    await db
+      .update(agentSchedules)
+      .set({ lastBulletinAt: new Date(), updatedAt: new Date() })
+      .where(sql`true`);
+  } catch (error) {
+    console.error("[schedule] bulletin-stamp failed:", String(error).slice(0, 200));
   }
 }
 

@@ -64,6 +64,52 @@ type Props = { adminKey: string };
 // break already-working functionality, so their toggle stays locked in the UI.
 const LOCKED_FEATURES: AiFeatureKey[] = ["summary", "shouldSend"];
 
+/**
+ * Roadmap Phase 2 task #5: one-click analyst presets. Each fills the system
+ * prompt, audience focus, AND the score thresholds together (the operator
+ * still reviews and saves — a preset never persists anything by itself).
+ */
+const ANALYST_PRESETS: Array<{
+  key: string;
+  label: string;
+  systemPrompt: string;
+  audienceFocus: string;
+  minImportance: number;
+  minRelevance: number;
+}> = [
+  {
+    key: "credit",
+    label: "تحلیلگر اعتبارسنجی",
+    systemPrompt:
+      "تو یک تحلیلگر خبرهٔ حوزهٔ اعتبارسنجی و رتبه‌بندی اعتباری هستی. هر خبر را از دید یک شرکت اعتبارسنجی تحلیل کن: تأثیر بر مدل‌های رتبه‌بندی، ریسک اعتباری ناشران و بانک‌ها، بازار بدهی، و مقررات نظارتی. خلاصه را دقیق و فنی بنویس، اهمیت و مرتبط بودن را صادقانه امتیاز بده و فقط خبرهایی را برای ارسال توصیه کن که برای مخاطب حرفه‌ای اعتبارسنجی ارزش عملی داشته باشند.",
+    audienceFocus:
+      "مخاطب، شرکت‌های اعتبارسنجی و تحلیلگران ریسک اعتباری هستند. خبر مرتبط یعنی: اعتبارسنجی، رتبه‌بندی اعتباری، ریسک اعتباری، سلامت مالی ناشران، بازار بدهی ایران، مقررات نظارتی بانک مرکزی/بورس دربارهٔ اعتبار. اخبار عمومی اقتصادی، قیمت و تورم روزمره، ورزشی، حوادث و سرگرمی بی‌ربط‌اند.",
+    minImportance: 70,
+    minRelevance: 70,
+  },
+  {
+    key: "capital",
+    label: "تحلیلگر بازار سرمایه",
+    systemPrompt:
+      "تو یک تحلیلگر بازار سرمایه هستی. هر خبر را از دید سرمایه‌گذاران و نهادهای مالی تحلیل کن: تأثیر بر شاخص‌ها، صنایع، ناشران بورسی، ابزارهای مالی و جریان نقدینگی. خلاصه را دقیق بنویس، اهمیت و مرتبط بودن را صادقانه امتیاز بده و فقط خبرهای اثرگذار بر تصمیم سرمایه‌گذاری را برای ارسال توصیه کن.",
+    audienceFocus:
+      "مخاطب، سرمایه‌گذاران و تحلیلگران بازار سرمایهٔ ایران هستند. خبر مرتبط یعنی: بورس و فرابورس، ناشران بورسی، صکوک و ابزارهای مالی، سیاست‌های پولی-مالی اثرگذار بر بازار، عرضه‌های اولیه، گزارش‌های مالی شرکت‌ها. اخبار بی‌ربط روزمره، ورزشی و سرگرمی بی‌ربط‌اند.",
+    minImportance: 65,
+    minRelevance: 70,
+  },
+  {
+    key: "insurance",
+    label: "تحلیلگر بیمه",
+    systemPrompt:
+      "تو یک تحلیلگر صنعت بیمه هستی. هر خبر را از دید شرکت‌های بیمه و نهاد ناظر تحلیل کن: تأثیر بر ترکیب پرتفوی، خسارت‌ها، آیین‌نامه‌های بیمه مرکزی، فناوری بیمه و بازار سرمایهٔ بیمه‌ای. خلاصه را دقیق بنویس، اهمیت و مرتبط بودن را صادقانه امتیاز بده و فقط خبرهای اثرگذار بر صنعت بیمه را برای ارسال توصیه کن.",
+    audienceFocus:
+      "مخاطب، شرکت‌های بیمه، بیمه مرکزی و تحلیلگران صنعت بیمه هستند. خبر مرتبط یعنی: بیمهٔ زندگی و غیرزندگی، خسارت و اتکایی، آیین‌نامه‌های بیمه مرکزی، تحولات فناوری بیمه، عملکرد مالی شرکت‌های بیمه. اخبار عمومی اقتصادی، ورزشی و حوادث بی‌ربط‌اند.",
+    minImportance: 65,
+    minRelevance: 70,
+  },
+];
+
+
 function buildDraft(
   config: Pick<
     ActiveAiConfig,
@@ -383,6 +429,42 @@ export function AiConfigConsole({ adminKey }: Props) {
             {promptChars.toLocaleString("fa-IR")} کاراکتر · تخمین {promptTokensEstimate.toLocaleString("fa-IR")} توکن
           </span>
         </div>
+
+        <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+          <p className="text-xs leading-5 text-sky-900">
+            قالب‌های آماده: متن پرامپت، تمرکز مخاطب و آستانه‌های اهمیت/مرتبط بودن را <b>با هم</b> پر می‌کنند؛ قبل از
+            ذخیره قابل ویرایش‌اند.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {ANALYST_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    systemPrompt: preset.systemPrompt,
+                    audienceFocus: preset.audienceFocus,
+                    decisionRules: {
+                      ...draft.decisionRules,
+                      minImportanceToSend: preset.minImportance,
+                      minRelevanceToSend: preset.minRelevance,
+                    },
+                    autoSendPolicy: {
+                      ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
+                      minImportance: preset.minImportance,
+                      minRelevance: preset.minRelevance,
+                    },
+                  })
+                }
+                type="button"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <textarea
           className="mt-3 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-6 text-slate-800 focus:border-blue-400 focus:outline-none"
           onChange={(event) => setDraft({ ...draft, systemPrompt: event.target.value })}
