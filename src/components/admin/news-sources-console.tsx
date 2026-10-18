@@ -115,6 +115,20 @@ const HEALTH_TONE: Record<Health, "success" | "warning" | "danger" | "muted"> = 
   paused: "muted",
 };
 
+/**
+ * Curated Persian feeds for the credit-rating / finance domain (Phase 3
+ * deliverable: «چند منبع»). One click fills the add-source form; the operator
+ * can edit before saving. URLs are the outlets' public RSS endpoints.
+ */
+const PRESET_SOURCES: Array<{ name: string; url: string; category: string; note: string }> = [
+  { name: "خبرگزاری جمهوری اسلامی (ایرنا)", url: "https://www.irna.ir/rss", category: "خبرگزاری", note: "رسمی‌ترین خبرگزاری دولتی — سیاست‌ها و مقررات" },
+  { name: "خبرگزاری دانشجویان ایران (ایسنا)", url: "https://www.isna.ir/rss", category: "خبرگزاری", note: "پوشش گستردهٔ اقتصادی و بانکی" },
+  { name: "خبرگزاری مهر", url: "https://www.mehrnews.com/rss", category: "خبرگزاری", note: "اقتصاد، بازار پول و سرمایه" },
+  { name: "روزنامهٔ دنیای اقتصاد", url: "https://donya-e-eqtesad.com/feeds", category: "اقتصادی", note: "تخصصی‌ترین رسانهٔ اقتصادی — بهترین منبع اعتبارسنجی" },
+  { name: "خبرآنلاین", url: "https://www.khabaronline.ir/rss", category: "عمومی", note: "اقتصاد و بازارهای مالی" },
+  { name: "سنا (خبرگزاری بازار سرمایه)", url: "https://www.sena.ir/rss", category: "بورس", note: "بورس، ناشران و ابزارهای مالی — قبل از ذخیره تست کنید" },
+];
+
 const emptyForm = (): FormState => ({
   id: null,
   name: "",
@@ -689,6 +703,35 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         >
           {pageMessage.text}
         </p>
+      ) : null}
+
+      {!form ? (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+          <h2 className="text-sm font-bold text-slate-900">منابع پیشنهادی حوزهٔ اعتبارسنجی و اقتصاد</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            یک منبع را انتخاب کنید تا فرم افزودن با مشخصات آن پر شود؛ قبل از ذخیره حتماً «تست اتصال» را بزنید.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {PRESET_SOURCES.map((preset) => (
+              <button
+                key={preset.url}
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                onClick={() =>
+                  setForm({
+                    ...emptyForm(),
+                    name: preset.name,
+                    url: preset.url,
+                    category: preset.category,
+                  })
+                }
+                title={preset.note}
+                type="button"
+              >
+                + {preset.name}
+              </button>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {form ? (

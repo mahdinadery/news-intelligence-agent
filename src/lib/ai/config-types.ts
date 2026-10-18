@@ -21,6 +21,7 @@ export type AiFeatureKey =
   | "novelty"
   | "mainEvent"
   | "whyItMatters"
+  | "entities"
   | "shouldSend"
   | "reason";
 
@@ -209,6 +210,7 @@ export const AI_FEATURE_ORDER: AiFeatureKey[] = [
   "novelty",
   "mainEvent",
   "whyItMatters",
+  "entities",
   "shouldSend",
   "reason",
 ];
@@ -221,6 +223,7 @@ export const AI_FEATURE_LABELS: Record<AiFeatureKey, string> = {
   novelty: "امتیاز تازگی",
   mainEvent: "رویداد اصلی",
   whyItMatters: "چرا مهم است",
+  entities: "نهادها و سازمان‌ها",
   shouldSend: "پیشنهاد ارسال",
   reason: "دلیل ارسال",
 };
@@ -275,6 +278,11 @@ export const DEFAULT_FEATURES: AiFeaturesConfig = {
     instruction:
       "در یک جمله کوتاه فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است. اگر خبر برای مخاطب مهم نیست، بنویس «برای مخاطب هدف اهمیت مشخصی ندارد».",
   },
+  entities: {
+    enabled: true,
+    instruction:
+      "نام بانک‌ها، شرکت‌ها، نهادها و سازمان‌هایی که خبر دربارهٔ آن‌هاست را به فارسی در آرایهٔ entities بیاور (حداکثر ۱۲ مورد). اگر نام مشخصی در خبر نیست، آرایهٔ خالی بده.",
+  },
   shouldSend: {
     enabled: true,
     instruction: "مشخص کن که آیا این خبر باید به کانال هدف ارسال شود یا نه.",
@@ -305,6 +313,7 @@ export const DEFAULT_OUTPUT_SCHEMA: AiOutputSchema = [
   { name: "novelty", enabled: true, description: "امتیاز تازگی", required: true, type: "number", min: 0, max: 100 },
   { name: "mainEvent", enabled: true, description: "رویداد اصلی", required: false, type: "string" },
   { name: "whyItMatters", enabled: true, description: "چرا برای مخاطب مهم است", required: false, type: "string" },
+  { name: "entities", enabled: true, description: "نام بانک‌ها/شرکت‌ها/نهادهای مهم خبر (فارسی، آرایه‌ای)", required: false, type: "string" },
   { name: "shouldSend", enabled: true, description: "پیشنهاد ارسال", required: true, type: "boolean" },
   { name: "reason", enabled: true, description: "دلیل تصمیم ارسال", required: true, type: "string" },
 ];

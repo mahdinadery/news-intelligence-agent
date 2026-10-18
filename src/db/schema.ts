@@ -124,6 +124,15 @@ export const news = pgTable(
     mainEvent: text("main_event"),
     /** One-line "why this matters for the audience" (Phase 1). Nullable until analyzed. */
     whyItMatters: text("why_it_matters"),
+    // Phase 3: multi-source confirmation (#10) — deterministic title
+    // fingerprint + how many DISTINCT sources carry the same event.
+    similarityKey: text("similarity_key"),
+    corroborationCount: integer("corroboration_count").notNull().default(0),
+    // Phase 3: two-stage grader (#9) — null | "confirmed" | "rejected".
+    relevanceGrade: text("relevance_grade"),
+    // Phase 3: entity extraction (#7) — Persian names of banks/companies/
+    // institutions mentioned in the story (from the AI output).
+    entityTags: jsonb("entity_tags").$type<string[]>(),
     // Snapshot of which AI config version produced the current analysis.
     aiConfigVersion: integer("ai_config_version"),
   },
@@ -166,6 +175,7 @@ export const aiAnalyses = pgTable(
     novelty: integer("novelty"),
     mainEvent: text("main_event"),
     whyItMatters: text("why_it_matters"),
+    entities: jsonb("entities").$type<string[]>(),
     shouldSend: boolean("should_send"),
     reason: text("reason"),
     errorMessage: text("error_message"),

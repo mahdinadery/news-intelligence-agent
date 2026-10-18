@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { label: "اخبار", icon: "news", href: "/news" },
   { label: "مدیریت اخبار", icon: "reports", href: "/admin/news" },
   { label: "منابع خبری", icon: "sources", href: "/admin/news-sources" },
+  { label: "پروندهٔ نهادها", icon: "reports", href: "/admin/entities" },
   { label: "انتشار و ارسال‌ها", icon: "bale", href: "/admin/deliveries" },
   { label: "Agent", icon: "agent" },
   { label: "بله", icon: "bale" },

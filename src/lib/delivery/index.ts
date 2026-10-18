@@ -11,10 +11,10 @@
 
 import { db } from "@/db";
 import { deliveries, news, type NewsRow } from "@/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { deliverToBale } from "./bale";
 import { deliverToLocal } from "./local";
-import { buildNewsMessage } from "./message";
+import { buildNewsMessage, type MessageExtras } from "./message";
 import type {
   DeliveryDestination,
   DeliverySendResult,
@@ -132,6 +132,61 @@ async function deliverToOne(
  * Sends one analyzed article to the selected destination(s) and records the result.
  * Never throws: every failure is returned as a structured, safe payload.
  */
+
+/**
+ * Phase 3 extras for one message: other sources carrying the same event (the
+ * article's own source is excluded), and titles of previously delivered
+ * related stories (same similarity key or a shared entity tag, within 14 days).
+ * Best-effort — a lookup failure yields empty extras, never a blocked send.
+ */
+export async function loadMessageExtras(article: NewsRow): Promise<MessageExtras> {
+  const extras: MessageExtras = {};
+  try {
+    const windowStart = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+    if (article.similarityKey) {
+      const rows = await db
+        .select({ source: news.source })
+        .from(news)
+        .where(
+          and(
+            eq(news.similarityKey, article.similarityKey),
+            gte(news.createdAt, new Date(Date.now() - 72 * 60 * 60 * 1000)),
+          ),
+        )
+        .limit(20);
+      const others = [...new Set(rows.map((row) => row.source))].filter(
+        (source) => source !== article.source,
+      );
+      if (others.length > 0) extras.corroborationSources = others;
+    }
+
+    const entityTags = article.entityTags ?? [];
+    if (article.similarityKey || entityTags.length > 0) {
+      const delivered = await db
+        .select({ title: news.title })
+        .from(news)
+        .innerJoin(deliveries, eq(deliveries.newsId, news.id))
+        .where(
+          and(
+            eq(deliveries.status, "sent"),
+            gte(deliveries.sentAt, windowStart),
+            sql`${news.id} <> ${article.id}`,
+            article.similarityKey
+              ? sql`(${news.similarityKey} = ${article.similarityKey} OR jsonb_exists_any(${news.entityTags}, ${entityTags}::text[]))`
+              : sql`jsonb_exists_any(${news.entityTags}, ${entityTags}::text[])`,
+          ),
+        )
+        .orderBy(desc(deliveries.sentAt))
+        .limit(2);
+      if (delivered.length > 0) extras.relatedTitles = delivered.map((row) => row.title);
+    }
+  } catch (error) {
+    console.error("[message-extras] lookup failed:", String(error).slice(0, 160));
+  }
+  return extras;
+}
+
 export async function sendNewsDelivery(
   newsId: string,
   target: DeliveryTarget,
@@ -160,7 +215,8 @@ export async function sendNewsDelivery(
     };
   }
 
-  const message = buildNewsMessage(article);
+  const extras = await loadMessageExtras(article);
+  const message = buildNewsMessage(article, extras);
   const destinations = target === "both" ? DESTINATIONS : [target];
 
   // Independent per-destination attempts.

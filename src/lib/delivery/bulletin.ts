@@ -29,6 +29,10 @@ export type BulletinItem = {
   url: string;
   importanceScore: number | null;
   publishedAt: Date | null;
+  /** Phase 3: multi-source confirmation — shows the «تأییدشده» badge. */
+  corroborated?: boolean;
+  /** Phase 3: Persian entity names (banks/companies/institutions). */
+  entityTags?: string[];
 };
 
 const NUMBER_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
@@ -89,6 +93,9 @@ export function buildBulletinMessage(args: {
     if (oneLiner) lines.push(oneLiner);
     const why = compact(item.whyItMatters, 220);
     if (why) lines.push(`چرا مهم است: ${why}`);
+    const entities = (item.entityTags ?? []).slice(0, 4).join("، ");
+    if (entities) lines.push(`نهادها: ${entities}`);
+    if (item.corroborated) lines.push("تأییدشده توسط چند منبع ✓");
     lines.push(`🔗 ${item.url}`);
   });
 

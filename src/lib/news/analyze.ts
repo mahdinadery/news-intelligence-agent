@@ -15,6 +15,7 @@ import { db } from "@/db";
 import { aiAnalyses, news, type NewsRow } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { resolveEffectiveModel, runAiAnalysis } from "../ai/client";
+import { gradeRelevance, isBorderlineRelevance } from "../ai/grader";
 import { getActiveAiConfig } from "../ai/config-service";
 
 export type AnalyzeResult =
@@ -42,6 +43,7 @@ async function recordAnalysisHistory(input: {
     novelty: number;
     mainEvent: string | null;
     whyItMatters: string | null;
+    entities: string[] | null;
     shouldSend: boolean;
     reason: string;
   } | null;
@@ -60,6 +62,7 @@ async function recordAnalysisHistory(input: {
       relevance: input.analysis?.relevance ?? null,
       novelty: input.analysis?.novelty ?? null,
       whyItMatters: input.analysis?.whyItMatters ?? null,
+      entities: input.analysis?.entities ?? null,
       mainEvent: input.analysis?.mainEvent ?? null,
       shouldSend: input.analysis?.shouldSend ?? null,
       reason: input.analysis?.reason ?? null,
@@ -159,7 +162,24 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
     };
   }
 
-  const { summary, category, importance, relevance, novelty, mainEvent, whyItMatters, shouldSend, reason } = result.analysis;
+  const { summary, category, importance, relevance, novelty, mainEvent, whyItMatters, entities, shouldSend, reason } = result.analysis;
+
+  // Phase 3 (#9): borderline relevance gets ONE cheap second opinion. The
+  // grader can only veto ("rejected") — it never raises a score.
+  let relevanceGrade: string | null = null;
+  if (isBorderlineRelevance(relevance)) {
+    try {
+      const verdict = await gradeRelevance({
+        title: article.title,
+        summary,
+        audienceFocus: config.audienceFocus,
+      });
+      if (verdict === "no") relevanceGrade = "rejected";
+      else if (verdict === "yes") relevanceGrade = "confirmed";
+    } catch {
+      relevanceGrade = null;
+    }
+  }
 
   try {
     const [updated] = await db
@@ -172,6 +192,8 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
         noveltyScore: novelty,
         mainEvent,
         whyItMatters,
+        entityTags: entities,
+        relevanceGrade,
         shouldSend,
         analysisReason: reason,
         analyzedAt: new Date(),
@@ -200,7 +222,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       configurationVersion: config.version,
       model: result.model ?? resolveEffectiveModel(config.model),
       status: "success",
-      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, shouldSend, reason },
+      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, entities, shouldSend, reason },
     });
 
     return { ok: true, newsItem: updated };
