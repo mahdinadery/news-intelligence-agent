@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  BASELINE_BLOCKED_KEYWORDS,
   evaluateTopicFilter,
+  isTopicGateActive,
   isTopicFilterActive,
   normalizeForMatch,
 } from "../src/lib/news/topic-filter.ts";
@@ -59,7 +61,7 @@ test("include mode: matching topic passes, non-matching is skipped", () => {
   assert.equal(hit.reason, "matched_topic");
   assert.deepEqual(hit.matchedTopics, ["بازار خودرو"]);
 
-  const miss = evaluateTopicFilter({ title: "نتایج لیگ فوتبال" }, f);
+  const miss = evaluateTopicFilter({ title: "قیمت طلا و ارز امروز" }, f);
   assert.equal(miss.verdict, "skip");
   assert.equal(miss.reason, "not_in_selected_topics");
 });
@@ -90,13 +92,13 @@ test("Persian keywords match regardless of ZWNJ/Arabic letter variants", () => {
 });
 
 test("exclude mode: matching topic is skipped, others pass", () => {
-  const f = filter({ mode: "exclude", topics: [topic({ label: "فوتبال", keywords: ["فوتبال"] })] });
+  const f = filter({ mode: "exclude", topics: [topic({ label: "قیمت‌ها", keywords: ["قیمت طلا"] })] });
 
-  const noise = evaluateTopicFilter({ title: "نتایج فوتبال" }, f);
+  const noise = evaluateTopicFilter({ title: "قیمت طلا امروز" }, f);
   assert.equal(noise.verdict, "skip");
   assert.equal(noise.reason, "matched_excluded_topic");
 
-  const keep = evaluateTopicFilter({ title: "قیمت خودرو" }, f);
+  const keep = evaluateTopicFilter({ title: "رتبه‌بندی اعتباری ناشران" }, f);
   assert.equal(keep.verdict, "pass");
 });
 
@@ -154,3 +156,54 @@ test("isTopicFilterActive reflects real narrowing only", () => {
   assert.equal(isTopicFilterActive(filter({ topics: [topic()] })), true);
 });
 
+// ── Baseline deny-list (always on) ─────────────────────────────────────────────
+
+test("baseline deny-list blocks off-topic news even when the filter is disabled", () => {
+  const outcome = evaluateTopicFilter({ title: "تجاری‌شدن ورزش کودکان" }, filter({ enabled: false }));
+  assert.equal(outcome.verdict, "skip");
+  assert.equal(outcome.reason, "matched_blocked_keyword");
+  assert.deepEqual(outcome.blockedKeywords, ["ورزش"]);
+});
+
+test("baseline deny-list applies when no filter is configured at all", () => {
+  const outcome = evaluateTopicFilter({ title: "تصادف زنجیره‌ای در جاده" }, null);
+  assert.equal(outcome.verdict, "skip");
+  assert.equal(outcome.reason, "matched_blocked_keyword");
+  assert.deepEqual(outcome.blockedKeywords, ["تصادف"]);
+});
+
+test("baseline deny-list wins even when an included topic matches", () => {
+  const f = filter({ topics: [topic({ label: "کودکان", keywords: ["کودکان"] })] });
+  const outcome = evaluateTopicFilter({ title: "تجاری‌شدن ورزش کودکان" }, f);
+  assert.equal(outcome.verdict, "skip");
+  assert.equal(outcome.reason, "matched_blocked_keyword");
+});
+
+test("baseline hits short-circuit before the configurable deny-list", () => {
+  const f = filter({ topics: [], blockedKeywords: ["کودکان"] });
+  const outcome = evaluateTopicFilter({ title: "ورزش کودکان" }, f);
+  assert.equal(outcome.verdict, "skip");
+  assert.deepEqual(outcome.blockedKeywords, ["ورزش"]);
+});
+
+test("config deny-list still reports its own hits when baseline misses", () => {
+  const f = filter({ topics: [], blockedKeywords: ["قیمت ارز"] });
+  const outcome = evaluateTopicFilter({ title: "قیمت ارز و طلا" }, f);
+  assert.equal(outcome.verdict, "skip");
+  assert.deepEqual(outcome.blockedKeywords, ["قیمت ارز"]);
+});
+
+test("isTopicGateActive is always armed (baseline) while isTopicFilterActive is not", () => {
+  assert.equal(isTopicGateActive(null), true);
+  assert.equal(isTopicGateActive(filter({ enabled: false })), true);
+  assert.equal(isTopicFilterActive(null), false);
+});
+
+test("baseline list is conservative and non-empty", () => {
+  assert.ok(BASELINE_BLOCKED_KEYWORDS.length > 0);
+  assert.ok(BASELINE_BLOCKED_KEYWORDS.includes("ورزش"));
+  // Must never contain credit-domain words that could shadow real news.
+  for (const forbidden of ["بانک", "اعتبار", "رتبه", "بورس", "اقتصاد"]) {
+    assert.equal(BASELINE_BLOCKED_KEYWORDS.includes(forbidden), false);
+  }
+});

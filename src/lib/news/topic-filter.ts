@@ -12,12 +12,40 @@
  * the admin UI after the topics change.
  *
  * FAIL-OPEN CONTRACT (important): when the filter is disabled, has no topics,
- * or no enabled topic carries a keyword, EVERY article passes. The filter can
- * therefore never lose news on its own — it only narrows what reaches the AI
- * when the operator explicitly configured topics.
+ * or no enabled topic carries a keyword, every article passes THE CONFIGURED
+ * PART of the filter. The filter can therefore never lose news on its own — it
+ * only narrows what reaches the AI when the operator explicitly configured
+ * topics.
+ *
+ * ONE exception is hard-coded on top: BASELINE_BLOCKED_KEYWORDS — a small,
+ * conservative deny-list of topics this product must never forward (sports,
+ * entertainment, accidents). It applies even when the filter is disabled or
+ * absent, because "the bot sent sports news to a credit-rating channel" is
+ * never a correct outcome. Operators add their own words via
+ * `AiTopicFilterConfig.blockedKeywords`.
  */
 
 import type { AiTopicFilterConfig, AiTopicRule } from "@/lib/ai/config-types";
+
+/**
+ * Always-on deny-list (see header). Checked BEFORE the operator configuration,
+ * in both modes, even when the topic filter is disabled or not configured.
+ * Deliberately tiny and unambiguous: words that can never appear in credit
+ * rating / credit risk news for a rating-agency audience. Extend via the
+ * configurable `blockedKeywords` deny-list, not by growing this list.
+ */
+export const BASELINE_BLOCKED_KEYWORDS: readonly string[] = [
+  "ورزش",
+  "فوتبال",
+  "لیگ برتر",
+  "لیگ قهرمانان",
+  "سرگرمی",
+  "هنرمندان",
+  "بازیگر",
+  "سینما",
+  "حوادث",
+  "تصادف",
+];
 
 /**
  * Normalizes text for Persian-friendly matching:
@@ -83,10 +111,12 @@ function effectiveBlockedKeywords(filter: AiTopicFilterConfig): string[] {
  * Evaluates one article against the topic filter.
  *
  * Order of evaluation:
- *   1. the deny-list (`blockedKeywords`) wins in BOTH modes — an article that
- *      contains a blocked keyword is skipped even when it matches a topic;
- *   2. include mode: pass iff at least one enabled topic matches (OR across topics);
- *   3. exclude mode: skip iff at least one enabled topic matches.
+ *   1. BASELINE_BLOCKED_KEYWORDS (always on) — see the file header;
+ *   2. the configured deny-list (`blockedKeywords`) wins in BOTH modes — an
+ *      article that contains a blocked keyword is skipped even when it matches
+ *      a topic;
+ *   3. include mode: pass iff at least one enabled topic matches (OR across topics);
+ *   4. exclude mode: skip iff at least one enabled topic matches.
  *
  * A deny-list-only configuration (no topics) is valid: everything passes unless
  * a blocked keyword is found.
@@ -95,6 +125,13 @@ export function evaluateTopicFilter(
   article: TopicFilterArticle,
   filter: AiTopicFilterConfig | null | undefined,
 ): TopicFilterOutcome {
+  const haystack = normalizeForMatch([article.title, article.description, article.content].filter(Boolean).join(" \u2000 "));
+
+  const baselineHits = BASELINE_BLOCKED_KEYWORDS.filter((keyword) => haystack.includes(normalizeForMatch(keyword)));
+  if (baselineHits.length > 0) {
+    return { verdict: "skip", reason: "matched_blocked_keyword", matchedTopics: [], blockedKeywords: [...baselineHits] };
+  }
+
   if (!filter || !filter.enabled) {
     return { verdict: "pass", reason: "filter_disabled", matchedTopics: [] };
   }
@@ -105,8 +142,6 @@ export function evaluateTopicFilter(
     // Misconfiguration safety net: never drop news just because nothing is configured.
     return { verdict: "pass", reason: "no_effective_topics", matchedTopics: [] };
   }
-
-  const haystack = normalizeForMatch([article.title, article.description, article.content].filter(Boolean).join(" \u2000 "));
 
   const blockedHits = blocked.filter((keyword) => haystack.includes(normalizeForMatch(keyword)));
   if (blockedHits.length > 0) {
@@ -140,6 +175,16 @@ export function evaluateTopicFilter(
 export function isTopicFilterActive(filter: AiTopicFilterConfig | null | undefined): boolean {
   if (!filter || !filter.enabled) return false;
   return effectiveTopics(filter).length > 0 || effectiveBlockedKeywords(filter).length > 0;
+}
+
+/**
+ * True when evaluateTopicFilter() would actually drop something: the baseline
+ * deny-list is always armed, so hot paths must NOT skip evaluation entirely.
+ * (Kept separate from isTopicFilterActive() which reports only the configured
+ * part and is used by the admin UI.)
+ */
+export function isTopicGateActive(filter: AiTopicFilterConfig | null | undefined): boolean {
+  return BASELINE_BLOCKED_KEYWORDS.length > 0 || isTopicFilterActive(filter);
 }
 
 /** Preset topic suggestions offered by the admin UI (labels + starter keywords). */

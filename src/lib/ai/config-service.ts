@@ -36,6 +36,7 @@ function toActiveConfig(row: AiConfigurationRow): ActiveAiConfig {
     provider: "openai-compatible",
     model: row.model,
     systemPrompt: row.systemPrompt,
+    audienceFocus: row.audienceFocus ?? "",
     temperature: row.temperature,
     maxTokens: row.maxTokens,
     features: row.features,
@@ -59,6 +60,7 @@ export function buildDefaultConfigInput(): AiConfigInput {
     provider: "openai-compatible",
     model: DEFAULT_MODEL_PLACEHOLDER,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    audienceFocus: "",
     temperature: DEFAULT_TEMPERATURE,
     maxTokens: DEFAULT_MAX_TOKENS,
     features: DEFAULT_FEATURES,
@@ -176,6 +178,7 @@ export async function createAiConfigVersion(
         provider: input.provider,
         model: input.model,
         systemPrompt: input.systemPrompt,
+        audienceFocus: input.audienceFocus?.trim() ?? "",
         temperature: input.temperature,
         maxTokens: input.maxTokens,
         features: input.features,
@@ -238,6 +241,10 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
 
   if (!input.systemPrompt || !input.systemPrompt.trim()) {
     errors.push("متن System Prompt نمی‌تواند خالی باشد.");
+  }
+
+  if (input.audienceFocus && input.audienceFocus.length > 2000) {
+    errors.push("متن تمرکز مخاطب نباید بیش از ۲۰۰۰ کاراکتر باشد.");
   }
 
   if (!input.name || !input.name.trim()) {

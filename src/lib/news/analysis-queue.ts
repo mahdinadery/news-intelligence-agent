@@ -15,7 +15,7 @@ import { news } from "@/db/schema";
 import { readActiveOperationalSettings } from "@/lib/ai/config-service";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { analyzeArticle } from "./analyze";
-import { evaluateTopicFilter, isTopicFilterActive } from "./topic-filter";
+import { evaluateTopicFilter, isTopicGateActive } from "./topic-filter";
 
 export const STALE_PROCESSING_MINUTES = 15;
 
@@ -57,9 +57,9 @@ export async function applyTopicGate(selectedIds: string[]): Promise<{ pass: str
 
   const settings = await readActiveOperationalSettings();
   const filter = settings?.topicFilter ?? null;
-  // "Active" includes a deny-list-only configuration (blockedKeywords with no
-  // topics), which the old empty-article probe wrongly reported as inactive.
-  if (!isTopicFilterActive(filter)) {
+  // "Active" includes a deny-list-only configuration AND the always-on
+  // baseline deny-list, so this gate can never be skipped entirely.
+  if (!isTopicGateActive(filter)) {
     return { pass: selectedIds, skipped: [] };
   }
 

@@ -113,7 +113,10 @@ export type AiTopicFilterConfig = {
    * Hard deny-list that applies in BOTH modes: an article containing any of
    * these keywords is dropped before the AI stage, even when it also matches an
    * included topic. This is the "these kinds of news must never be sent" switch
-   * (sports, celebrity news, daily prices, ...). Optional/empty => no deny-list.
+   * (sports, celebrity news, daily prices, ...). Optional/empty => no
+   * operator deny-list. NOTE: a small BASELINE_BLOCKED_KEYWORDS list in
+   * topic-filter.ts always applies on top of this, even when the filter is
+   * disabled entirely.
    */
   blockedKeywords?: string[];
 };
@@ -148,6 +151,8 @@ export type ActiveAiConfig = {
   /** Empty string => caller must fall back to AI_API_MODEL / AI_MODEL / built-in default. */
   model: string;
   systemPrompt: string;
+  /** Audience/relevance anchor. Empty string => built-in credit-rating default. */
+  audienceFocus: string;
   temperature: number;
   maxTokens: number;
   features: AiFeaturesConfig;
@@ -175,6 +180,13 @@ export type AiConfigInput = {
   provider: AiProvider;
   model: string;
   systemPrompt: string;
+  /**
+   * Who the audience is + what "relevant" means when the AI scores `relevance`.
+   * Empty/missing => the built-in credit-rating audience definition (see
+   * DEFAULT_AUDIENCE_FOCUS in prompt-builder.ts, which also hard-wires the
+   * "unrelated news gets relevance < 30" rules into every prompt).
+   */
+  audienceFocus?: string;
   temperature: number;
   maxTokens: number;
   features: AiFeaturesConfig;
@@ -240,7 +252,8 @@ export const DEFAULT_FEATURES: AiFeaturesConfig = {
   },
   relevance: {
     enabled: true,
-    instruction: "میزان مرتبط بودن و آموزنده بودن این خبر برای مخاطب هدف را ارزیابی کن.",
+    instruction:
+      "میزان مرتبط بودن این خبر با مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») را ارزیابی کن. اخباری که با آن تعریف پیوند روشنی ندارند باید امتیاز زیر ۳۰ بگیرند.",
     scaleMin: 0,
     scaleMax: 100,
   },

@@ -23,7 +23,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { canonicalizeUrl } from "./canonical-url";
 import { normalizeContent, normalizeTitle } from "./normalize";
 import { fetchFeed, parseFeed, type NewsFetchResult, type NormalizedNews } from "./rss";
-import { evaluateTopicFilter, isTopicFilterActive } from "./topic-filter";
+import { evaluateTopicFilter, isTopicGateActive } from "./topic-filter";
 
 const CHUNK_SIZE = 50;
 
@@ -71,7 +71,7 @@ function partitionByTopic(
 ): { pass: Candidate[]; skip: Candidate[] } {
   if (fresh.length === 0) return { pass: fresh, skip: [] };
 
-  if (!isTopicFilterActive(topicFilter)) {
+  if (!isTopicGateActive(topicFilter)) {
     return { pass: fresh, skip: [] };
   }
 

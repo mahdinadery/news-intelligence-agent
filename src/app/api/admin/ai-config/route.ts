@@ -79,6 +79,7 @@ export async function POST(request: Request) {
     provider: "openai-compatible",
     model: body.model ?? "",
     systemPrompt: body.systemPrompt,
+    audienceFocus: body.audienceFocus ?? "",
     temperature: body.temperature,
     maxTokens: body.maxTokens,
     features: body.features,
