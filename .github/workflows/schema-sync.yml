@@ -54,9 +54,16 @@ jobs:
             console.log("public tables:", rows.map((r) => r.table_name).join(", ") || "(none)");
             const cols = await pool.query(
               `select table_name || '.' || column_name as c from information_schema.columns
-                where table_schema='public' and column_name in ('topic_filter','auto_send_policy','items_filtered') order by 1`
+                where table_schema='public' and column_name in ('topic_filter','auto_send_policy','items_filtered','audience_focus') order by 1`
             );
-            console.log("PR#1 columns present:", cols.rows.map((r) => r.c).join(", ") || "(none)");
+            console.log("expected columns present:", cols.rows.map((r) => r.c).join(", ") || "(none)");
+            const missing = ["ai_configurations.audience_focus"].filter(
+              (want) => !cols.rows.some((r) => r.c === want)
+            );
+            if (missing.length > 0) {
+              console.error("missing after sync:", missing.join(", "));
+              process.exit(1);
+            }
             await pool.end();
           })().catch((e) => {
             console.error("verify failed:", String(e.message).slice(0, 200));
