@@ -16,6 +16,7 @@ import { sendBulletinDelivery } from "@/lib/delivery";
 import { buildBulletinMessage, pickBulletinItems } from "@/lib/delivery/bulletin";
 import { coerceScheduleConfig } from "@/lib/agent/schedule";
 import { evaluateArticle } from "@/lib/agent/rules";
+import { collapseEventGroups } from "@/lib/news/corroboration";
 import { scheduleToRule } from "@/lib/agent/scheduled-run";
 import { readScheduleRecord } from "@/lib/agent/schedule-store";
 import { and, desc, gte, isNotNull } from "drizzle-orm";
@@ -52,7 +53,9 @@ export async function POST(request: Request) {
 
     const record = await readScheduleRecord();
     const rule = scheduleToRule(coerceScheduleConfig(record));
-    const qualifying = matched.filter((row) => evaluateArticle(row, rule).matches);
+    // Same-event copies collapse to one digest entry («یک خبر، چند منبع»).
+    const collapsed = collapseEventGroups(matched);
+    const qualifying = collapsed.filter((row) => evaluateArticle(row, rule).matches);
     const items = pickBulletinItems(qualifying, 5);
 
     if (items.length === 0) {

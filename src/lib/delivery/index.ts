@@ -146,7 +146,7 @@ export async function loadMessageExtras(article: NewsRow): Promise<MessageExtras
 
     if (article.similarityKey) {
       const rows = await db
-        .select({ source: news.source })
+        .select({ source: news.source, url: news.url })
         .from(news)
         .where(
           and(
@@ -155,10 +155,16 @@ export async function loadMessageExtras(article: NewsRow): Promise<MessageExtras
           ),
         )
         .limit(20);
-      const others = [...new Set(rows.map((row) => row.source))].filter(
-        (source) => source !== article.source,
-      );
-      if (others.length > 0) extras.corroborationSources = others;
+      // One entry per outlet (first URL wins) — the message lists every source
+      // of the chosen story with its link.
+      const seen = new Set<string>([article.source]);
+      const others: Array<{ source: string; url: string }> = [];
+      for (const row of rows) {
+        if (seen.has(row.source)) continue;
+        seen.add(row.source);
+        others.push({ source: row.source, url: row.url });
+      }
+      if (others.length > 0) extras.corroborationItems = others;
     }
 
     const entityTags = article.entityTags ?? [];

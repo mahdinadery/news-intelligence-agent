@@ -34,3 +34,26 @@ test("buildNewsMessage: long explanations are compacted, not dumped raw", () => 
   const line = text.split("\n").find((entry) => entry.startsWith("مهم"));
   assert.ok(line.length < 320);
 });
+
+test("buildNewsMessage: multi-source story lists every outlet with its link", () => {
+  const text = buildNewsMessage(row({ source: "ایرنا", url: "https://irna.example/x" }), {
+    corroborationItems: [
+      { source: "ایسنا", url: "https://isna.example/y" },
+      { source: "مهر", url: "https://mehr.example/z" },
+    ],
+  });
+  const blockAt = text.indexOf("منابع این خبر (۳):");
+  assert.ok(blockAt > 0);
+  assert.ok(text.includes("• ایرنا (انتخاب‌شده): https://irna.example/x"));
+  assert.ok(text.includes("• ایسنا: https://isna.example/y"));
+  assert.ok(text.includes("• مهر: https://mehr.example/z"));
+  // The classic single-source footer must NOT duplicate the block.
+  assert.ok(!text.includes("🔗 منبع:"));
+});
+
+test("buildNewsMessage: single-source story keeps the classic footer", () => {
+  const text = buildNewsMessage(row({ url: "https://example.com/news/1" }));
+  assert.ok(text.includes("🔗 منبع:\nhttps://example.com/news/1") || text.includes("🔗 منبع:\n"));
+  assert.ok(text.includes("https://example.com/news/1"));
+  assert.ok(!text.includes("منابع این خبر"));
+});

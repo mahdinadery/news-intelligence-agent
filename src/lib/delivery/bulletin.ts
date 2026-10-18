@@ -31,6 +31,8 @@ export type BulletinItem = {
   publishedAt: Date | null;
   /** Phase 3: multi-source confirmation — shows the «تأییدشده» badge. */
   corroborated?: boolean;
+  /** Other outlets carrying the same event (names) — listed under the item. */
+  corroborationSources?: string[];
   /** Phase 3: Persian entity names (banks/companies/institutions). */
   entityTags?: string[];
 };
@@ -95,7 +97,14 @@ export function buildBulletinMessage(args: {
     if (why) lines.push(`چرا مهم است: ${why}`);
     const entities = (item.entityTags ?? []).slice(0, 4).join("، ");
     if (entities) lines.push(`نهادها: ${entities}`);
-    if (item.corroborated) lines.push("تأییدشده توسط چند منبع ✓");
+    const otherSources = (item.corroborationSources ?? []).slice(0, 3);
+    if (otherSources.length > 0) {
+      lines.push(
+        `تأییدشده توسط ${Math.max(2, otherSources.length + 1).toLocaleString("fa-IR")} منبع: ${otherSources.join("، ")}`,
+      );
+    } else if (item.corroborated) {
+      lines.push("تأییدشده توسط چند منبع ✓");
+    }
     lines.push(`🔗 ${item.url}`);
   });
 

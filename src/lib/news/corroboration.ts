@@ -59,3 +59,36 @@ export function similarityKeyOf(title: string): string {
 export function corroborationBonus(distinctSources: number): number {
   return distinctSources >= CORROBORATION_MIN_SOURCES ? CORROBORATION_BONUS : 0;
 }
+
+/**
+ * Collapses same-event items into ONE representative per similarity key —
+ * the core of «یک خبر انتخاب شود، منابع زیرش بیایند». The representative is the
+ * highest-importance copy (newest on ties). Items without a key always pass
+ * through. Pure + deterministic.
+ */
+export function collapseEventGroups<
+  T extends { similarityKey: string | null; importanceScore: number | null; publishedAt: Date | null },
+>(items: T[]): T[] {
+  const bestByKey = new Map<string, T>();
+
+  for (const item of items) {
+    const key = (item.similarityKey ?? "").trim();
+    if (!key) continue;
+    const current = bestByKey.get(key);
+    if (!current) {
+      bestByKey.set(key, item);
+      continue;
+    }
+    const importance = (item.importanceScore ?? 0) - (current.importanceScore ?? 0);
+    const recency = (item.publishedAt?.getTime() ?? 0) - (current.publishedAt?.getTime() ?? 0);
+    if (importance > 0 || (importance === 0 && recency > 0)) {
+      bestByKey.set(key, item);
+    }
+  }
+
+  const representatives = new Set(bestByKey.values());
+  return items.filter((item) => {
+    const key = (item.similarityKey ?? "").trim();
+    return !key || representatives.has(item);
+  });
+}
