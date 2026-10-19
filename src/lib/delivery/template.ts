@@ -11,7 +11,8 @@
  */
 
 import type { NewsRow } from "@/db/schema";
-import { buildNewsMessage } from "./message";
+import { sanitizeWhyItMatters } from "../ai/why-guard";
+import { buildNewsMessage, stripEmptyLabelBlocks } from "./message";
 
 /** Only variables that exist on the current data model are supported. */
 export const PUBLISHING_TEMPLATE_VARS = [
@@ -69,9 +70,11 @@ function value(varName: PublishingTemplateVar, article: NewsRow): string {
       return score === null || score === undefined ? "—" : String(score);
     }
     case "mainEvent":
-      return article.mainEvent ?? "—";
+      return article.mainEvent ?? "";
     case "whyItMatters":
-      return article.whyItMatters ?? "—";
+      // Sanitized at parse time; re-guarded here for legacy rows so template
+      // messages never show the canned filler either.
+      return sanitizeWhyItMatters(article.whyItMatters) ?? "";
     case "sourceName":
       return article.source;
     case "originalUrl":
@@ -100,8 +103,10 @@ export function renderPublishingMessage(template: string | null | undefined, art
     return compact(value(rawKey as PublishingTemplateVar, article));
   });
 
-  // Collapse 3+ blank lines introduced by empty optional fields.
-  return rendered.replace(/\n{3,}/g, "\n\n").trim();
+  // Optional fields that came back empty leave dangling «label:» lines —
+  // drop those blocks, then collapse 3+ blank lines.
+  const cleaned = stripEmptyLabelBlocks(rendered);
+  return cleaned.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** Unknown placeholder names in a template (used for admin validation). */

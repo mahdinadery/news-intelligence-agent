@@ -234,6 +234,33 @@ export const AI_FEATURE_LABELS: Record<AiFeatureKey, string> = {
  * here must reproduce the same prompt intent so existing AI analysis keeps
  * working unchanged for anyone who has not touched the admin UI yet.
  */
+/**
+ * The legacy `whyItMatters` instruction told the model to answer the canned
+ * phrase «برای مخاطب هدف اهمیت مشخصی ندارد» when unsure — which then shipped
+ * to the channel even for highly-rated stories. Kept verbatim so stored
+ * configurations that still carry it are detected and upgraded on read.
+ */
+export const LEGACY_WHY_IT_MATTERS_INSTRUCTION =
+  "در یک جمله کوتاه فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است. اگر خبر برای مخاطب مهم نیست، بنویس «برای مخاطب هدف اهمیت مشخصی ندارد».";
+
+/**
+ * Replacement instruction: always demand a CONCRETE reason tied to the
+ * audience, never a canned "doesn't matter" filler — including for indirect
+ * macro channels.
+ */
+export const WHY_IT_MATTERS_DEFAULT_INSTRUCTION =
+  "در یک جمله کوتاه و مشخص فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است و به کانال اثرگذاری آن اشاره کن (مثلاً نقدینگی و تأمین مالی بانک‌ها، ریسک اعتباری مشتریان، کیفیت دارایی، هزینهٔ سرمایه، رتبه‌بندی اعتباری یا شاخص‌های کلان اقتصادی). هرگز جمله‌های بی‌محتوا یا منفی مانند «برای مخاطب هدف اهمیت مشخصی ندارد» یا «مهم نیست» ننویس؛ حتی اگر پیوند مستقیم نمی‌بینی، زنجیرهٔ اثر غیرمستقیم (مثلاً اثر شاخص‌های کلان بر ترازنامهٔ بانک‌ها) را در همان یک جمله شرح بده.";
+
+/**
+ * Rewrites ONLY an untouched legacy instruction to the fixed default; any
+ * operator-customized text is preserved as-is.
+ */
+export function upgradeLegacyWhyItMattersInstruction(instruction: string): string {
+  return instruction.trim() === LEGACY_WHY_IT_MATTERS_INSTRUCTION
+    ? WHY_IT_MATTERS_DEFAULT_INSTRUCTION
+    : instruction;
+}
+
 export const DEFAULT_SYSTEM_PROMPT = `شما یک تحلیلگر خبری حرفه‌ای (News Analyst Agent) هستید. وظیفه شما تحلیل مقاله خبری ارائه‌شده و تولید یک پاسخ ساختاریافته JSON دقیق است.
 
 هرگز واقعیت، عدد یا ادعایی که در عنوان یا توضیحات مقاله نیامده را حدس نزن یا اختراع نکن. اگر اطلاعات ناکافی است، مقادیر را محافظه‌کارانه در نظر بگیر و این کمبود اطلاعات را به‌صراحت در خلاصه و دلیل ذکر کن.
@@ -275,8 +302,7 @@ export const DEFAULT_FEATURES: AiFeaturesConfig = {
   },
   whyItMatters: {
     enabled: true,
-    instruction:
-      "در یک جمله کوتاه فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است. اگر خبر برای مخاطب مهم نیست، بنویس «برای مخاطب هدف اهمیت مشخصی ندارد».",
+    instruction: WHY_IT_MATTERS_DEFAULT_INSTRUCTION,
   },
   entities: {
     enabled: true,

@@ -11,6 +11,44 @@ import type { NewsRow } from "@/db/schema";
 
 const MAX_SUMMARY_LENGTH = 600;
 
+/**
+ * Display-layer noise filter for rows analyzed before the prompt fix (the
+ * legacy prompt produced «برای مخاطب هدف اهمیت مشخصی ندارد» as filler). The
+ * full rule set lives in src/lib/ai/why-guard.ts; this module cannot import
+ * it without breaking the node test runner (extensionless relative import).
+ */
+const WHY_NOISE =
+  /اهمیت مشخصی ندارد|اهمیت (خاص|چندان)ی ندارد|مهم نیست|بدون (اهمیت|ربط)|^[-—–]\s*$|^ندارد\s*[.،]?$/;
+
+function usefulWhy(value: string | null | undefined): string {
+  const raw = (value ?? "").replace(/\s+/g, " ").trim();
+  return raw.length >= 12 && !WHY_NOISE.test(raw) ? raw : "";
+}
+
+/**
+ * Drops «label:» lines whose value line is empty or «—» — optional AI fields
+ * (whyItMatters, mainEvent) would otherwise leave a dangling label in
+ * template-rendered messages.
+ */
+export function stripEmptyLabelBlocks(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    const isLabel = trimmed.length > 0 && trimmed.length <= 60 && /[:：]$/.test(trimmed);
+    const nextLine = lines[i + 1];
+    const nextTrimmed = nextLine === undefined ? undefined : nextLine.trim();
+    const nextIsEmpty = nextTrimmed === undefined || nextTrimmed === "" || nextTrimmed === "—";
+    if (isLabel && nextIsEmpty) {
+      if (nextTrimmed === "" || nextTrimmed === "—") i += 1;
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n");
+}
+
 function compact(value: string | null | undefined, limit: number): string {
   const text = (value ?? "").replace(/\s+/g, " ").trim();
   if (!text) return "—";
@@ -38,7 +76,7 @@ export type MessageExtras = {
 };
 
 export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): string {
-  const why = article.whyItMatters?.trim();
+  const why = usefulWhy(article.whyItMatters);
   const entities = (extras.entityTags ?? article.entityTags ?? []).slice(0, 6).join("، ");
   const related = (extras.relatedTitles ?? []).slice(0, 2);
 
