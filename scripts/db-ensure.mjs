@@ -221,6 +221,18 @@ const STEPS = [
     )`,
   },
 
+  {
+    name: "table short_links",
+    sql: `CREATE TABLE IF NOT EXISTS "short_links" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      "slug" text NOT NULL,
+      "url" text NOT NULL,
+      "click_count" integer DEFAULT 0 NOT NULL,
+      "last_clicked_at" timestamp with time zone,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    )`,
+  },
+
   // ── Column repair for drifted tables (older milestone shapes) ────────────
   { name: "column news.external_id", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "external_id" text` },
   { name: "column news.canonical_url", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "canonical_url" text` },
@@ -444,6 +456,8 @@ const STEPS = [
       RAISE WARNING 'deliveries_open_candidate_unique not created (%). Clean up duplicate OPEN candidates manually, then re-run db:ensure.', SQLERRM;
     END $$`,
   },
+  { name: "index short_links_slug_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS "short_links_slug_unique" ON "short_links" ("slug")` },
+  { name: "index short_links_url_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS "short_links_url_unique" ON "short_links" ("url")` },
 ];
 
 /** Only run when invoked directly (`node scripts/db-ensure.mjs`), not on import. */

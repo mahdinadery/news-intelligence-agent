@@ -68,8 +68,10 @@ export function buildBulletinMessage(args: {
   generatedAt: Date;
   /** IANA timezone for the header date (e.g. "Asia/Tehran"). */
   timezone: string;
+  /** Maps a long URL to its display (short) form; identity when absent. */
+  linkFor?: (url: string) => string;
 }): string {
-  const { intro, items, generatedAt, timezone } = args;
+  const { intro, items, generatedAt, timezone, linkFor } = args;
 
   let dateLabel = generatedAt.toISOString().slice(0, 10);
   try {
@@ -105,7 +107,7 @@ export function buildBulletinMessage(args: {
     } else if (item.corroborated) {
       lines.push("تأییدشده توسط چند منبع ✓");
     }
-    lines.push(`🔗 ${item.url}`);
+    lines.push(`🔗 ${linkFor?.(item.url) || item.url}`);
   });
 
   return lines.join("\n");

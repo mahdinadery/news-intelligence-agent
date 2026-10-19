@@ -73,10 +73,13 @@ export type MessageExtras = {
   entityTags?: string[];
   /** Titles of previously delivered related stories (follow-ups). */
   relatedTitles?: string[];
+  /** Maps a long source URL to its display (short) form; identity when absent. */
+  linkFor?: (url: string) => string;
 };
 
 export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): string {
   const why = usefulWhy(article.whyItMatters);
+  const link = (url: string) => extras.linkFor?.(url) || url;
   const entities = (extras.entityTags ?? article.entityTags ?? []).slice(0, 6).join("، ");
   const related = (extras.relatedTitles ?? []).slice(0, 2);
 
@@ -88,10 +91,10 @@ export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): 
       ? [
           "",
           `منابع این خبر (${(others.length + 1).toLocaleString("fa-IR")}):`,
-          `• ${compact(article.source, 60)} (انتخاب‌شده): ${article.url}`,
-          ...others.map((item) => `• ${compact(item.source, 60)}: ${item.url}`),
+          `• ${compact(article.source, 60)} (انتخاب‌شده): ${link(article.url)}`,
+          ...others.map((item) => `• ${compact(item.source, 60)}: ${link(item.url)}`),
         ]
-      : ["", "🔗 منبع:", article.url];
+      : ["", "🔗 منبع:", link(article.url)];
 
   return [
     "📰 عنوان خبر",
