@@ -9,6 +9,7 @@
  */
 
 import type { AiOutputSchema } from "./config-types";
+import { sanitizeWhyItMatters } from "./why-guard";
 
 export type ParsedAiOutput = {
   summary: string;
@@ -73,7 +74,7 @@ export function parseAiOutput(rawText: string, outputSchema: AiOutputSchema): Pa
     relevance: clampScore(parsed.relevance),
     novelty: clampScore(parsed.novelty),
     mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
-    whyItMatters: typeof parsed.whyItMatters === "string" && parsed.whyItMatters.trim() ? parsed.whyItMatters.trim() : null,
+    whyItMatters: sanitizeWhyItMatters(parsed.whyItMatters),
     entities: coerceEntities(parsed.entities),
     shouldSend: Boolean(parsed.shouldSend),
     reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
@@ -148,6 +149,13 @@ export function validateAiOutputAgainstSchema(
     if (field.required && field.type === "string" && typeof value === "string" && !value.trim()) {
       issues.push({ field: field.name, message: "فیلد الزامی است اما مقدار خالی برگردانده شد." });
     }
+
+    if (field.name === "whyItMatters" && typeof value === "string" && value.trim() && !sanitizeWhyItMatters(value)) {
+      issues.push({
+        field: "whyItMatters",
+        message: "جملهٔ کلیشه‌ای یا بی‌محتواست و در پیام نمایش داده نمی‌شود (دلیل مشخص برای مخاطب بنویس).",
+      });
+    }
   }
 
   const blocking = issues.filter((issue) => outputSchema.find((f) => f.name === issue.field)?.required);
@@ -166,7 +174,7 @@ export function validateAiOutputAgainstSchema(
       relevance: clampScore(parsed.relevance),
       novelty: clampScore(parsed.novelty),
       mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
-      whyItMatters: typeof parsed.whyItMatters === "string" && parsed.whyItMatters.trim() ? parsed.whyItMatters.trim() : null,
+      whyItMatters: sanitizeWhyItMatters(parsed.whyItMatters),
       entities: coerceEntities(parsed.entities),
       shouldSend: Boolean(parsed.shouldSend),
       reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",

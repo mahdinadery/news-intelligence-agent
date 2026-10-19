@@ -23,6 +23,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_TEMPERATURE,
   DEFAULT_TOPIC_FILTER,
+  upgradeLegacyWhyItMattersInstruction,
   type ActiveAiConfig,
   type AiAutoSendPolicy,
   type AiConfigInput,
@@ -43,7 +44,17 @@ function withMissingConfigParts(
 ): { features: ActiveAiConfig["features"]; outputSchema: ActiveAiConfig["outputSchema"] } {
   const mergedFeatures = { ...features };
   for (const key of AI_FEATURE_ORDER) {
-    if (!mergedFeatures[key]) mergedFeatures[key] = { ...DEFAULT_FEATURES[key] };
+    if (!mergedFeatures[key]) {
+      mergedFeatures[key] = { ...DEFAULT_FEATURES[key] };
+    } else if (key === "whyItMatters") {
+      // One-time prompt upgrade: the legacy instruction told the model to
+      // answer the canned «…اهمیت مشخصی ندارد» line — rewrite it in place
+      // (exact-match only; operator-customized text is preserved).
+      mergedFeatures[key] = {
+        ...mergedFeatures[key],
+        instruction: upgradeLegacyWhyItMattersInstruction(mergedFeatures[key].instruction),
+      };
+    }
   }
   const known = new Set(outputSchema.map((field) => field.name));
   const mergedSchema = [...outputSchema];
