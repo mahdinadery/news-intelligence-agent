@@ -387,6 +387,31 @@ export const agentSchedules = pgTable("agent_schedules", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+/**
+ * Short links for delivery messages (additive). One deterministic slug per
+ * target URL; the public `/s/[slug]` route redirects and counts clicks. The
+ * long source URL always stays on `news.url` — only the rendered message is
+ * presented with the short form.
+ */
+export const shortLinks = pgTable(
+  "short_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull(),
+    url: text("url").notNull(),
+    clickCount: integer("click_count").notNull().default(0),
+    lastClickedAt: timestamp("last_clicked_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("short_links_slug_unique").on(table.slug),
+    uniqueIndex("short_links_url_unique").on(table.url),
+  ],
+);
+
+export type ShortLinkRow = typeof shortLinks.$inferSelect;
+export type NewShortLinkRow = typeof shortLinks.$inferInsert;
+
 export type NewsRow = typeof news.$inferSelect;
 export type NewNewsRow = typeof news.$inferInsert;
 export type NewsSourceRow = typeof newsSources.$inferSelect;

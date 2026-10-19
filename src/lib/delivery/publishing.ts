@@ -24,6 +24,7 @@ import { getActiveAiConfig } from "@/lib/ai/config-service";
 import { deliverToBale } from "./bale";
 import { deliverToLocal } from "./local";
 import { renderPublishingMessage } from "./template";
+import { ensureShortLinks, linkResolver } from "./short-link";
 import type { DeliveryDestination } from "./types";
 import { isOpenCandidate } from "./types";
 
@@ -132,7 +133,9 @@ export async function ensureDeliveryCandidate(
     .limit(1);
 
   const config = await getActiveAiConfig();
-  const message = renderPublishingMessage(config.publishingTemplate, article);
+  const linkMap = await ensureShortLinks([article.url]);
+  const linkFor = linkMap.size > 0 ? linkResolver(linkMap) : undefined;
+  const message = renderPublishingMessage(config.publishingTemplate, article, linkFor);
   const analysisId = await latestSuccessAnalysisId(newsId);
 
   try {

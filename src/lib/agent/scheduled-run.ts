@@ -16,6 +16,7 @@ import { readActiveOperationalSettings } from "@/lib/ai/config-service";
 import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
 import { sendBulletinDelivery } from "@/lib/delivery";
 import { buildBulletinMessage, MAX_BULLETIN_ITEMS, pickBulletinItems } from "@/lib/delivery/bulletin";
+import { ensureShortLinks, linkResolver } from "@/lib/delivery/short-link";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { expandTargets } from "@/lib/delivery/types";
 import {
@@ -226,7 +227,9 @@ async function sendBulletin(
     {},
   );
 
+  const linkMap = await ensureShortLinks(items.map((item) => item.url));
   const text = buildBulletinMessage({
+    linkFor: linkMap.size > 0 ? linkResolver(linkMap) : undefined,
     intro,
     items: items.map((item) => ({
       id: item.id,

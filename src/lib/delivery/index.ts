@@ -15,6 +15,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { deliverToBale } from "./bale";
 import { deliverToLocal } from "./local";
 import { buildNewsMessage, type MessageExtras } from "./message";
+import { ensureShortLinks, linkResolver } from "./short-link";
 import type {
   DeliveryDestination,
   DeliverySendResult,
@@ -222,6 +223,12 @@ export async function sendNewsDelivery(
   }
 
   const extras = await loadMessageExtras(article);
+  // Short links for the message only — best-effort; a failure keeps originals.
+  const linkMap = await ensureShortLinks([
+    article.url,
+    ...(extras.corroborationItems ?? []).map((item) => item.url),
+  ]);
+  if (linkMap.size > 0) extras.linkFor = linkResolver(linkMap);
   const message = buildNewsMessage(article, extras);
   const destinations = target === "both" ? DESTINATIONS : [target];
 

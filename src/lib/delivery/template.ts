@@ -50,7 +50,11 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 const MAX_FIELD_LENGTH = 900;
 
-function value(varName: PublishingTemplateVar, article: NewsRow): string {
+function value(
+  varName: PublishingTemplateVar,
+  article: NewsRow,
+  linkFor?: (url: string) => string,
+): string {
   switch (varName) {
     case "title":
       return article.normalizedTitle ?? article.title;
@@ -78,7 +82,7 @@ function value(varName: PublishingTemplateVar, article: NewsRow): string {
     case "sourceName":
       return article.source;
     case "originalUrl":
-      return article.url;
+      return linkFor?.(article.url) || article.url;
     case "publishedAt":
       return article.publishedAt ? article.publishedAt.toISOString().slice(0, 10) : "—";
   }
@@ -94,13 +98,17 @@ function compact(text: string, limit = MAX_FIELD_LENGTH): string {
  * to the pre-M8 built-in layout so existing configurations (created before the
  * template existed) keep producing exactly the same message as today.
  */
-export function renderPublishingMessage(template: string | null | undefined, article: NewsRow): string {
+export function renderPublishingMessage(
+  template: string | null | undefined,
+  article: NewsRow,
+  linkFor?: (url: string) => string,
+): string {
   const source = template?.trim();
-  if (!source) return buildNewsMessage(article);
+  if (!source) return buildNewsMessage(article, linkFor ? { linkFor } : {});
 
   const rendered = source.replace(/\{([a-zA-Z]+)\}/g, (match, rawKey: string) => {
     if (!(PUBLISHING_TEMPLATE_VARS as readonly string[]).includes(rawKey)) return match;
-    return compact(value(rawKey as PublishingTemplateVar, article));
+    return compact(value(rawKey as PublishingTemplateVar, article, linkFor));
   });
 
   // Optional fields that came back empty leave dangling «label:» lines —
