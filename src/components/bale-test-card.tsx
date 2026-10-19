@@ -41,10 +41,10 @@ const CHECK_LABELS: Record<BaleCheckStatus, string> = {
 };
 
 const CHECK_TONES: Record<BaleCheckStatus, string> = {
-  ok: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  warning: "bg-amber-50 text-amber-700 ring-amber-200",
-  error: "bg-rose-50 text-rose-700 ring-rose-200",
-  skipped: "bg-slate-100 text-slate-600 ring-slate-200",
+  ok: "bg-ok-soft text-ok-ink ring-ok-line",
+  warning: "bg-warn-soft text-warn-ink ring-warn-line",
+  error: "bg-danger-soft text-danger-ink ring-danger-line",
+  skipped: "bg-surface-3 text-muted ring-line",
 };
 
 const statusLabel: Record<BaleTestStatus, string> = {
@@ -176,11 +176,11 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
   return (
     <section
       aria-labelledby="bale-heading"
-      className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6"
+      className="mt-6 rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6"
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-surface-3 text-muted">
             <svg
               aria-hidden="true"
               className="h-6 w-6"
@@ -198,18 +198,18 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
             </svg>
           </div>
           <div>
-            <h2 id="bale-heading" className="text-base font-bold text-slate-950">
+            <h2 id="bale-heading" className="text-base font-bold text-ink">
               اتصال به بله
             </h2>
-            <p className="mt-1 text-sm text-slate-500">ارسال پیام آزمایشی و بررسی دسترسی ربات به کانال</p>
+            <p className="mt-1 text-sm text-muted">ارسال پیام آزمایشی و بررسی دسترسی ربات به کانال</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-slate-500">وضعیت بله:</span>
+          <span className="text-sm text-muted">وضعیت بله:</span>
           <StatusBadge tone={statusTone[status]}>{statusLabel[status]}</StatusBadge>
           <button
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+            className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:text-faint"
             disabled={diagnosing}
             onClick={handleDiagnostics}
             type="button"
@@ -219,8 +219,8 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
           <button
             className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
               status === "sending"
-                ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                : "bg-blue-600 text-white hover:bg-blue-700"
+                ? "cursor-not-allowed bg-surface-3 text-faint"
+                : "bg-accent text-white hover:bg-accent-strong"
             }`}
             disabled={status === "sending"}
             onClick={handleTest}
@@ -231,21 +231,21 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
         </div>
       </div>
 
-      <div aria-live="polite" className="mt-5 border-t border-slate-100 pt-4">
+      <div aria-live="polite" className="mt-5 border-t border-line-soft pt-4">
         {message ? (
           <p
             className={`text-sm font-medium ${
               status === "connected"
-                ? "text-emerald-700"
+                ? "text-ok-ink"
                 : status === "error"
-                  ? "text-rose-700"
-                  : "text-amber-700"
+                  ? "text-danger-ink"
+                  : "text-warn-ink"
             }`}
           >
             {message}
           </p>
         ) : (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-faint">
             با کلیک روی «تست اتصال»، یک پیام آزمایشی ثبت می‌شود و نتیجهٔ آن در صندوق خروجی نمایش داده
             می‌شود.
           </p>
@@ -253,7 +253,7 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
 
         {detail ? (
           <p
-            className="mt-2 break-words rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500"
+            className="mt-2 break-words rounded-lg bg-surface-2 px-3 py-2 font-mono text-xs text-muted"
             dir="ltr"
           >
             {detail}
@@ -262,20 +262,20 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
       </div>
 
       {diagnosticsError ? (
-        <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-6 text-rose-800">
+        <p className="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-xs leading-6 text-danger-ink">
           {diagnosticsError}
         </p>
       ) : null}
 
       {diagnostics ? (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <div className="mt-4 rounded-xl border border-line bg-surface-2/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-bold text-slate-800">نتیجهٔ بررسی کانال</p>
+            <p className="text-sm font-bold text-ink-soft">نتیجهٔ بررسی کانال</p>
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${
                 diagnostics.ready
-                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                  : "bg-rose-50 text-rose-700 ring-rose-200"
+                  ? "bg-ok-soft text-ok-ink ring-ok-line"
+                  : "bg-danger-soft text-danger-ink ring-danger-line"
               }`}
             >
               {diagnostics.ready ? "آمادهٔ ارسال" : "نیاز به اصلاح"}
@@ -284,9 +284,9 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
 
           <ul className="mt-3 space-y-2">
             {diagnostics.checks.map((check) => (
-              <li className="rounded-lg border border-slate-200 bg-white px-3 py-2" key={check.id}>
+              <li className="rounded-lg border border-line bg-surface px-3 py-2" key={check.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-700">{check.title}</span>
+                  <span className="text-xs font-bold text-ink-soft">{check.title}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${CHECK_TONES[check.status]}`}
                   >
@@ -294,16 +294,16 @@ export function BaleTestCard({ onTestComplete, adminKey = "" }: BaleTestCardProp
                   </span>
                 </div>
                 {check.detail ? (
-                  <p className="mt-1 break-words text-[11px] leading-5 text-slate-500">{check.detail}</p>
+                  <p className="mt-1 break-words text-[11px] leading-5 text-muted">{check.detail}</p>
                 ) : null}
                 {check.hint ? (
-                  <p className="mt-1 text-[11px] leading-5 text-amber-700">راهکار: {check.hint}</p>
+                  <p className="mt-1 text-[11px] leading-5 text-warn-ink">راهکار: {check.hint}</p>
                 ) : null}
               </li>
             ))}
           </ul>
 
-          <p className="mt-3 text-[11px] leading-5 text-slate-400">
+          <p className="mt-3 text-[11px] leading-5 text-faint">
             این بررسی پیامی ارسال نمی‌کند؛ برای تأیید نهایی «تست اتصال» را بزنید.
             {diagnostics.chatIdMasked ? ` مقصد: ${diagnostics.chatIdMasked}` : ""}
           </p>

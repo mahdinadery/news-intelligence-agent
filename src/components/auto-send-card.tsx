@@ -38,11 +38,11 @@ type PassResult = {
 };
 
 const OUTCOME_LABEL: Record<ItemOutcome["outcome"], { text: string; className: string }> = {
-  sent: { text: "ارسال شد به صندوق خروجی ✓", className: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
-  partially_sent: { text: "بخشی ارسال شد", className: "bg-amber-50 text-amber-800 ring-amber-200" },
-  failed: { text: "ناموفق", className: "bg-rose-50 text-rose-800 ring-rose-200" },
-  already_sent: { text: "قبلاً ارسال شده (در صندوق خروجی موجود است)", className: "bg-slate-100 text-slate-600 ring-slate-200" },
-  not_matched: { text: "مشمول شرایط نیست", className: "bg-slate-100 text-slate-500 ring-slate-200" },
+  sent: { text: "ارسال شد به صندوق خروجی ✓", className: "bg-ok-soft text-ok-ink ring-ok-line" },
+  partially_sent: { text: "بخشی ارسال شد", className: "bg-warn-soft text-warn-ink ring-warn-line" },
+  failed: { text: "ناموفق", className: "bg-danger-soft text-danger-ink ring-danger-line" },
+  already_sent: { text: "قبلاً ارسال شده (در صندوق خروجی موجود است)", className: "bg-surface-3 text-muted ring-line" },
+  not_matched: { text: "مشمول شرایط نیست", className: "bg-surface-3 text-muted ring-line" },
 };
 
 const REASON_LABEL: Record<string, string> = {
@@ -109,18 +109,18 @@ export function AutoSendCard({
   return (
     <section
       aria-labelledby="auto-send-heading"
-      className="mt-6 rounded-2xl border border-violet-200/80 bg-white p-5 shadow-sm shadow-violet-100/50 sm:p-6"
+      className="mt-6 rounded-2xl border border-brand-line/80 bg-surface p-5 shadow-sm shadow-brand-line/50 sm:p-6"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-600/20">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand text-white shadow-md shadow-brand/20">
             <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 2 4.5 13H11l-1 9 8.5-11H12l1-9Z" />
             </svg>
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 id="auto-send-heading" className="text-base font-bold text-slate-950">
+              <h2 id="auto-send-heading" className="text-base font-bold text-ink">
                 قواعد ارسال خودکار هوشمند 🤖
               </h2>
               {rule ? (
@@ -129,7 +129,7 @@ export function AutoSendCard({
                 </StatusBadge>
               ) : null}
             </div>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted">
               هر خبری که شرایط مشخص‌شده (اهمیت ≥ {rule?.thresholds?.minImportance ?? 50}٪ و مرتبط بودن ≥ {rule?.thresholds?.minRelevance ?? 50}٪) را داشته باشد، خودکار به صندوق خروجی ارسال می‌شود.
             </p>
           </div>
@@ -138,7 +138,7 @@ export function AutoSendCard({
         <div className="flex flex-wrap items-center gap-2">
           <button
             className={`rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition-all ${
-              running ? "cursor-not-allowed bg-slate-100 text-slate-400" : "bg-violet-600 text-white hover:bg-violet-700"
+              running ? "cursor-not-allowed bg-surface-3 text-faint" : "bg-brand text-white hover:bg-brand-strong"
             }`}
             disabled={running}
             onClick={() => handleRun(false)}
@@ -147,7 +147,7 @@ export function AutoSendCard({
             {running ? "در حال بررسی..." : "بررسی و ارسال خودکار"}
           </button>
           <button
-            className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100"
+            className="rounded-xl border border-brand-line bg-brand-soft px-3 py-2.5 text-xs font-bold text-brand-ink transition-colors hover:bg-brand-soft"
             disabled={running}
             onClick={() => handleRun(true)}
             title="ارسال حتی اگر قبلاً ارسال شده باشد (جهت تست فوری صندوق خروجی)"
@@ -158,50 +158,50 @@ export function AutoSendCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-xs font-semibold text-slate-500">مقصد ارسال خودکار</p>
-          <p className="mt-1 text-sm font-bold text-violet-900">{destinationLabel}</p>
+      <div className="mt-5 grid gap-4 border-t border-line-soft pt-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-xs font-semibold text-muted">مقصد ارسال خودکار</p>
+          <p className="mt-1 text-sm font-bold text-brand-ink">{destinationLabel}</p>
         </div>
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-xs font-semibold text-slate-500">وضعیت اتصال مقصدها</p>
-          <p className="mt-1 text-xs font-semibold text-slate-700">
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-xs font-semibold text-muted">وضعیت اتصال مقصدها</p>
+          <p className="mt-1 text-xs font-semibold text-ink-soft">
             صندوق محلی (Local):{" "}
-            <span className="text-emerald-700">آماده و فعال ✓</span>
+            <span className="text-ok-ink">آماده و فعال ✓</span>
             {" · "}
             بله:{" "}
             {rule?.destinationsReady?.bale ? (
-              <span className="text-emerald-700">کلید تنظیم شده</span>
+              <span className="text-ok-ink">کلید تنظیم شده</span>
             ) : (
-              <span className="text-slate-400">بدون کلید</span>
+              <span className="text-faint">بدون کلید</span>
             )}
           </p>
         </div>
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-xs font-semibold text-slate-500">شرایط تعیین‌شده (حد نصاب‌ها)</p>
-          <p className="mt-1 text-xs font-bold text-slate-800">
+        <div className="rounded-xl bg-surface-2 p-3">
+          <p className="text-xs font-semibold text-muted">شرایط تعیین‌شده (حد نصاب‌ها)</p>
+          <p className="mt-1 text-xs font-bold text-ink-soft">
             اهمیت ≥ {rule?.thresholds?.minImportance ?? 50}٪ · مرتبط بودن ≥ {rule?.thresholds?.minRelevance ?? 50}٪
           </p>
         </div>
       </div>
 
       {result ? (
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="mt-5 rounded-xl border border-line bg-surface-2/80 p-4">
           {!result.success ? (
-            <p className="text-sm font-medium text-rose-700">{result.message ?? "اجرای ارسال خودکار ناموفق بود."}</p>
+            <p className="text-sm font-medium text-danger-ink">{result.message ?? "اجرای ارسال خودکار ناموفق بود."}</p>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
-                <span className="text-slate-500">
-                  خبرهای بررسی‌شده: <b className="text-slate-900">{result.considered ?? 0}</b>
+                <span className="text-muted">
+                  خبرهای بررسی‌شده: <b className="text-ink">{result.considered ?? 0}</b>
                 </span>
-                <span className="text-violet-700">
+                <span className="text-brand-ink">
                   واجد شرایط: <b>{result.matched ?? 0}</b>
                 </span>
-                <span className="text-emerald-700">
+                <span className="text-ok-ink">
                   ارسال جدید به صندوق خروجی: <b>{result.sent ?? 0}</b>
                 </span>
-                <span className="text-slate-500">
+                <span className="text-muted">
                   قبلاً در صندوق موجود است: <b>{result.skippedDuplicates ?? 0}</b>
                 </span>
               </div>
@@ -211,22 +211,22 @@ export function AutoSendCard({
                   {result.items.slice(0, 10).map((item) => {
                     const meta = OUTCOME_LABEL[item.outcome] ?? OUTCOME_LABEL.sent;
                     return (
-                      <li className="rounded-lg bg-white p-3 ring-1 ring-slate-100" key={item.id}>
+                      <li className="rounded-lg bg-surface p-3 ring-1 ring-line-soft" key={item.id}>
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${meta.className}`}
                           >
                             {meta.text}
                           </span>
-                          <span className="text-xs font-semibold text-slate-800">{item.title}</span>
+                          <span className="text-xs font-semibold text-ink-soft">{item.title}</span>
                         </div>
                         {item.reasons && item.reasons.length > 0 ? (
-                          <p className="mt-1.5 text-xs text-slate-500">
+                          <p className="mt-1.5 text-xs text-muted">
                             علت: {item.reasons.map((reason) => REASON_LABEL[reason] ?? reason).join(" · ")}
                           </p>
                         ) : null}
                         {item.errors && item.errors.length > 0 ? (
-                          <p className="mt-1 break-words font-mono text-[11px] text-rose-600" dir="ltr">
+                          <p className="mt-1 break-words font-mono text-[11px] text-danger-ink" dir="ltr">
                             {item.errors.join(" | ")}
                           </p>
                         ) : null}
@@ -235,7 +235,7 @@ export function AutoSendCard({
                   })}
                 </ul>
               ) : (
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-muted">
                   هیچ خبر تحلیل‌شده‌ای یافت نشد. ابتدا در صفحه «اخبار» روی «تحلیل با AI» بزنید.
                 </p>
               )}

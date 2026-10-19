@@ -132,11 +132,11 @@ export function NewsFetchCard({
   return (
     <section
       aria-labelledby="news-fetch-heading"
-      className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6"
+      className="mt-6 rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6"
     >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-ink">
             <svg
               aria-hidden="true"
               className="h-6 w-6"
@@ -153,24 +153,24 @@ export function NewsFetchCard({
             </svg>
           </div>
           <div>
-            <h2 id="news-fetch-heading" className="text-base font-bold text-slate-950">
+            <h2 id="news-fetch-heading" className="text-base font-bold text-ink">
               اخبار دریافت‌شده
             </h2>
-            <p className="mt-1 text-sm text-slate-500">دریافت دستی اخبار از منبع RSS پیکربندی‌شده</p>
+            <p className="mt-1 text-sm text-muted">دریافت دستی اخبار از منبع RSS پیکربندی‌شده</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:gap-4">
-          <div className="rounded-xl border border-slate-200 px-4 py-2 text-center">
-            <p className="text-xs text-slate-500">کل اخبار ذخیره‌شده</p>
-            <p className="mt-1 text-lg font-bold text-slate-950">{loadingStats ? "…" : total}</p>
+          <div className="rounded-xl border border-line px-4 py-2 text-center">
+            <p className="text-xs text-muted">کل اخبار ذخیره‌شده</p>
+            <p className="mt-1 text-lg font-bold text-ink">{loadingStats ? "…" : total}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 px-4 py-2 text-center">
-            <p className="text-xs text-slate-500">اخبار آخرین دریافت</p>
-            <p className="mt-1 text-lg font-bold text-slate-950">{loadingStats ? "…" : lastFetch}</p>
+          <div className="rounded-xl border border-line px-4 py-2 text-center">
+            <p className="text-xs text-muted">اخبار آخرین دریافت</p>
+            <p className="mt-1 text-lg font-bold text-ink">{loadingStats ? "…" : lastFetch}</p>
           </div>
           <button
-            className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-faint"
             disabled={isFetching}
             onClick={handleFetch}
             type="button"
@@ -180,29 +180,29 @@ export function NewsFetchCard({
         </div>
       </div>
 
-      <div aria-live="polite" className="mt-5 border-t border-slate-100 pt-4">
+      <div aria-live="polite" className="mt-5 border-t border-line-soft pt-4">
         {result ? (
           <p
             className={`text-sm font-medium ${
-              result.kind === "success" ? "text-emerald-700" : "text-rose-700"
+              result.kind === "success" ? "text-ok-ink" : "text-danger-ink"
             }`}
           >
             {result.text}
-            {result.detail ? <span className="mt-1 block text-xs text-slate-500">{result.detail}</span> : null}
+            {result.detail ? <span className="mt-1 block text-xs text-muted">{result.detail}</span> : null}
           </p>
         ) : (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-faint">
             دریافت خودکار فعال نیست؛ برای همگام‌سازی منبع روی «دریافت اخبار» بزنید.
           </p>
         )}
 
         {stats && stats.lastFetchedAt ? (
-          <p className="mt-2 text-xs text-slate-400">آخرین دریافت: {formatDateTime(stats.lastFetchedAt)}</p>
+          <p className="mt-2 text-xs text-faint">آخرین دریافت: {formatDateTime(stats.lastFetchedAt)}</p>
         ) : null}
 
         {stats && stats.success && stats.totalStored > 0 ? (
           <a
-            className="mt-3 inline-block text-sm font-medium text-sky-700 hover:underline"
+            className="mt-3 inline-block text-sm font-medium text-accent-ink hover:underline"
             href="/news"
           >
             مشاهده فهرست اخبار

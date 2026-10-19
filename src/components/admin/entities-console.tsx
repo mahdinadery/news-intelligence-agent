@@ -70,32 +70,32 @@ function formatDateShort(iso: string | null): string {
 }
 
 function importanceTone(avg: number): { pill: string; label: string } {
-  if (avg >= 70) return { pill: "bg-emerald-100 text-emerald-800", label: "اهمیت بالا" };
-  if (avg >= 40) return { pill: "bg-amber-100 text-amber-800", label: "اهمیت متوسط" };
-  return { pill: "bg-slate-100 text-slate-700", label: "اهمیت پایین" };
+  if (avg >= 70) return { pill: "bg-ok-soft text-ok-ink", label: "اهمیت بالا" };
+  if (avg >= 40) return { pill: "bg-warn-soft text-warn-ink", label: "اهمیت متوسط" };
+  return { pill: "bg-surface-3 text-ink-soft", label: "اهمیت پایین" };
 }
 
 /** High (>=70) / mid (40..69) / low (<40) importance distribution bar. */
 function DistributionBar({ stat }: { stat: MetricStat }) {
   const total = stat.scoredCount;
   if (total <= 0) {
-    return <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" />;
+    return <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3" />;
   }
   return (
-    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100" title="توزیع اهمیت: بالا/متوسط/پایین">
-      <div className="bg-emerald-500" style={{ width: `${(stat.highCount / total) * 100}%` }} />
-      <div className="bg-amber-500" style={{ width: `${(stat.midCount / total) * 100}%` }} />
-      <div className="bg-slate-300" style={{ width: `${(stat.lowCount / total) * 100}%` }} />
+    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-surface-3" title="توزیع اهمیت: بالا/متوسط/پایین">
+      <div className="bg-ok" style={{ width: `${(stat.highCount / total) * 100}%` }} />
+      <div className="bg-warn" style={{ width: `${(stat.midCount / total) * 100}%` }} />
+      <div className="bg-track-strong" style={{ width: `${(stat.lowCount / total) * 100}%` }} />
     </div>
   );
 }
 
 function KpiCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3.5">
-      <p className="text-[11px] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-slate-950">{value}</p>
-      <p className="mt-1 text-[11px] leading-5 text-slate-400">{detail}</p>
+    <div className="rounded-2xl border border-line bg-surface p-3.5">
+      <p className="text-[11px] text-muted">{label}</p>
+      <p className="mt-1 text-xl font-bold text-ink">{value}</p>
+      <p className="mt-1 text-[11px] leading-5 text-faint">{detail}</p>
     </div>
   );
 }
@@ -113,7 +113,7 @@ function StatRow({
   return (
     <button
       className={`w-full rounded-lg border px-3 py-2 text-right text-sm transition ${
-        active ? "border-sky-300 bg-sky-50 text-sky-900" : "border-slate-100 hover:bg-slate-50"
+        active ? "border-accent bg-accent-soft text-accent-ink" : "border-line-soft hover:bg-surface-2"
       }`}
       onClick={onSelect}
       type="button"
@@ -127,7 +127,7 @@ function StatRow({
       <span className="mt-1.5 block">
         <DistributionBar stat={stat} />
       </span>
-      <span className="mt-1.5 block text-[11px] text-slate-500">
+      <span className="mt-1.5 block text-[11px] text-muted">
         {stat.count.toLocaleString("fa-IR")} خبر
         {stat.corroboratedCount > 0 ? ` · ${stat.corroboratedCount.toLocaleString("fa-IR")} تأییدشده` : ""}
         {stat.recent7d > 0 ? ` · ${stat.recent7d.toLocaleString("fa-IR")} در ۷ روز اخیر` : ""}
@@ -140,15 +140,15 @@ function StatRow({
 
 function NewsList({ items }: { items: DetailNews[] }) {
   if (items.length === 0) {
-    return <p className="p-4 text-center text-xs text-slate-400">خبری برای این مورد پیدا نشد.</p>;
+    return <p className="p-4 text-center text-xs text-faint">خبری برای این مورد پیدا نشد.</p>;
   }
   return (
     <div className="space-y-3">
       {items.map((item) => (
-        <article key={item.id} className="rounded-xl border border-slate-100 p-3">
+        <article key={item.id} className="rounded-xl border border-line-soft p-3">
           <div className="flex flex-wrap items-center gap-2">
             <a
-              className="text-sm font-medium text-sky-800 hover:underline"
+              className="text-sm font-medium text-accent-ink hover:underline"
               href={item.url}
               rel="noreferrer"
               target="_blank"
@@ -159,9 +159,9 @@ function NewsList({ items }: { items: DetailNews[] }) {
             {item.relevanceGrade === "rejected" ? <StatusBadge tone="danger">نامرتبط (گریدر)</StatusBadge> : null}
           </div>
           {item.summary ? (
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.summary}</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{item.summary}</p>
           ) : null}
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-faint">
             {item.source} · اهمیت {(item.importanceScore ?? 0).toLocaleString("fa-IR")} · مرتبط بودن{" "}
             {(item.relevanceScore ?? 0).toLocaleString("fa-IR")} · {formatDate(item.publishedAt)}
           </p>
@@ -275,15 +275,15 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold text-slate-950">پروندهٔ ناشران و نهادها</h1>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
+          <h1 className="text-lg font-bold text-ink">پروندهٔ ناشران و نهادها</h1>
+          <p className="mt-1 text-xs leading-5 text-muted">
             داشبورد رتبه‌بندی ناشران و نهادها بر اساس <strong>تعداد</strong>، <strong>زمان</strong> و{" "}
             <strong>امتیاز میزان اهمیت</strong>. نام بانک‌ها/شرکت‌ها/نهادها را هوش مصنوعی از تحلیل خبرها استخراج
             می‌کند و از هر موجودیت می‌توانید «بولتن موردی» همان نهاد را برای کانال بفرستید.
           </p>
         </div>
         <button
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft hover:bg-surface-2"
           onClick={() => {
             setLoading(true);
             load();
@@ -295,14 +295,14 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
       </div>
 
       {loadFailure ? (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{loadFailure}</p>
+        <p className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-ink">{loadFailure}</p>
       ) : null}
       {message ? (
         <p
           className={`rounded-xl border px-4 py-3 text-sm ${
             message.kind === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
+              ? "border-ok-line bg-ok-soft text-ok-ink"
+              : "border-danger-line bg-danger-soft text-danger-ink"
           }`}
         >
           {message.text}
@@ -339,7 +339,7 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-2">
+        <section className="rounded-2xl border border-line bg-surface p-4 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {(
               [
@@ -350,7 +350,7 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
               <button
                 key={key}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  tab === key ? "bg-sky-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  tab === key ? "bg-accent text-white" : "border border-line bg-surface text-muted hover:bg-surface-2"
                 }`}
                 onClick={() => {
                   setTab(key);
@@ -367,21 +367,21 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
           </div>
 
           <input
-            className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none"
+            className="mt-3 w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             onChange={(event) => setQuery(event.target.value)}
             placeholder={tab === "publishers" ? "جست‌وجوی ناشر..." : "جست‌وجوی موجودیت..."}
             value={query}
           />
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-slate-400">مرتب‌سازی:</span>
+            <span className="text-[11px] text-faint">مرتب‌سازی:</span>
             {(["count", "time", "importance"] as const).map((key) => (
               <button
                 key={key}
                 className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
                   sortKey === key
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "bg-ink text-on-ink"
+                    : "border border-line bg-surface text-muted hover:bg-surface-2"
                 }`}
                 onClick={() => {
                   if (sortKey === key) {
@@ -400,9 +400,9 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
           </div>
 
           <div className="mt-3 max-h-[560px] space-y-1 overflow-y-auto">
-            {loading ? <p className="p-3 text-xs text-slate-400">در حال بارگذاری...</p> : null}
+            {loading ? <p className="p-3 text-xs text-faint">در حال بارگذاری...</p> : null}
             {!loading && visible.length === 0 ? (
-              <p className="p-3 text-xs leading-6 text-slate-400">
+              <p className="p-3 text-xs leading-6 text-faint">
                 {tab === "publishers"
                   ? "هنوز ناشری با خبر تحلیل‌شده ثبت نشده است."
                   : "هنوز موجودیتی استخراج نشده است. خبرهای تحلیل‌شدهٔ جدید به‌صورت خودکار این فهرست را پر می‌کنند."}
@@ -419,19 +419,19 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-3">
+        <section className="rounded-2xl border border-line bg-surface p-4 lg:col-span-3">
           {!selected ? (
-            <p className="p-6 text-center text-sm text-slate-400">
+            <p className="p-6 text-center text-sm text-faint">
               یک ناشر یا موجودیت را از فهرست انتخاب کنید تا پروندهٔ آن با جزئیات تعداد، زمان و اهمیت نمایش داده شود.
             </p>
           ) : detailLoading ? (
-            <p className="p-6 text-center text-sm text-slate-400">در حال بارگذاری پرونده...</p>
+            <p className="p-6 text-center text-sm text-faint">در حال بارگذاری پرونده...</p>
           ) : detail ? (
             <div>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h2 className="text-base font-bold text-slate-950">{detail.stats.name}</h2>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <h2 className="text-base font-bold text-ink">{detail.stats.name}</h2>
+                  <p className="mt-1 text-xs text-muted">
                     {detailKind === "publisher" ? "ناشر" : "موجودیت"} ·{" "}
                     {detail.stats.count.toLocaleString("fa-IR")} خبر تحلیل‌شده · میانگین اهمیت{" "}
                     {detail.stats.avgImportance.toLocaleString("fa-IR")} · بیشینه{" "}
@@ -439,7 +439,7 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
                     {detail.stats.corroboratedCount.toLocaleString("fa-IR")} تأییدشده · اولین:{" "}
                     {formatDate(detail.stats.firstPublishedAt)} · آخرین: {formatDate(detail.stats.lastPublishedAt)}
                   </p>
-                  <p className="mt-1 text-[11px] text-slate-400">
+                  <p className="mt-1 text-[11px] text-faint">
                     توزیع اهمیت: بالا {detail.stats.highCount.toLocaleString("fa-IR")} · متوسط{" "}
                     {detail.stats.midCount.toLocaleString("fa-IR")} · پایین{" "}
                     {detail.stats.lowCount.toLocaleString("fa-IR")} · در ۷ روز اخیر{" "}
@@ -451,7 +451,7 @@ export function EntitiesConsole({ adminKey = "" }: { adminKey?: string }) {
                 </div>
                 {detailKind === "entity" ? (
                   <button
-                    className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                    className="rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-strong disabled:opacity-50"
                     disabled={bulletinBusy}
                     onClick={sendBulletin}
                     type="button"

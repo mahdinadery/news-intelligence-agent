@@ -17,14 +17,14 @@ const TYPE_LABELS: Record<AiOutputFieldSchema["type"], string> = {
 /** One row = one field in the structured output schema (name/enabled/description/required/type). */
 export function AiConfigOutputFieldRow({ value, locked, onChange }: Props) {
   return (
-    <div className="grid grid-cols-2 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
+    <div className="grid grid-cols-2 items-center gap-3 rounded-xl border border-line bg-surface p-3 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
       <div>
-        <p className="font-mono text-xs font-bold text-slate-900">{value.name}</p>
-        <p className="text-[11px] text-slate-400">{TYPE_LABELS[value.type]}</p>
+        <p className="font-mono text-xs font-bold text-ink">{value.name}</p>
+        <p className="text-[11px] text-faint">{TYPE_LABELS[value.type]}</p>
       </div>
 
       <input
-        className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-400 focus:outline-none"
+        className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-ink-soft focus:border-accent focus:outline-none"
         onChange={(event) => onChange({ ...value, description: event.target.value })}
         placeholder="توضیح فیلد"
         value={value.description}
@@ -52,16 +52,16 @@ export function AiConfigOutputFieldRow({ value, locked, onChange }: Props) {
       </label>
 
       {value.type === "number" ? (
-        <div className="flex items-center gap-1 text-[11px] text-slate-500">
+        <div className="flex items-center gap-1 text-[11px] text-muted">
           <input
-            className="w-12 rounded-md border border-slate-200 px-1.5 py-1 text-center"
+            className="w-12 rounded-md border border-line px-1.5 py-1 text-center"
             onChange={(event) => onChange({ ...value, min: Number(event.target.value) })}
             type="number"
             value={value.min ?? 0}
           />
           <span>-</span>
           <input
-            className="w-12 rounded-md border border-slate-200 px-1.5 py-1 text-center"
+            className="w-12 rounded-md border border-line px-1.5 py-1 text-center"
             onChange={(event) => onChange({ ...value, max: Number(event.target.value) })}
             type="number"
             value={value.max ?? 100}

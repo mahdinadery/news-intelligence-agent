@@ -44,14 +44,14 @@ export function NewsRefreshButton() {
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
       <button
-        className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        className="rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-faint"
         disabled={busy}
         onClick={handleClick}
         type="button"
       >
         {busy ? "در حال دریافت..." : "دریافت اخبار"}
       </button>
-      {note ? <p className="text-xs text-slate-500">{note}</p> : null}
+      {note ? <p className="text-xs text-muted">{note}</p> : null}
     </div>
   );
 }

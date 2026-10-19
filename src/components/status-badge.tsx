@@ -8,17 +8,17 @@ type StatusBadgeProps = {
 };
 
 const toneClasses: Record<StatusTone, string> = {
-  success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  warning: "bg-amber-50 text-amber-700 ring-amber-200",
-  danger: "bg-rose-50 text-rose-700 ring-rose-200",
-  muted: "bg-slate-100 text-slate-600 ring-slate-200",
+  success: "bg-ok-soft text-ok-ink ring-ok-line",
+  warning: "bg-warn-soft text-warn-ink ring-warn-line",
+  danger: "bg-danger-soft text-danger-ink ring-danger-line",
+  muted: "bg-surface-3 text-muted ring-line",
 };
 
 const dotClasses: Record<StatusTone, string> = {
-  success: "bg-emerald-500",
-  warning: "bg-amber-500",
-  danger: "bg-rose-500",
-  muted: "bg-slate-400",
+  success: "bg-ok",
+  warning: "bg-warn",
+  danger: "bg-danger",
+  muted: "bg-track-strong",
 };
 
 export function StatusBadge({ children, tone = "success" }: StatusBadgeProps) {

@@ -58,10 +58,10 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+    <div className="space-y-4 rounded-2xl border border-line/80 bg-surface p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold text-slate-900">کنترل انتشار</h2>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
+        <h2 className="text-sm font-bold text-ink">کنترل انتشار</h2>
+        <span className="rounded-full bg-surface-3 px-2.5 py-1 text-[11px] font-bold text-muted">
           وضعیت فعلی: {status}
         </span>
       </div>
@@ -69,7 +69,7 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
       {status === "pending_approval" ? (
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="rounded-xl bg-ok px-4 py-2.5 text-sm font-bold text-white hover:bg-ok-strong disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => action("approve", `/api/admin/deliveries/${deliveryId}/approve`)}
             type="button"
@@ -77,7 +77,7 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
             {busy === "approve" ? "..." : "تأیید"}
           </button>
           <button
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-muted hover:bg-surface-2 disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => action("reject", `/api/admin/deliveries/${deliveryId}/reject`, { reason: "رد توسط مدیر" })}
             type="button"
@@ -85,7 +85,7 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
             {busy === "reject" ? "..." : "رد"}
           </button>
           <button
-            className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+            className="rounded-xl border border-brand-line bg-brand-soft px-4 py-2.5 text-sm font-bold text-brand-ink hover:bg-brand-soft disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => setOverrideOpen((v) => !v)}
             type="button"
@@ -96,18 +96,18 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
       ) : null}
 
       {overrideOpen && status === "pending_approval" ? (
-        <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
-          <p className="text-xs font-bold text-violet-900">
+        <div className="rounded-xl border border-brand-line bg-brand-soft/50 p-3">
+          <p className="text-xs font-bold text-brand-ink">
             نظر هوش مصنوعی تغییر نمی‌کند؛ فقط یک override روی همین رکورد ارسال ثبت می‌شود (به‌همراه دلیل، در تاریخچه).
           </p>
           <input
-            className="mt-2 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-lg border border-brand-line bg-surface px-3 py-2 text-sm"
             onChange={(e) => setOverrideReason(e.target.value)}
             placeholder="دلیل override (الزامی)"
             value={overrideReason}
           />
           <button
-            className="mt-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+            className="mt-2 rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-strong disabled:opacity-50"
             disabled={busy !== null || !overrideReason.trim()}
             onClick={() =>
               action("override", `/api/admin/deliveries/${deliveryId}/approve`, { force: true, reason: overrideReason.trim() })
@@ -123,7 +123,7 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
         <div className="flex flex-wrap items-center gap-2">
           {destination === "bale" ? (
             <button
-              className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white hover:bg-accent-strong disabled:opacity-50"
               disabled={busy !== null}
               onClick={() => action("send", `/api/admin/deliveries/${deliveryId}/send`)}
               type="button"
@@ -132,7 +132,7 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
             </button>
           ) : (
             <button
-              className="rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-on-ink hover:bg-ink/90 disabled:opacity-50"
               disabled={busy !== null}
               onClick={() => action("send", `/api/admin/deliveries/${deliveryId}/send`)}
               type="button"
@@ -141,26 +141,26 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
             </button>
           )}
           <button
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-muted hover:bg-surface-2 disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => action("cancel", `/api/admin/deliveries/${deliveryId}/cancel`)}
             type="button"
           >
             لغو
           </button>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-faint">
             ارسال اتمی است: دو کلیک هم‌زمان فقط یک پیام می‌سازد.
           </span>
         </div>
       ) : null}
 
       {needsRepublish && status === "approved" ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-          <span className="text-xs font-bold text-amber-900">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warn-line bg-warn-soft px-3 py-2">
+          <span className="text-xs font-bold text-warn-ink">
             این خبر قبلاً به همین مقصد ارسال شده است؛ برای جلوگیری از تکرار، ارسال مسدود شد.
           </span>
           <button
-            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-warn px-3 py-1.5 text-xs font-bold text-white hover:bg-warn-strong disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => action("force", `/api/admin/deliveries/${deliveryId}/send`, { force: true })}
             type="button"
@@ -173,29 +173,29 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
       {status === "failed" && canRetry ? (
         <div className="flex flex-wrap items-center gap-2">
           <button
-            className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-xl bg-warn px-4 py-2.5 text-sm font-bold text-white hover:bg-warn-strong disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => action("retry", `/api/admin/deliveries/${deliveryId}/retry`)}
             type="button"
           >
             {busy === "retry" ? "..." : "تلاش مجدد (با همان متن)"}
           </button>
-          <span className="text-[11px] text-slate-400">اگر رکورد قبلاً ارسال شده باشد، تلاش مجدد از سمت سرور رد می‌شود.</span>
+          <span className="text-[11px] text-faint">اگر رکورد قبلاً ارسال شده باشد، تلاش مجدد از سمت سرور رد می‌شود.</span>
         </div>
       ) : null}
 
       {status === "sending" ? (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="rounded-xl border border-warn-line bg-warn-soft px-3 py-2 text-xs text-warn-ink">
           یک درخواست ارسال روی این رکورد در جریان است. برای دیدن نتیجه، صفحه را تازه کنید.
         </p>
       ) : null}
 
       {isOpen ? (
-        <div className="border-t border-slate-100 pt-4">
+        <div className="border-t border-line-soft pt-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-bold text-slate-600">متن پیام نهایی</p>
+            <p className="text-xs font-bold text-muted">متن پیام نهایی</p>
             <button
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2"
               onClick={() => setEditing((v) => !v)}
               type="button"
             >
@@ -205,21 +205,21 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
           {editing ? (
             <>
               <textarea
-                className="mt-2 w-full resize-y rounded-xl border border-slate-200 p-3 text-sm leading-6 focus:border-blue-400 focus:outline-none"
+                className="mt-2 w-full resize-y rounded-xl border border-line p-3 text-sm leading-6 focus:border-accent focus:outline-none"
                 onChange={(e) => setDraft(e.target.value)}
                 rows={12}
                 value={draft}
               />
               <div className="mt-2 flex items-center gap-3">
                 <button
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white hover:bg-accent-strong disabled:opacity-50"
                   disabled={busy !== null || !draft.trim()}
                   onClick={() => action("edit", `/api/admin/deliveries/${deliveryId}/message`, { message: draft }, "PATCH")}
                   type="button"
                 >
                   {busy === "edit" ? "..." : "ذخیره متن"}
                 </button>
-                <span className="text-[11px] text-slate-400">ویرایش فقط همین رکورد را تغییر می‌دهد؛ خبر و تحلیل AI دست‌نخورده‌اند.</span>
+                <span className="text-[11px] text-faint">ویرایش فقط همین رکورد را تغییر می‌دهد؛ خبر و تحلیل AI دست‌نخورده‌اند.</span>
               </div>
             </>
           ) : null}
@@ -227,7 +227,7 @@ export function DeliveryActions({ deliveryId, status, destination, message, canR
       ) : null}
 
       {note ? (
-        <p className={`rounded-xl border px-3 py-2 text-xs ${note.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+        <p className={`rounded-xl border px-3 py-2 text-xs ${note.kind === "ok" ? "border-ok-line bg-ok-soft text-ok-ink" : "border-danger-line bg-danger-soft text-danger-ink"}`}>
           {note.text}
         </p>
       ) : null}

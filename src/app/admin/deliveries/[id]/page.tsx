@@ -66,18 +66,18 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
   const backHref = `/admin/deliveries${clientKey ? `?key=${encodeURIComponent(clientKey)}` : ""}`;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
+    <div dir="rtl" className="min-h-screen bg-canvas-2 text-ink">
       <div className="lg:flex">
         <Sidebar />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1180px] space-y-6 p-4 sm:p-6 lg:p-10">
             <AdminKeyQuerySync adminKey={clientKey} />
             <header>
-              <Link className="text-sm font-medium text-blue-700 hover:underline" href={backHref}>
+              <Link className="text-sm font-medium text-accent-ink hover:underline" href={backHref}>
                 → بازگشت به فهرست ارسال‌ها
               </Link>
-              <h1 className="mt-3 text-2xl font-bold leading-9 tracking-tight text-slate-950">{article.title}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <h1 className="mt-3 text-2xl font-bold leading-9 tracking-tight text-ink">{article.title}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <StatusBadge tone={publishingStatusTone(delivery.status)}>{publishStatusLabel(delivery.status)}</StatusBadge>
                 <span>مقصد: {delivery.destination === "bale" ? "بله" : "Local"}</span>
                 <span>· شروع‌کننده: {delivery.triggeredBy === "auto" ? "قوانین خودکار" : "دستی"}</span>
@@ -91,7 +91,7 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
                   <Row
                     label="آدرس اصلی"
                     value={
-                      <a className="break-all text-blue-700 hover:underline" dir="ltr" href={article.url} rel="noopener noreferrer nofollow" target="_blank">
+                      <a className="break-all text-accent-ink hover:underline" dir="ltr" href={article.url} rel="noopener noreferrer nofollow" target="_blank">
                         {article.url}
                       </a>
                     }
@@ -101,7 +101,7 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
                   <Row label="وضعیت خبر" value={article.status} />
                 </dl>
                 {article.summary ? (
-                  <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-700">{article.summary}</p>
+                  <p className="mt-3 rounded-xl bg-surface-2 p-3 text-sm leading-7 text-ink-soft">{article.summary}</p>
                 ) : null}
               </Card>
 
@@ -109,32 +109,32 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
                 {analysis ? (
                   <>
                     <div className="flex flex-wrap gap-2 text-[11px]">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-600">
+                      <span className="rounded-full bg-surface-3 px-2.5 py-1 font-bold text-muted">
                         پیکربندی نسخه {analysis.configurationVersion ?? "—"}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-slate-600" dir="ltr">
+                      <span className="rounded-full bg-surface-3 px-2.5 py-1 font-mono text-muted" dir="ltr">
                         {analysis.model ?? "—"}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{formatFull(analysis.createdAt.toISOString())}</span>
+                      <span className="rounded-full bg-surface-3 px-2.5 py-1 text-muted">{formatFull(analysis.createdAt.toISOString())}</span>
                     </div>
-                    <p className="mt-3 text-sm leading-7 text-slate-800">{analysis.summary}</p>
+                    <p className="mt-3 text-sm leading-7 text-ink-soft">{analysis.summary}</p>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs">
                       <Chip>دسته: {analysis.category ?? "—"}</Chip>
                       <Chip>اهمیت: {analysis.importance ?? "—"}</Chip>
                       <Chip>مرتبط بودن: {analysis.relevance ?? "—"}</Chip>
                       <Chip>تازگی: {analysis.novelty ?? "—"}</Chip>
                     </div>
-                    {analysis.mainEvent ? <p className="mt-2 text-xs text-slate-500">رویداد اصلی: {analysis.mainEvent}</p> : null}
+                    {analysis.mainEvent ? <p className="mt-2 text-xs text-muted">رویداد اصلی: {analysis.mainEvent}</p> : null}
                     <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-500">تصمیم AI:</span>
+                      <span className="text-xs font-bold text-muted">تصمیم AI:</span>
                       <StatusBadge tone={analysis.shouldSend ? "success" : "muted"}>
                         {analysis.shouldSend ? "باید ارسال شود" : "عدم توصیه ارسال"}
                       </StatusBadge>
                     </div>
-                    {analysis.reason ? <p className="mt-1 text-xs leading-6 text-slate-500">دلیل: {analysis.reason}</p> : null}
+                    {analysis.reason ? <p className="mt-1 text-xs leading-6 text-muted">دلیل: {analysis.reason}</p> : null}
                   </>
                 ) : (
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-faint">
                     این رکورد به یک تحلیل خاص لینک نشده است (رکوردهای پیش از این milestone) — متن خبر همان چیزی است که
                     پایین‌تر در «متن پیام» می‌بینید.
                   </p>
@@ -143,10 +143,10 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
             </div>
 
             <Card title="متن پیام (محصول نهایی انتشار)">
-              <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-800 ring-1 ring-slate-100">
+              <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl bg-surface-2 p-4 text-sm leading-7 text-ink-soft ring-1 ring-line-soft">
                 {delivery.message ?? "—"}
               </pre>
-              <p className="mt-2 text-[11px] text-slate-400">
+              <p className="mt-2 text-[11px] text-faint">
                 این متن یک اثر مستقل انتشار است؛ ویرایش آن عنوان خبر، خلاصه AI و امتیازها را تغییر نمی‌دهد.
               </p>
             </Card>
@@ -170,23 +170,23 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
                   <Row label="شناسه پیام بله" value={delivery.providerMessageId ? <code className="font-mono text-xs" dir="ltr">{delivery.providerMessageId}</code> : "—"} />
                   <Row label="تعداد تلاش مجدد" value={String(delivery.retryCount ?? 0)} />
                   {delivery.overrideRequested ? (
-                    <Row label="override" value={<span className="font-bold text-violet-700">{delivery.overrideReason ?? "ثبت شده"}</span>} />
+                    <Row label="override" value={<span className="font-bold text-brand-ink">{delivery.overrideReason ?? "ثبت شده"}</span>} />
                   ) : null}
-                  {delivery.errorMessage ? <Row label="آخرین خطا" value={<span className="text-rose-700">{delivery.errorMessage}</span>} /> : null}
+                  {delivery.errorMessage ? <Row label="آخرین خطا" value={<span className="text-danger-ink">{delivery.errorMessage}</span>} /> : null}
                 </dl>
               </Card>
 
               <Card title="تاریخچه اقدامات">
                 {events.length === 0 ? (
-                  <p className="text-sm text-slate-400">رویدادی ثبت نشده است.</p>
+                  <p className="text-sm text-faint">رویدادی ثبت نشده است.</p>
                 ) : (
                   <ul className="space-y-2">
                     {events.map((event) => (
-                      <li className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 text-xs" key={event.id}>
-                        <span className="font-bold text-slate-700">{DELIVERY_EVENT_LABELS[event.event] ?? event.event}</span>
-                        <span className="text-slate-400">{formatFull(event.createdAt.toISOString())}</span>
-                        {event.actor ? <span className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{event.actor}</span> : null}
-                        {event.detail ? <span className="w-full break-words text-[11px] text-slate-500">{event.detail}</span> : null}
+                      <li className="flex flex-wrap items-center gap-2 rounded-lg border border-line-soft bg-surface-2/60 px-3 py-2 text-xs" key={event.id}>
+                        <span className="font-bold text-ink-soft">{DELIVERY_EVENT_LABELS[event.event] ?? event.event}</span>
+                        <span className="text-faint">{formatFull(event.createdAt.toISOString())}</span>
+                        {event.actor ? <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted">{event.actor}</span> : null}
+                        {event.detail ? <span className="w-full break-words text-[11px] text-muted">{event.detail}</span> : null}
                       </li>
                     ))}
                   </ul>
@@ -194,7 +194,7 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
               </Card>
             </div>
 
-            <p className="text-[11px] leading-5 text-slate-400">
+            <p className="text-[11px] leading-5 text-faint">
               ارسال فقط با کلیک انجام می‌شود؛ هیچ ارسال خودکاری برای مسیر تأیید انسانی فعال نیست. اعتبارنامه‌های بله
               هرگز در این صفحه یا پاسخ API نمایش داده نمی‌شوند.
             </p>
@@ -207,8 +207,8 @@ export default async function AdminDeliveryDetailPage({ params, searchParams }: 
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-bold text-slate-900">{title}</h2>
+    <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm">
+      <h2 className="text-sm font-bold text-ink">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -216,9 +216,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-50 pb-1.5 last:border-0">
-      <dt className="shrink-0 text-xs font-bold text-slate-400">{label}</dt>
-      <dd className="text-left text-slate-700">{value}</dd>
+    <div className="flex items-start justify-between gap-3 border-b border-line-soft pb-1.5 last:border-0">
+      <dt className="shrink-0 text-xs font-bold text-faint">{label}</dt>
+      <dd className="text-left text-ink-soft">{value}</dd>
     </div>
   );
 }

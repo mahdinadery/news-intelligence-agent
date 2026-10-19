@@ -16,9 +16,9 @@ type OutboxEntry = {
 };
 
 const statusMeta: Record<OutboxStatus, { label: string; className: string }> = {
-  sent: { label: "ارسال شد ✓", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-  failed: { label: "ارسال ناموفق", className: "bg-rose-50 text-rose-700 ring-rose-200" },
-  "dry-run": { label: "ثبت آزمایشی", className: "bg-amber-50 text-amber-700 ring-amber-200" },
+  sent: { label: "ارسال شد ✓", className: "bg-ok-soft text-ok-ink ring-ok-line" },
+  failed: { label: "ارسال ناموفق", className: "bg-danger-soft text-danger-ink ring-danger-line" },
+  "dry-run": { label: "ثبت آزمایشی", className: "bg-warn-soft text-warn-ink ring-warn-line" },
 };
 
 function formatTime(iso: string): string {
@@ -89,26 +89,26 @@ export function BaleOutbox({ refreshKey }: { refreshKey?: number }) {
   return (
     <section
       aria-labelledby="outbox-heading"
-      className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6"
+      className="mt-6 rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6"
     >
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 id="outbox-heading" className="text-lg font-bold text-slate-950">
+            <h2 id="outbox-heading" className="text-lg font-bold text-ink">
               صندوق خروجی پیام‌ها (Local Outbox)
             </h2>
             {autoCount > 0 ? (
-              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-800">
+              <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-bold text-brand-ink">
                 {autoCount} پیام خودکار 🤖
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-faint">
             پیام‌های ارسال‌شده (هم به‌صورت خودکار توسط هوش مصنوعی و هم دستی) به‌طور دائمی در پایگاه داده ذخیره و در اینجا نمایش داده می‌شوند.
           </p>
         </div>
         <button
-          className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+          className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-surface-2"
           onClick={() => void load()}
           type="button"
         >
@@ -117,11 +117,11 @@ export function BaleOutbox({ refreshKey }: { refreshKey?: number }) {
       </div>
 
       {loading ? (
-        <p className="py-8 text-center text-sm text-slate-400">در حال بارگذاری صندوق خروجی...</p>
+        <p className="py-8 text-center text-sm text-faint">در حال بارگذاری صندوق خروجی...</p>
       ) : entries.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-10 text-center">
-          <p className="text-sm font-medium text-slate-600">هنوز پیامی در صندوق خروجی ثبت نشده است.</p>
-          <p className="mt-1 text-xs text-slate-400">
+        <div className="rounded-xl border border-dashed border-line bg-surface-2/70 px-5 py-10 text-center">
+          <p className="text-sm font-medium text-muted">هنوز پیامی در صندوق خروجی ثبت نشده است.</p>
+          <p className="mt-1 text-xs text-faint">
             با کلیک روی «تحلیل با AI» در صفحه اخبار یا «اجرای ارسال خودکار»، خبرهای واجد شرایط به اینجا ارسال می‌شوند.
           </p>
         </div>
@@ -135,8 +135,8 @@ export function BaleOutbox({ refreshKey }: { refreshKey?: number }) {
               <li
                 className={`rounded-xl border p-4 transition-colors ${
                   isAuto
-                    ? "border-violet-200/80 bg-violet-50/20"
-                    : "border-slate-200/80 bg-slate-50/60"
+                    ? "border-brand-line/80 bg-brand-soft/20"
+                    : "border-line/80 bg-surface-2/60"
                 }`}
                 key={entry.id}
               >
@@ -149,20 +149,20 @@ export function BaleOutbox({ refreshKey }: { refreshKey?: number }) {
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${
                       isAuto
-                        ? "bg-violet-100 text-violet-800 ring-violet-200"
-                        : "bg-sky-50 text-sky-700 ring-sky-200"
+                        ? "bg-brand-soft text-brand-ink ring-brand-line"
+                        : "bg-accent-soft text-accent-ink ring-accent-line"
                     }`}
                   >
                     {entry.channel}
                   </span>
-                  <span className="ms-auto text-xs text-slate-400">{formatTime(entry.createdAt)}</span>
+                  <span className="ms-auto text-xs text-faint">{formatTime(entry.createdAt)}</span>
                 </div>
-                <div className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-800 font-sans">
+                <div className="mt-3 whitespace-pre-line text-sm leading-6 text-ink-soft font-sans">
                   {entry.text}
                 </div>
                 {entry.error ? (
                   <p
-                    className="mt-2 break-words rounded-lg bg-white px-3 py-2 font-mono text-xs text-rose-600 ring-1 ring-rose-200"
+                    className="mt-2 break-words rounded-lg bg-surface px-3 py-2 font-mono text-xs text-danger-ink ring-1 ring-danger-line"
                     dir="ltr"
                   >
                     {entry.error}
