@@ -19,34 +19,34 @@ export function AiConfigVersionHistory({ versions, loading, activating, onActiva
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
-      <h2 className="text-base font-bold text-slate-950">تاریخچه نسخه‌ها</h2>
-      <p className="mt-1 text-sm text-slate-500">
+    <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
+      <h2 className="text-base font-bold text-ink">تاریخچه نسخه‌ها</h2>
+      <p className="mt-1 text-sm text-muted">
         هر بار ذخیره، یک نسخه جدید ایجاد می‌شود؛ نسخه‌های قبلی حفظ می‌شوند و می‌توانید هر کدام را دوباره فعال کنید.
       </p>
 
       {loading ? (
-        <p className="mt-5 text-sm text-slate-400">در حال بارگذاری تاریخچه...</p>
+        <p className="mt-5 text-sm text-faint">در حال بارگذاری تاریخچه...</p>
       ) : versions.length === 0 ? (
-        <p className="mt-5 text-sm text-slate-400">هنوز نسخه‌ای ذخیره نشده است.</p>
+        <p className="mt-5 text-sm text-faint">هنوز نسخه‌ای ذخیره نشده است.</p>
       ) : (
         <ul className="mt-4 space-y-2">
           {versions.map((version) => {
             const isExpanded = expandedId === version.id;
             return (
-              <li className="rounded-xl border border-slate-200 bg-slate-50/60" key={version.id}>
+              <li className="rounded-xl border border-line bg-surface-2/60" key={version.id}>
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3">
                   <div className="flex items-center gap-3">
-                    <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
+                    <span className="rounded-lg bg-surface px-2.5 py-1 text-xs font-bold text-ink-soft ring-1 ring-line">
                       نسخه {version.version}
                     </span>
                     <div>
-                      <p className="text-sm font-bold text-slate-900">{version.name}</p>
-                      <p className="text-[11px] text-slate-400">به‌روزرسانی: {formatDate(version.updatedAt)}</p>
+                      <p className="text-sm font-bold text-ink">{version.name}</p>
+                      <p className="text-[11px] text-faint">به‌روزرسانی: {formatDate(version.updatedAt)}</p>
                     </div>
                     {version.isActive ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-ok-soft px-2.5 py-1 text-xs font-bold text-ok-ink ring-1 ring-inset ring-ok-line">
+                        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ok" />
                         فعال
                       </span>
                     ) : null}
@@ -54,7 +54,7 @@ export function AiConfigVersionHistory({ versions, loading, activating, onActiva
 
                   <div className="flex items-center gap-2">
                     <button
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                      className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-3"
                       onClick={() => setExpandedId(isExpanded ? null : version.id)}
                       type="button"
                     >
@@ -62,7 +62,7 @@ export function AiConfigVersionHistory({ versions, loading, activating, onActiva
                     </button>
                     {!version.isActive ? (
                       <button
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                        className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-line"
                         disabled={activating === version.id}
                         onClick={() => onActivate(version.id)}
                         type="button"
@@ -74,10 +74,10 @@ export function AiConfigVersionHistory({ versions, loading, activating, onActiva
                 </div>
 
                 {isExpanded ? (
-                  <div className="space-y-3 border-t border-slate-200 p-4 text-xs text-slate-600">
+                  <div className="space-y-3 border-t border-line p-4 text-xs text-muted">
                     <div>
-                      <p className="font-bold text-slate-700">System Prompt:</p>
-                      <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-2.5 ring-1 ring-slate-100">
+                      <p className="font-bold text-ink-soft">System Prompt:</p>
+                      <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface p-2.5 ring-1 ring-line-soft">
                         {version.systemPrompt}
                       </p>
                     </div>

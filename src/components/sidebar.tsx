@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { ThemeToggle } from "./theme-toggle";
 
 type NavIconName = "dashboard" | "sources" | "news" | "agent" | "bale" | "reports" | "settings" | "aiConfig";
 
@@ -97,10 +98,13 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-full shrink-0 border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-[276px] lg:border-b-0 lg:border-l">
+    <aside className="w-full shrink-0 border-b border-line bg-surface lg:sticky lg:top-0 lg:h-screen lg:w-[276px] lg:border-b-0 lg:border-l">
       <div className="flex h-full flex-col px-4 py-5 sm:px-6 lg:px-5">
         <div className="flex items-center gap-3 px-2 pb-6">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+          <div className="ms-auto lg:hidden">
+            <ThemeToggle />
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-accent text-white shadow-lg shadow-accent/20">
             <svg
               aria-hidden="true"
               className="h-6 w-6"
@@ -114,8 +118,8 @@ export function Sidebar() {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-950">دستیار اخبار</p>
-            <p className="mt-0.5 text-xs text-slate-400">مرکز مدیریت هوشمند</p>
+            <p className="text-sm font-bold text-ink">دستیار هوشمند اخبار</p>
+            <p className="mt-0.5 text-xs text-faint">مرکز مدیریت، تحلیل و انتشار</p>
           </div>
         </div>
 
@@ -127,7 +131,7 @@ export function Sidebar() {
                 <NavIcon name={item.icon} />
                 <span className="flex-1 whitespace-nowrap">{item.label}</span>
                 {item.href ? null : (
-                  <span className="rounded-md bg-slate-100 px-1.5 py-1 text-[10px] font-medium text-slate-400">
+                  <span className="rounded-md bg-surface-3 px-1.5 py-1 text-[10px] font-medium text-faint">
                     به‌زودی
                   </span>
                 )}
@@ -139,7 +143,7 @@ export function Sidebar() {
                 <Link
                   aria-current={isActive ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
-                    isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    isActive ? "bg-accent-soft text-accent-ink" : "text-muted hover:bg-surface-2 hover:text-ink"
                   }`}
                   href={item.href}
                   key={item.label}
@@ -152,7 +156,7 @@ export function Sidebar() {
             return (
               <div
                 aria-disabled="true"
-                className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400"
+                className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-faint"
                 key={item.label}
                 title="به‌زودی"
               >
@@ -162,16 +166,17 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-8 hidden rounded-2xl border border-blue-100 bg-blue-50/70 p-4 lg:block">
-          <p className="text-xs font-semibold text-blue-900">مرحله ۳ — دریافت اخبار</p>
-          <p className="mt-2 text-xs leading-5 text-blue-700/80">
-            اخبار از منبع RSS دریافت و در پایگاه داده ذخیره می‌شوند. تحلیل هوشمند و ارسال خودکار به مراحل بعدی
-            موکول شده است.
+        <div className="mt-8 hidden rounded-2xl border border-ok-line bg-ok-soft p-4 lg:block">
+          <p className="text-xs font-semibold text-ok-ink">⏱️ انتشار پیوسته</p>
+          <p className="mt-2 text-xs leading-5 text-ok-ink/85">
+            زمان‌بندی ارسال را از «انتشار و ارسال‌ها» تعیین کنید؛ اجرا با کرون روی سرور انجام می‌شود و نیازی به
+            باز بودن این صفحه نیست.
           </p>
         </div>
 
-        <div className="mt-auto hidden border-t border-slate-100 pt-5 lg:block">
-          <p className="px-2 text-xs text-slate-400">نسخه رابط کاربری + دریافت اخبار</p>
+        <div className="mt-auto hidden border-t border-line-soft pt-5 lg:block">
+          <ThemeToggle />
+          <p className="mt-3 px-2 text-[11px] text-faint">نسخه ۳ — تحلیل، بولتن و انتشار خودکار</p>
         </div>
       </div>
     </aside>

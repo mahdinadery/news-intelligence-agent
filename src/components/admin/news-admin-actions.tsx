@@ -90,7 +90,7 @@ export function NewsAdminActions({ newsId, status, adminKey }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-line/80 bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <button
           className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
@@ -102,14 +102,14 @@ export function NewsAdminActions({ newsId, status, adminKey }: Props) {
         </button>
 
         {status === "FAILED" ? (
-          <span className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200">
+          <span className="rounded-lg bg-danger-soft px-3 py-1.5 text-xs font-bold text-danger-ink ring-1 ring-danger-line">
             تحلیل قبلی ناموفق بود — با همان دکمه بالا دوباره تلاش کنید
           </span>
         ) : null}
 
         {status !== "READY_TO_SEND" ? (
           <button
-            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+            className="rounded-xl border border-ok-line bg-ok-soft px-4 py-2.5 text-sm font-bold text-ok-ink hover:bg-ok-soft disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => setStatus("READY_TO_SEND", "ready")}
             type="button"
@@ -118,7 +118,7 @@ export function NewsAdminActions({ newsId, status, adminKey }: Props) {
           </button>
         ) : (
           <button
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium text-muted hover:bg-surface-2 disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => setStatus("READY_FOR_AI", "reprocess")}
             type="button"
@@ -129,10 +129,10 @@ export function NewsAdminActions({ newsId, status, adminKey }: Props) {
       </div>
 
       {isAnalyzed ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-          <span className="text-xs font-bold text-slate-500">نامزد ارسال:</span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-3">
+          <span className="text-xs font-bold text-muted">نامزد ارسال:</span>
           <button
-            className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            className="rounded-xl border border-accent-line bg-accent-soft px-4 py-2 text-sm font-bold text-accent-ink hover:bg-accent-soft disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => createCandidate("bale")}
             type="button"
@@ -140,7 +140,7 @@ export function NewsAdminActions({ newsId, status, adminKey }: Props) {
             {busy === "candidate" ? "..." : "ساخت نامزد برای بله"}
           </button>
           <button
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-muted hover:bg-surface-2 disabled:opacity-50"
             disabled={busy !== null}
             onClick={() => createCandidate("local")}
             type="button"
@@ -151,12 +151,12 @@ export function NewsAdminActions({ newsId, status, adminKey }: Props) {
       ) : null}
 
       {message ? (
-        <p className={`mt-3 rounded-lg border px-3 py-2 text-xs ${message.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+        <p className={`mt-3 rounded-lg border px-3 py-2 text-xs ${message.kind === "ok" ? "border-ok-line bg-ok-soft text-ok-ink" : "border-danger-line bg-danger-soft text-danger-ink"}`}>
           {message.text}
         </p>
       ) : null}
 
-      <p className="mt-3 text-[11px] text-slate-400">
+      <p className="mt-3 text-[11px] text-faint">
         این صفحه هرگز چیزی ارسال نمی‌کند. «ساخت نامزد» فقط یک رکورد در انتظار تأیید می‌سازد؛ ارسال واقعی بعد از تأیید
         انسانی و از صفحه «انتشار و ارسال‌ها» انجام می‌شود.
       </p>

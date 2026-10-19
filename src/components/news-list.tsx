@@ -70,16 +70,16 @@ function formatDate(iso: string | null): string {
 }
 
 function ScoreBar({ label, score }: { label: string; score: number }) {
-  const barColor = score >= 70 ? "bg-emerald-500" : score >= 40 ? "bg-amber-500" : "bg-slate-400";
-  const textColor = score >= 70 ? "text-emerald-700" : score >= 40 ? "text-amber-700" : "text-slate-600";
+  const barColor = score >= 70 ? "bg-ok" : score >= 40 ? "bg-warn" : "bg-track-strong";
+  const textColor = score >= 70 ? "text-ok-ink" : score >= 40 ? "text-warn-ink" : "text-muted";
 
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs font-semibold">
-        <span className="text-slate-500">{label}</span>
+        <span className="text-muted">{label}</span>
         <span className={textColor}>{score}٪</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${score}%` }} />
       </div>
     </div>
@@ -88,12 +88,12 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
 
 function StatusMark({ status }: { status: "sent" | "failed" | null }) {
   if (status === "sent") {
-    return <span className="font-semibold text-emerald-700">✓ ارسال شده</span>;
+    return <span className="font-semibold text-ok-ink">✓ ارسال شده</span>;
   }
   if (status === "failed") {
-    return <span className="font-semibold text-rose-700">! ناموفق</span>;
+    return <span className="font-semibold text-danger-ink">! ناموفق</span>;
   }
-  return <span className="text-slate-400">○ ارسال نشده</span>;
+  return <span className="text-faint">○ ارسال نشده</span>;
 }
 
 function ArticleCard({
@@ -226,15 +226,15 @@ function ArticleCard({
   }
 
   return (
-    <li className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40">
+    <li className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40">
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">{item.source}</span>
-          <span className="text-slate-400">{formatDate(item.publishedAt)}</span>
+          <span className="rounded-full bg-surface-3 px-2.5 py-1 font-semibold text-muted">{item.source}</span>
+          <span className="text-faint">{formatDate(item.publishedAt)}</span>
         </div>
 
         {hasAnalysis ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+          <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-ink ring-1 ring-inset ring-accent-line">
             <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
             </svg>
@@ -243,34 +243,34 @@ function ArticleCard({
         ) : null}
       </div>
 
-      <h3 className="mt-3 text-base font-bold leading-7 text-slate-950 sm:text-lg">
+      <h3 className="mt-3 text-base font-bold leading-7 text-ink sm:text-lg">
         <a className="hover:underline" href={item.url} rel="noopener noreferrer nofollow" target="_blank">
           {item.title}
         </a>
       </h3>
 
       {item.description ? (
-        <p className="mt-2 text-sm leading-7 text-slate-600">{truncate(item.description, DESCRIPTION_LIMIT)}</p>
+        <p className="mt-2 text-sm leading-7 text-muted">{truncate(item.description, DESCRIPTION_LIMIT)}</p>
       ) : null}
 
       {hasAnalysis ? (
-        <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/20 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100/50 pb-3">
+        <div className="mt-5 rounded-xl border border-accent-line bg-accent-soft/20 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-accent-line/50 pb-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-blue-900">دسته‌بندی:</span>
-              <span className="rounded-lg bg-blue-100/60 px-2 py-1 text-xs font-bold text-blue-800">
+              <span className="text-xs font-bold text-accent-ink">دسته‌بندی:</span>
+              <span className="rounded-lg bg-accent-soft/60 px-2 py-1 text-xs font-bold text-accent-ink">
                 {item.category || "سایر"}
               </span>
             </div>
 
             {item.shouldSend ? (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-ok-soft px-2.5 py-1 text-xs font-bold text-ok-ink ring-1 ring-inset ring-ok-line">
+                <span className="h-1.5 w-1.5 rounded-full bg-ok" />
                 پیشنهاد ارسال به بله
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-3 px-2.5 py-1 text-xs font-bold text-muted">
+                <span className="h-1.5 w-1.5 rounded-full bg-track-strong" />
                 عدم نیاز به ارسال
               </span>
             )}
@@ -282,53 +282,53 @@ function ArticleCard({
             <ScoreBar label="تازگی خبر" score={item.noveltyScore ?? 0} />
           </div>
 
-          <div className="mt-4 space-y-3 border-t border-blue-100/50 pt-3 text-sm">
+          <div className="mt-4 space-y-3 border-t border-accent-line/50 pt-3 text-sm">
             <div>
-              <p className="font-bold text-blue-950">خلاصه تحلیل هوشمند:</p>
-              <p className="mt-1 leading-7 text-slate-700">{item.summary}</p>
+              <p className="font-bold text-accent-ink">خلاصه تحلیل هوشمند:</p>
+              <p className="mt-1 leading-7 text-ink-soft">{item.summary}</p>
             </div>
             <div>
-              <p className="font-bold text-blue-950">علت تصمیم‌گیری:</p>
-              <p className="mt-1 leading-7 text-slate-700">{item.analysisReason}</p>
+              <p className="font-bold text-accent-ink">علت تصمیم‌گیری:</p>
+              <p className="mt-1 leading-7 text-ink-soft">{item.analysisReason}</p>
             </div>
           </div>
         </div>
       ) : null}
 
       {analyzeError ? (
-        <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs text-rose-700">
+        <div className="mt-4 rounded-xl border border-danger-line bg-danger-soft p-3 text-xs text-danger-ink">
           <p className="font-semibold">{analyzeError}</p>
-          <p className="mt-1 text-slate-500">برای آزمایش مجدد روی دکمه تحلیل کلیک کنید.</p>
+          <p className="mt-1 text-muted">برای آزمایش مجدد روی دکمه تحلیل کلیک کنید.</p>
         </div>
       ) : null}
 
       {autoNote && !analyzeError ? (
-        <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2 text-xs font-medium text-violet-800">
+        <div className="mt-3 rounded-xl border border-brand-line bg-brand-soft/70 px-3 py-2 text-xs font-medium text-brand-ink">
           {autoNote}
         </div>
       ) : null}
 
       {/* Delivery block — only for analyzed articles */}
       {hasAnalysis ? (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <div className="mt-4 rounded-xl border border-line bg-surface-2/60 p-4">
           <div className="grid gap-3 text-xs sm:grid-cols-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-500">ارسال Local:</span>
+              <span className="text-muted">ارسال Local:</span>
               <StatusMark status={delivery.local} />
             </div>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-500">ارسال بله:</span>
+              <span className="text-muted">ارسال بله:</span>
               <StatusMark status={delivery.bale} />
             </div>
           </div>
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
             <fieldset className="flex flex-wrap items-center gap-3">
               <legend className="sr-only">مقصد ارسال</legend>
-              <span className="text-xs font-semibold text-slate-600">مقصد ارسال:</span>
+              <span className="text-xs font-semibold text-muted">مقصد ارسال:</span>
               {DESTINATION_OPTIONS.map((option) => (
                 <label
-                  className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-slate-600"
+                  className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted"
                   key={option.value}
                 >
                   <input
@@ -348,10 +348,10 @@ function ArticleCard({
             <button
               className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
                 sending
-                  ? "cursor-not-allowed bg-slate-200 text-slate-500"
+                  ? "cursor-not-allowed bg-track text-muted"
                   : delivery.local === "sent" && delivery.bale === "sent"
-                    ? "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                    ? "bg-surface-3 text-muted ring-1 ring-inset ring-line"
+                    : "bg-ok-strong text-white hover:bg-ok-strong"
               }`}
               disabled={sending}
               onClick={handleSend}
@@ -362,12 +362,12 @@ function ArticleCard({
           </div>
 
           {sendResults ? (
-            <ul className="mt-4 space-y-2 border-t border-slate-200 pt-3">
+            <ul className="mt-4 space-y-2 border-t border-line pt-3">
               {sendResults.map((outcome) => {
                 const name = DESTINATION_NAMES[outcome.destination];
                 if (outcome.status === "already_sent") {
                   return (
-                    <li className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800" key={outcome.destination}>
+                    <li className="rounded-lg bg-warn-soft px-3 py-2 text-xs font-medium text-warn-ink" key={outcome.destination}>
                       ارسال به {name}: {outcome.errorMessage ?? "این خبر قبلاً به این مقصد ارسال شده است."}
                     </li>
                   );
@@ -375,7 +375,7 @@ function ArticleCard({
                 return (
                   <li
                     className={`rounded-lg px-3 py-2 text-xs font-medium ${
-                      outcome.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+                      outcome.ok ? "bg-ok-soft text-ok-ink" : "bg-danger-soft text-danger-ink"
                     }`}
                     key={outcome.destination}
                   >
@@ -395,9 +395,9 @@ function ArticleCard({
         </div>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-line-soft pt-4">
         <a
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-700 hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-ink hover:underline"
           href={item.url}
           rel="noopener noreferrer nofollow"
           target="_blank"
@@ -415,10 +415,10 @@ function ArticleCard({
         <button
           className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
             analyzing
-              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              ? "cursor-not-allowed bg-surface-3 text-faint"
               : hasAnalysis
-                ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                ? "bg-surface-3 text-ink-soft hover:bg-track"
+                : "bg-accent text-white hover:bg-accent-strong shadow-sm"
           }`}
           disabled={analyzing}
           onClick={handleAnalyze}
@@ -434,8 +434,8 @@ function ArticleCard({
 export function NewsList({ items, deliveryStates }: { items: NewsListItem[]; deliveryStates?: NewsDeliveryStates }) {
   if (items.length === 0) {
     return (
-      <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-16 text-center">
-        <div className="grid h-14 w-14 place-items-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200">
+      <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-surface-2/70 px-6 py-16 text-center">
+        <div className="grid h-14 w-14 place-items-center rounded-full bg-surface text-faint shadow-sm ring-1 ring-line">
           <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -445,12 +445,12 @@ export function NewsList({ items, deliveryStates }: { items: NewsListItem[]; del
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 8h8M8 12h8M8 16h5" />
           </svg>
         </div>
-        <p className="mt-5 text-sm font-semibold text-slate-700">هنوز خبری ذخیره نشده است.</p>
-        <p className="mt-1 max-w-md text-xs leading-5 text-slate-400">
+        <p className="mt-5 text-sm font-semibold text-ink-soft">هنوز خبری ذخیره نشده است.</p>
+        <p className="mt-1 max-w-md text-xs leading-5 text-faint">
           به داشبورد بروید و با دکمه «دریافت اخبار» اولین همگام‌سازی را انجام دهید.
         </p>
         <a
-          className="mt-5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+          className="mt-5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-strong"
           href="/dashboard"
         >
           رفتن به داشبورد

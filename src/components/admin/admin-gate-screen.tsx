@@ -11,7 +11,7 @@ export function AdminGateScreen({ width = "default" }: Props) {
   const containerWidth = width === "narrow" ? "max-w-[1180px]" : "max-w-[1480px]";
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900" dir="rtl">
+    <div className="min-h-screen bg-canvas-2 text-ink" dir="rtl">
       <div className="lg:flex">
         <Sidebar />
         <main className="min-w-0 flex-1">

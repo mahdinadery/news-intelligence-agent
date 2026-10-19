@@ -320,24 +320,24 @@ export function AiConfigConsole({ adminKey }: Props) {
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-slate-200/80 pb-6">
-        <p className="mb-2 text-sm font-medium text-blue-600">مرکز پیکربندی هوش مصنوعی</p>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">پیکربندی تحلیل هوش مصنوعی</h1>
-        <p className="mt-2 text-sm text-slate-500">
+      <header className="border-b border-line/80 pb-6">
+        <p className="mb-2 text-sm font-medium text-accent-ink">مرکز پیکربندی هوش مصنوعی</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">پیکربندی تحلیل هوش مصنوعی</h1>
+        <p className="mt-2 text-sm text-muted">
           رفتار تحلیل هوش مصنوعی (پرامپت، ویژگی‌ها، آستانه‌ها و ساختار خروجی) را بدون نیاز به تغییر کد مدیریت کنید.
         </p>
         {meta ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-700">نسخه فعال: {meta.version}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+            <span className="rounded-full bg-surface-3 px-2.5 py-1 font-bold text-ink-soft">نسخه فعال: {meta.version}</span>
             <span>آخرین به‌روزرسانی: {new Date(meta.updatedAt).toLocaleString("fa-IR")}</span>
           </div>
         ) : null}
       </header>
 
-      {loading ? <p className="text-sm text-slate-400">در حال بارگذاری پیکربندی...</p> : null}
+      {loading ? <p className="text-sm text-faint">در حال بارگذاری پیکربندی...</p> : null}
 
       {schemaSynced && !loadFailure ? (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+        <p className="rounded-xl border border-ok-line bg-ok-soft px-4 py-3 text-sm leading-6 text-ok-ink">
           ساختار پایگاه داده با کد همگام نبود؛ به‌صورت خودکار (بدون حذف داده) همگام‌سازی شد و پیکربندی از مقادیر پیش‌فرض
           ساخته شد. اکنون می‌توانید مقادیر را ذخیره و فعال کنید.
         </p>
@@ -360,19 +360,19 @@ export function AiConfigConsole({ adminKey }: Props) {
       ) : null}
 
       {/* A. Provider & Model */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
-        <h2 className="text-base font-bold text-slate-950">ارائه‌دهنده و مدل هوش مصنوعی</h2>
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
+        <h2 className="text-base font-bold text-ink">ارائه‌دهنده و مدل هوش مصنوعی</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="ارائه‌دهنده">
             <input
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+              className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-muted"
               disabled
               value="OpenAI-compatible"
             />
           </Field>
           <Field label="مدل (خالی = استفاده از env)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               onChange={(event) => setDraft({ ...draft, model: event.target.value })}
               placeholder={effectiveModel || "gpt-4o-mini"}
               value={draft.model}
@@ -380,7 +380,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="Temperature (۰ تا ۲)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               max={2}
               min={0}
               onChange={(event) => setDraft({ ...draft, temperature: Number(event.target.value) })}
@@ -391,7 +391,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="حداکثر توکن خروجی">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               max={8000}
               min={50}
               onChange={(event) => setDraft({ ...draft, maxTokens: Number(event.target.value) })}
@@ -401,20 +401,20 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 text-xs">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-bold ring-1 ring-inset ${aiKeyConfigured ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-rose-50 text-rose-700 ring-rose-200"}`}>
-            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${aiKeyConfigured ? "bg-emerald-500" : "bg-rose-500"}`} />
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 p-3 text-xs">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-bold ring-1 ring-inset ${aiKeyConfigured ? "bg-ok-soft text-ok-ink ring-ok-line" : "bg-danger-soft text-danger-ink ring-danger-line"}`}>
+            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${aiKeyConfigured ? "bg-ok" : "bg-danger"}`} />
             {aiKeyConfigured ? "کلید API تنظیم شده" : "کلید API تنظیم نشده (AI_API_KEY)"}
           </span>
-          <span className="text-slate-500">مدل مؤثر فعلی: <b className="text-slate-800">{effectiveModel || "—"}</b></span>
+          <span className="text-muted">مدل مؤثر فعلی: <b className="text-ink-soft">{effectiveModel || "—"}</b></span>
         </div>
 
         {!loading && !aiKeyConfigured ? (
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-6 text-amber-800">
+          <p className="mt-3 rounded-xl border border-warn-line bg-warn-soft px-3 py-2.5 text-xs leading-6 text-warn-ink">
             <b>تحلیل هوش مصنوعی غیرفعال است:</b> متغیر{" "}
-            <code className="rounded bg-white px-1 font-mono text-[11px]" dir="ltr">AI_API_KEY</code>{" "}
-            (و در صورت نیاز <code className="rounded bg-white px-1 font-mono text-[11px]" dir="ltr">AI_API_BASE_URL</code> /{" "}
-            <code className="rounded bg-white px-1 font-mono text-[11px]" dir="ltr">AI_API_MODEL</code>) را در
+            <code className="rounded bg-surface px-1 font-mono text-[11px]" dir="ltr">AI_API_KEY</code>{" "}
+            (و در صورت نیاز <code className="rounded bg-surface px-1 font-mono text-[11px]" dir="ltr">AI_API_BASE_URL</code> /{" "}
+            <code className="rounded bg-surface px-1 font-mono text-[11px]" dir="ltr">AI_API_MODEL</code>) را در
             Environment Variables سرویس میزبان — مثل Vercel → Settings → Environment Variables — تنظیم کنید و
             سرویس را دوباره Deploy کنید. تا آن زمان هیچ تحلیلی اجرا نمی‌شود، ولی بقیه پنل کار می‌کند.
           </p>
@@ -422,16 +422,16 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* B. System Prompt */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-slate-950">System Prompt</h2>
-          <span className="text-xs text-slate-400">
+          <h2 className="text-base font-bold text-ink">System Prompt</h2>
+          <span className="text-xs text-faint">
             {promptChars.toLocaleString("fa-IR")} کاراکتر · تخمین {promptTokensEstimate.toLocaleString("fa-IR")} توکن
           </span>
         </div>
 
-        <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
-          <p className="text-xs leading-5 text-sky-900">
+        <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/60 p-3">
+          <p className="text-xs leading-5 text-accent-ink">
             قالب‌های آماده: متن پرامپت، تمرکز مخاطب و آستانه‌های اهمیت/مرتبط بودن را <b>با هم</b> پر می‌کنند؛ قبل از
             ذخیره قابل ویرایش‌اند.
           </p>
@@ -439,7 +439,7 @@ export function AiConfigConsole({ adminKey }: Props) {
             {ANALYST_PRESETS.map((preset) => (
               <button
                 key={preset.key}
-                className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                className="rounded-lg border border-accent bg-surface px-3 py-1.5 text-xs font-medium text-accent-ink hover:bg-accent-soft"
                 onClick={() =>
                   setDraft({
                     ...draft,
@@ -466,22 +466,22 @@ export function AiConfigConsole({ adminKey }: Props) {
         </div>
 
         <textarea
-          className="mt-3 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-6 text-slate-800 focus:border-blue-400 focus:outline-none"
+          className="mt-3 w-full resize-y rounded-xl border border-line px-3 py-2.5 text-sm leading-6 text-ink-soft focus:border-accent focus:outline-none"
           onChange={(event) => setDraft({ ...draft, systemPrompt: event.target.value })}
           rows={8}
           value={draft.systemPrompt}
         />
 
         <div className="mt-5">
-          <h3 className="text-sm font-bold text-slate-900">تمرکز مخاطب (ملاک امتیاز مرتبط بودن)</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
+          <h3 className="text-sm font-bold text-ink">تمرکز مخاطب (ملاک امتیاز مرتبط بودن)</h3>
+          <p className="mt-1 text-xs leading-5 text-muted">
             مشخص کنید خبر «مرتبط» یعنی چه. اگر خالی بماند، تعریف پیش‌فرض استفاده می‌شود: مخاطب هدف،{" "}
             <b>شرکت اعتبارسنجی</b> است و فقط اخبار اعتبارسنجی/رتبه‌بندی اعتباری/ریسک اعتباری مرتبط محسوب می‌شوند. این
             متن همراه قوانین قطعی («خبر بی‌ربط باید relevance زیر ۳۰ بگیرد، حتی اگر بسیار مهم باشد») به همهٔ درخواست‌های
             تحلیل اضافه می‌شود — پس از ذخیره، روی همهٔ نسخه‌ها اثر دارد.
           </p>
           <textarea
-            className="mt-2 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-6 text-slate-800 focus:border-blue-400 focus:outline-none"
+            className="mt-2 w-full resize-y rounded-xl border border-line px-3 py-2.5 text-sm leading-6 text-ink-soft focus:border-accent focus:outline-none"
             onChange={(event) => setDraft({ ...draft, audienceFocus: event.target.value })}
             placeholder={DEFAULT_AUDIENCE_FOCUS}
             rows={3}
@@ -490,13 +490,13 @@ export function AiConfigConsole({ adminKey }: Props) {
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <input
-            className="w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+            className="w-64 rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
             placeholder="نام این پیکربندی"
             value={draft.name}
           />
           <button
-            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-muted hover:bg-surface-2"
             onClick={() => setDraft({ ...draft, systemPrompt: DEFAULT_SYSTEM_PROMPT })}
             type="button"
           >
@@ -506,9 +506,9 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* C. Analysis Features */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
-        <h2 className="text-base font-bold text-slate-950">ویژگی‌های تحلیل (Analysis Features)</h2>
-        <p className="mt-1 text-sm text-slate-500">هر ویژگی به‌طور مستقل قابل فعال/غیرفعال‌سازی و ویرایش است.</p>
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
+        <h2 className="text-base font-bold text-ink">ویژگی‌های تحلیل (Analysis Features)</h2>
+        <p className="mt-1 text-sm text-muted">هر ویژگی به‌طور مستقل قابل فعال/غیرفعال‌سازی و ویرایش است.</p>
         <div className="mt-4 space-y-3">
           {AI_FEATURE_ORDER.map((key) => (
             <AiConfigFeatureRow
@@ -523,10 +523,10 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* D. Decision Rules */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
-        <h2 className="text-base font-bold text-slate-950">قوانین تصمیم‌گیری (Decision Rules)</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          این آستانه‌ها فقط به هوش مصنوعی می‌گویند چگونه فیلد <code className="rounded bg-slate-100 px-1">shouldSend</code> را
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
+        <h2 className="text-base font-bold text-ink">قوانین تصمیم‌گیری (Decision Rules)</h2>
+        <p className="mt-1 text-sm text-muted">
+          این آستانه‌ها فقط به هوش مصنوعی می‌گویند چگونه فیلد <code className="rounded bg-surface-3 px-1">shouldSend</code> را
           پیشنهاد دهد. این پیشنهاد به‌تنهایی هیچ ارسالی انجام نمی‌دهد؛ قوانین ارسال خودکار واقعی جدا و در بخش Agent
           تنظیم می‌شوند.
         </p>
@@ -534,7 +534,7 @@ export function AiConfigConsole({ adminKey }: Props) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="حداقل امتیاز اهمیت">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               max={100}
               min={0}
               onChange={(event) =>
@@ -546,7 +546,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="حداقل امتیاز مرتبط بودن">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               max={100}
               min={0}
               onChange={(event) =>
@@ -558,7 +558,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="حداقل امتیاز تازگی">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               max={100}
               min={0}
               onChange={(event) =>
@@ -571,7 +571,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           {(draft.decisionRules.combine ?? "all") === "any" ? (
             <Field label="آستانه کلی ارسال (فقط حالت OR)">
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
                 max={100}
                 min={0}
                 onChange={(event) =>
@@ -587,7 +587,7 @@ export function AiConfigConsole({ adminKey }: Props) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="منطق ترکیب حد نصاب‌ها">
             <select
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none"
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -604,13 +604,13 @@ export function AiConfigConsole({ adminKey }: Props) {
             </select>
           </Field>
         </div>
-        <p className="mt-2 text-xs leading-6 text-slate-500">
+        <p className="mt-2 text-xs leading-6 text-muted">
           در حالت AND، اهمیت بالا هرگز جای مرتبط بودن پایین را نمی‌گیرد؛ خبری که به موضوعات شما مربوط نیست حتی اگر
           بسیار مهم باشد توصیهٔ ارسال نمی‌گیرد. حالت OR فقط برای سازگاری با تنظیمات قدیمی نگه داشته شده و همان دلیلی
           است که پیش‌تر خبرهای نامرتبط ارسال می‌شدند.
         </p>
 
-        <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+        <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-ink-soft">
           <input
             checked={draft.decisionRules.enableAutoRecommendation}
             className="h-4 w-4 accent-blue-600"
@@ -624,10 +624,10 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* E1. Topic Filter (pre-AI relevance gate) */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-slate-950">موضوعات و فیلتر مرتبط‌سازی (Topic Filter)</h2>
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+          <h2 className="text-base font-bold text-ink">موضوعات و فیلتر مرتبط‌سازی (Topic Filter)</h2>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-ink-soft">
             <input
               checked={draft.topicFilter?.enabled ?? false}
               className="h-4 w-4 accent-blue-600"
@@ -642,7 +642,7 @@ export function AiConfigConsole({ adminKey }: Props) {
             فعال‌سازی فیلتر موضوعی
           </label>
         </div>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-muted">
           پیش از مرحله پرهزینه تحلیل هوش مصنوعی، اخبار با قواعد ساده کلیدواژه‌ای غربال می‌شوند. اخبار نامرتبط ذخیره اما
           با وضعیت «خارج از موضوع» علامت‌گذاری می‌شوند و هرگز به AI ارسال نمی‌شوند (قابل بازگشت به صف از مدیریت اخبار).
           وقتی فیلتر غیرفعال یا بدون کلیدواژه باشد، همه اخبار رد می‌شوند (هیچ خبری از دست نمی‌رود).
@@ -651,7 +651,7 @@ export function AiConfigConsole({ adminKey }: Props) {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Field label="حالت فیلتر">
             <select
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none"
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -668,7 +668,7 @@ export function AiConfigConsole({ adminKey }: Props) {
             </select>
           </Field>
           <button
-            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100"
+            className="rounded-lg border border-accent-line bg-accent-soft px-3 py-2 text-xs font-medium text-accent-ink hover:bg-accent-soft"
             onClick={() =>
               setDraft({
                 ...draft,
@@ -689,10 +689,10 @@ export function AiConfigConsole({ adminKey }: Props) {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-500">افزودن سریع موضوعات پیشنهادی:</span>
+          <span className="text-xs font-medium text-muted">افزودن سریع موضوعات پیشنهادی:</span>
           {ALL_TOPIC_PRESETS.map((preset) => (
             <button
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              className="rounded-full border border-line bg-surface-2 px-3 py-1 text-[11px] font-medium text-muted transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-ink"
               key={preset.label}
               onClick={() =>
                 setDraft({
@@ -714,15 +714,15 @@ export function AiConfigConsole({ adminKey }: Props) {
           ))}
         </div>
 
-        <div className="mt-4 rounded-xl border border-rose-200/70 bg-rose-50/40 p-3">
+        <div className="mt-4 rounded-xl border border-danger-line/70 bg-danger-soft/40 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="text-xs font-bold text-rose-800" htmlFor="blocked-keywords">
+            <label className="text-xs font-bold text-danger-ink" htmlFor="blocked-keywords">
               کلیدواژه‌های ممنوع (این خبرها هرگز ارسال نمی‌شوند)
             </label>
-            <span className="text-[11px] text-rose-500">در هر دو حالت فیلتر اعمال می‌شود</span>
+            <span className="text-[11px] text-danger-ink">در هر دو حالت فیلتر اعمال می‌شود</span>
           </div>
           <textarea
-            className="mt-2 w-full resize-y rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm focus:border-rose-400 focus:outline-none"
+            className="mt-2 w-full resize-y rounded-lg border border-danger-line bg-surface px-3 py-2 text-sm focus:border-danger focus:outline-none"
             id="blocked-keywords"
             onChange={(event) =>
               setDraft({
@@ -741,10 +741,10 @@ export function AiConfigConsole({ adminKey }: Props) {
             value={(draft.topicFilter?.blockedKeywords ?? []).join("، ")}
           />
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-medium text-rose-600">افزودن سریع:</span>
+            <span className="text-[11px] font-medium text-danger-ink">افزودن سریع:</span>
             {BLOCKED_KEYWORD_PRESETS.map((keyword) => (
               <button
-                className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-medium text-rose-700 transition-colors hover:bg-rose-50"
+                className="rounded-full border border-danger-line bg-surface px-2.5 py-1 text-[11px] font-medium text-danger-ink transition-colors hover:bg-danger-soft"
                 key={keyword}
                 onClick={() => {
                   const current = draft.topicFilter?.blockedKeywords ?? [];
@@ -763,11 +763,11 @@ export function AiConfigConsole({ adminKey }: Props) {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] leading-5 text-rose-500">
+          <p className="mt-2 text-[11px] leading-5 text-danger-ink">
             خبری که یکی از این کلمات را در عنوان یا متن داشته باشد، پیش از تحلیل هوش مصنوعی کنار گذاشته می‌شود
             (وضعیت «خارج از موضوع») و هیچ‌وقت ارسال نمی‌شود — حتی اگر موضوع دیگری را هم پوشش دهد.
           </p>
-          <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50/60 px-3 py-2 text-[11px] leading-5 text-rose-600">
+          <p className="mt-2 rounded-lg border border-danger-line bg-danger-soft/60 px-3 py-2 text-[11px] leading-5 text-danger-ink">
             <b>کلیدواژه‌های ممنوع همیشگی</b> (در کد، حتی وقتی این فیلتر غیرفعال است):{" "}
             {BASELINE_BLOCKED_KEYWORDS.join("، ")}. این فهرست کوچک و ثابت است و نیازی به تنظیم ندارد.
           </p>
@@ -775,7 +775,7 @@ export function AiConfigConsole({ adminKey }: Props) {
 
         <div className="mt-4 space-y-3">
           {(draft.topicFilter?.topics ?? []).length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm text-slate-400">
+            <p className="rounded-xl border border-dashed border-line bg-surface-2/70 px-4 py-6 text-center text-sm text-faint">
               هنوز موضوعی تعریف نشده است. تا زمانی که موضوعی با کلیدواژه نداشته باشید، فیلتری اعمال نمی‌شود.
             </p>
           ) : (
@@ -799,10 +799,10 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* E2. Auto-send policy (Agent / Bale delivery conditions) */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-slate-950">سیاست ارسال خودکار (Agent / بله)</h2>
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+          <h2 className="text-base font-bold text-ink">سیاست ارسال خودکار (Agent / بله)</h2>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-ink-soft">
             <input
               checked={draft.autoSendPolicy?.useCustom ?? false}
               className="h-4 w-4 accent-blue-600"
@@ -817,16 +817,16 @@ export function AiConfigConsole({ adminKey }: Props) {
             استفاده از تنظیمات این بخش (به‌جای متغیرهای محیطی)
           </label>
         </div>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-muted">
           شرایط ارسال خودکار تحلیل‌شده‌ها به مقصد بله/Local. تا وقتی گزینه بالا فعال نیست، رفتار تاریخی سامانه (متغیرهای
-          محیطی <code className="rounded bg-slate-100 px-1">AUTO_SEND_*</code>) حفظ می‌شود. با فعال‌سازی، مقادیر زیر روی
+          محیطی <code className="rounded bg-surface-3 px-1">AUTO_SEND_*</code>) حفظ می‌شود. با فعال‌سازی، مقادیر زیر روی
           نسخه پیکربندی ذخیره و قابل ردیابی می‌شوند.
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="ارسال خودکار">
             <select
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               onChange={(event) =>
                 setDraft({
@@ -845,7 +845,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="مقصد ارسال">
             <select
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               onChange={(event) =>
                 setDraft({
@@ -865,7 +865,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="حداقل اهمیت (۰-۱۰۰)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               max={100}
               min={0}
@@ -884,7 +884,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="حداقل مرتبط بودن (۰-۱۰۰)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               max={100}
               min={0}
@@ -903,7 +903,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="حداقل تازگی (۰-۱۰۰)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               max={100}
               min={0}
@@ -922,7 +922,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="سقف اخبار هر نوبت (۱-۱۰۰)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               max={100}
               min={1}
@@ -941,7 +941,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="دسته‌های مجاز (جدا با ویرگول؛ خالی = همه)">
             <input
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               onChange={(event) =>
                 setDraft({
@@ -961,7 +961,7 @@ export function AiConfigConsole({ adminKey }: Props) {
           </Field>
           <Field label="الزام پیشنهاد AI (shouldSend)">
             <select
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
               onChange={(event) =>
                 setDraft({
@@ -982,9 +982,9 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* F. Output Schema */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
-        <h2 className="text-base font-bold text-slate-950">ساختار خروجی (Output Schema)</h2>
-        <p className="mt-1 text-sm text-slate-500">فیلدهای مورد انتظار در پاسخ JSON هوش مصنوعی.</p>
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
+        <h2 className="text-base font-bold text-ink">ساختار خروجی (Output Schema)</h2>
+        <p className="mt-1 text-sm text-muted">فیلدهای مورد انتظار در پاسخ JSON هوش مصنوعی.</p>
         <div className="mt-4 space-y-2">
           {draft.outputSchema.map((field, index) => (
             <AiConfigOutputFieldRow
@@ -1002,43 +1002,43 @@ export function AiConfigConsole({ adminKey }: Props) {
       </section>
 
       {/* G. Publishing Template (Milestone 8) */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-slate-950">قالب انتشار (Publishing Template)</h2>
+          <h2 className="text-base font-bold text-ink">قالب انتشار (Publishing Template)</h2>
           <button
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-2"
             onClick={() => setDraft({ ...draft, publishingTemplate: DEFAULT_PUBLISHING_TEMPLATE })}
             type="button"
           >
             بازنشانی قالب پیش‌فرض
           </button>
         </div>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-muted">
           ظاهری که خبر تحلیل‌شده با آن ارسال می‌شود. این متن روی همان نسخه پیکربندی ذخیره می‌شود؛ تغییر آن
           خلاصه، امتیازها یا تحلیل خبر را دست نمی‌کند و هیچ ارسال خودکاری انجام نمی‌دهد.
         </p>
         <textarea
-          className="mt-3 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs leading-6 text-slate-800 focus:border-blue-400 focus:outline-none"
+          className="mt-3 w-full resize-y rounded-xl border border-line px-3 py-2.5 font-mono text-xs leading-6 text-ink-soft focus:border-accent focus:outline-none"
           dir="rtl"
           onChange={(event) => setDraft({ ...draft, publishingTemplate: event.target.value })}
           rows={10}
           value={draft.publishingTemplate}
         />
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-500">متغیرها:</span>
+          <span className="text-xs font-medium text-muted">متغیرها:</span>
           {PUBLISHING_TEMPLATE_VARS.map((name) => (
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600" key={name}>
+            <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-muted" key={name}>
               {`{${name}}`}
             </code>
           ))}
         </div>
         {unknownTemplateVars.length > 0 ? (
-          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="mt-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-xs text-warn-ink">
             متغیر ناشناخته: {unknownTemplateVars.map((name) => `{${name}}`).join("، ")} — این‌ها در پیام نهایی باقی
             می‌مانند و مقدارگیری نمی‌شوند.
           </p>
         ) : null}
-        <p className="mt-2 text-[11px] text-slate-400">
+        <p className="mt-2 text-[11px] text-faint">
           خالی گذاشتن این فیلد یعنی استفاده از چیدمان داخلی قبلی (سازگاری با پیکربندی‌های پیشین).
         </p>
       </section>
@@ -1055,21 +1055,21 @@ export function AiConfigConsole({ adminKey }: Props) {
       />
 
       {/* Validation feedback + action buttons */}
-      <section className="sticky bottom-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:p-5">
+      <section className="sticky bottom-4 rounded-2xl border border-line bg-surface/95 p-4 shadow-lg backdrop-blur sm:p-5">
         {saveErrors.length > 0 ? (
-          <ul className="mb-3 space-y-1 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+          <ul className="mb-3 space-y-1 rounded-xl border border-danger-line bg-danger-soft p-3 text-sm text-danger-ink">
             {saveErrors.map((error, index) => (
               <li key={index}>• {error}</li>
             ))}
           </ul>
         ) : null}
         {saveSuccess ? (
-          <p className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{saveSuccess}</p>
+          <p className="mb-3 rounded-xl border border-ok-line bg-ok-soft p-3 text-sm text-ok-ink">{saveSuccess}</p>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+            className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-line"
             disabled={saving !== null}
             onClick={() => handleSave(true)}
             type="button"
@@ -1077,7 +1077,7 @@ export function AiConfigConsole({ adminKey }: Props) {
             {saving === "activate" ? "در حال ذخیره..." : "ذخیره و فعال‌سازی"}
           </button>
           <button
-            className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-bold text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl border border-accent-line bg-accent-soft px-5 py-2.5 text-sm font-bold text-accent-ink transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
             disabled={saving !== null}
             onClick={() => handleSave(false)}
             type="button"
@@ -1085,7 +1085,7 @@ export function AiConfigConsole({ adminKey }: Props) {
             {saving === "draft" ? "در حال ذخیره..." : "ذخیره به‌عنوان پیش‌نویس"}
           </button>
           <button
-            className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            className="rounded-xl border border-line px-5 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-2"
             disabled={saving !== null}
             onClick={handleResetToDefault}
             type="button"
@@ -1101,7 +1101,7 @@ export function AiConfigConsole({ adminKey }: Props) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
       {children}
     </label>
   );

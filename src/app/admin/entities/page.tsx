@@ -27,7 +27,7 @@ export default async function EntitiesPage({ searchParams }: PageProps) {
   const clientKey = adminKeyForClient(access);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900" dir="rtl">
+    <div className="min-h-screen bg-canvas-2 text-ink" dir="rtl">
       <div className="lg:flex">
         <Sidebar />
 

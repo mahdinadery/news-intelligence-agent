@@ -64,7 +64,7 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
   if (isNextProductionBuild) {
     return (
       <Shell>
-        <p className="text-sm text-slate-400">این صفحه در زمان اجرا پر می‌شود.</p>
+        <p className="text-sm text-faint">این صفحه در زمان اجرا پر می‌شود.</p>
       </Shell>
     );
   }
@@ -102,10 +102,10 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
   return (
     <Shell>
       <AdminKeyQuerySync adminKey={clientKey} />
-      <header className="border-b border-slate-200/80 pb-6">
-        <p className="mb-2 text-sm font-medium text-blue-600">مرکز مدیریت اخبار</p>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">انتشار و ارسال‌ها</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+      <header className="border-b border-line/80 pb-6">
+        <p className="mb-2 text-sm font-medium text-accent-ink">مرکز مدیریت اخبار</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">انتشار و ارسال‌ها</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
           هیچ خبری به‌صورت خودکار منتشر نمی‌شود. خبرهای «آماده ارسال» به صورت <b>نامزد</b> اینجا می‌آیند؛ باید تأیید
           (یا رد) شوند و سپس با کلیک شما به مقصد ارسال می‌شوند.
         </p>
@@ -125,7 +125,7 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
           return (
             <Link
               className={`rounded-xl px-3.5 py-2 text-sm font-bold transition-colors ${
-                active ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                active ? "bg-accent text-white" : "border border-line bg-surface text-muted hover:bg-surface-2"
               }`}
               href={`/admin/deliveries${buildQuery({ status: tab.value || undefined, page: undefined }, base)}`}
               key={tab.value || "all"}
@@ -134,13 +134,13 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
             </Link>
           );
         })}
-        <span className="mx-2 h-6 w-px bg-slate-200" />
+        <span className="mx-2 h-6 w-px bg-track" />
         {(["bale", "local"] as const).map((destination) => {
           const active = base.destination === destination;
           return (
             <Link
               className={`rounded-xl px-3 py-2 text-xs font-bold ${
-                active ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                active ? "bg-ink text-on-ink" : "border border-line bg-surface text-muted hover:bg-surface-2"
               }`}
               href={`/admin/deliveries${buildQuery({ destination, page: undefined }, base)}`}
               key={destination}
@@ -150,16 +150,16 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
           );
         })}
         {base.destination ? (
-          <Link className="text-xs font-medium text-slate-400 underline" href={`/admin/deliveries${buildQuery({ destination: undefined, page: undefined }, base)}`}>
+          <Link className="text-xs font-medium text-faint underline" href={`/admin/deliveries${buildQuery({ destination: undefined, page: undefined }, base)}`}>
             حذف فیلتر مقصد
           </Link>
         ) : null}
       </div>
 
-      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="mt-5 overflow-x-auto rounded-2xl border border-line/80 bg-surface shadow-sm">
         <table className="w-full min-w-[1080px] text-right text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-xs text-slate-500">
+            <tr className="border-b border-line-soft text-xs text-muted">
               <th className="p-3 font-medium">خبر / منبع</th>
               <th className="p-3 font-medium">تصمیم AI</th>
               <th className="p-3 font-medium">اهمیت</th>
@@ -172,48 +172,48 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td className="p-8 text-center text-sm text-slate-400" colSpan={7}>
+                <td className="p-8 text-center text-sm text-faint" colSpan={7}>
                   رکوردی یافت نشد. خبرهای تحلیل‌شده با «پیشنهاد ارسال = بله» پس از تحلیل، به‌عنوان نامزد اینجا ظاهر می‌شوند.
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
-                <tr className="border-b border-slate-50 align-top last:border-0 hover:bg-slate-50/50" key={row.id}>
+                <tr className="border-b border-line-soft align-top last:border-0 hover:bg-surface-2/50" key={row.id}>
                   <td className="max-w-[360px] p-3">
-                    <Link className="font-bold text-slate-900 hover:text-blue-700 hover:underline" href={`/admin/deliveries/${row.id}`}>
+                    <Link className="font-bold text-ink hover:text-accent-ink hover:underline" href={`/admin/deliveries/${row.id}`}>
                       {row.newsTitle}
                     </Link>
-                    <p className="mt-0.5 text-[11px] text-slate-400">{row.newsSource}</p>
+                    <p className="mt-0.5 text-[11px] text-faint">{row.newsSource}</p>
                   </td>
                   <td className="p-3">
                     {row.shouldSend === true ? (
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
+                      <span className="rounded-full bg-ok-soft px-2.5 py-1 text-xs font-bold text-ok-ink ring-1 ring-ok-line">
                         باید ارسال شود
                       </span>
                     ) : row.shouldSend === false ? (
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">توصیه نشده</span>
+                      <span className="rounded-full bg-surface-3 px-2.5 py-1 text-xs font-bold text-muted">توصیه نشده</span>
                     ) : (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-xs text-faint">—</span>
                     )}
                   </td>
-                  <td className="p-3 text-xs font-bold text-slate-700">{row.importanceScore ?? "—"}</td>
-                  <td className="p-3 text-xs text-slate-500">
+                  <td className="p-3 text-xs font-bold text-ink-soft">{row.importanceScore ?? "—"}</td>
+                  <td className="p-3 text-xs text-muted">
                     {row.relevanceScore ?? "—"} / {row.noveltyScore ?? "—"}
                   </td>
-                  <td className="p-3 text-xs font-bold text-slate-700">{row.destination === "bale" ? "بله" : "Local"}</td>
+                  <td className="p-3 text-xs font-bold text-ink-soft">{row.destination === "bale" ? "بله" : "Local"}</td>
                   <td className="p-3">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <StatusBadge tone={publishingStatusTone(row.status)}>{publishStatusLabel(row.status)}</StatusBadge>
                       {row.overrideRequested ? (
-                        <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 ring-1 ring-violet-200" title={row.overrideReason ?? undefined}>
+                        <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-bold text-brand-ink ring-1 ring-brand-line" title={row.overrideReason ?? undefined}>
                           override
                         </span>
                       ) : null}
-                      {row.retryCount > 0 ? <span className="text-[10px] text-slate-400">تلاش: {row.retryCount}</span> : null}
+                      {row.retryCount > 0 ? <span className="text-[10px] text-faint">تلاش: {row.retryCount}</span> : null}
                     </div>
-                    {row.errorMessage ? <p className="mt-1 max-w-[260px] truncate text-[11px] text-rose-600" title={row.errorMessage}>{row.errorMessage}</p> : null}
+                    {row.errorMessage ? <p className="mt-1 max-w-[260px] truncate text-[11px] text-danger-ink" title={row.errorMessage}>{row.errorMessage}</p> : null}
                   </td>
-                  <td className="p-3 text-[11px] text-slate-500">
+                  <td className="p-3 text-[11px] text-muted">
                     <p>ساخت: {formatTime(row.createdAt)}</p>
                     <p className="mt-0.5">تأیید: {formatTime(row.approvedAt)}</p>
                     <p className="mt-0.5">ارسال: {formatTime(row.sentAt)}</p>
@@ -226,17 +226,17 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-faint">
           نمایش {rows.length} از {total} رکورد — صفحه {page} از {totalPages}
         </p>
         <div className="flex gap-2">
           {page > 1 ? (
-            <Link className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50" href={`/admin/deliveries${buildQuery({ page: String(page - 1) }, base)}`}>
+            <Link className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-bold text-muted hover:bg-surface-2" href={`/admin/deliveries${buildQuery({ page: String(page - 1) }, base)}`}>
               قبلی
             </Link>
           ) : null}
           {page < totalPages ? (
-            <Link className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50" href={`/admin/deliveries${buildQuery({ page: String(page + 1) }, base)}`}>
+            <Link className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-bold text-muted hover:bg-surface-2" href={`/admin/deliveries${buildQuery({ page: String(page + 1) }, base)}`}>
               بعدی
             </Link>
           ) : null}
@@ -248,7 +248,7 @@ export default async function AdminDeliveriesPage({ searchParams }: PageProps) {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
+    <div dir="rtl" className="min-h-screen bg-canvas-2 text-ink">
       <div className="lg:flex">
         <Sidebar />
         <main className="min-w-0 flex-1">
@@ -261,10 +261,10 @@ function Shell({ children }: { children: ReactNode }) {
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone: StatusTone }) {
   const toneClass =
-    tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : tone === "danger" ? "text-rose-700" : "text-slate-500";
+    tone === "success" ? "text-ok-ink" : tone === "warning" ? "text-warn-ink" : tone === "danger" ? "text-danger-ink" : "text-muted";
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs text-slate-500">{label}</p>
+    <div className="rounded-2xl border border-line/80 bg-surface px-4 py-3 shadow-sm">
+      <p className="text-xs text-muted">{label}</p>
       <p className={`mt-1 text-xl font-bold ${toneClass}`}>{value}</p>
     </div>
   );

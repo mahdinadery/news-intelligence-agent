@@ -447,10 +447,10 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-slate-200/80 pb-6">
-        <p className="mb-2 text-sm font-medium text-blue-600">مرکز مدیریت اخبار</p>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">منابع خبری</h1>
-        <p className="mt-2 text-sm text-slate-500">افزودن، تست، فعال/غیرفعال کردن و دریافت دستی منابع RSS</p>
+      <header className="border-b border-line/80 pb-6">
+        <p className="mb-2 text-sm font-medium text-accent-ink">مرکز مدیریت اخبار</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">منابع خبری</h1>
+        <p className="mt-2 text-sm text-muted">افزودن، تست، فعال/غیرفعال کردن و دریافت دستی منابع RSS</p>
       </header>
 
       {loadFailure ? (
@@ -469,11 +469,11 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           بررسی سلامت، فید هر منبع را بی‌آنکه خبری ذخیره شود می‌گیرد و وضعیت «سالم/خالی/کهنه/ناسالم» را به‌روز می‌کند.
         </p>
         <button
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft hover:bg-surface-2 disabled:opacity-50"
           disabled={probeBusy}
           onClick={handleProbeAll}
           type="button"
@@ -490,23 +490,23 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         <StatCard label="خطا" value={summary.failed} tone="danger" />
       </div>
 
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
+      <section className="rounded-2xl border border-ok-line bg-ok-soft/40 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-950">بسته خبری اعتبارسنجی (اخبار داخلی)</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{CREDIT_RATING_PACK.description}</p>
+            <h2 className="text-base font-bold text-ink">بسته خبری اعتبارسنجی (اخبار داخلی)</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{CREDIT_RATING_PACK.description}</p>
           </div>
           <div className="flex shrink-0 gap-2 text-xs">
-            <span className="rounded-full bg-white px-3 py-1 font-semibold text-emerald-700">
+            <span className="rounded-full bg-surface px-3 py-1 font-semibold text-ok-ink">
               {CREDIT_RATING_PACK.topics.length} موضوع
             </span>
-            <span className="rounded-full bg-white px-3 py-1 font-semibold text-emerald-700">
+            <span className="rounded-full bg-surface px-3 py-1 font-semibold text-ok-ink">
               {CREDIT_RATING_PACK.sources.length} منبع
             </span>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-700">
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-soft">
           <label className="inline-flex cursor-pointer items-center gap-2">
             <input
               checked={packTopics}
@@ -538,14 +538,14 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="rounded-xl bg-ok-strong px-4 py-2 text-sm font-bold text-white hover:bg-ok-strong disabled:opacity-50"
             disabled={packBusy || (!packTopics && !packSources && !packAudience)}
             onClick={handleApplyPack}
             type="button"
           >
             {packBusy ? "در حال اعمال و تست منابع…" : "اعمال بسته اعتبارسنجی"}
           </button>
-          <span className="text-[11px] text-emerald-900/70">
+          <span className="text-[11px] text-ok-ink/70">
             موضوعات روی نسخه فعال پیکربندی AI اعمال می‌شوند (نسخه قبلی در تاریخچه می‌ماند).
           </span>
         </div>
@@ -554,8 +554,8 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           <div
             className={`mt-3 rounded-xl border px-4 py-3 text-xs leading-6 ${
               packResult.success
-                ? "border-emerald-200 bg-white text-slate-700"
-                : "border-rose-200 bg-rose-50 text-rose-800"
+                ? "border-ok-line bg-surface text-ink-soft"
+                : "border-danger-line bg-danger-soft text-danger-ink"
             }`}
           >
             {!packResult.success ? <p className="font-bold">{packResult.message ?? "اعمال بسته ناموفق بود."}</p> : null}
@@ -595,10 +595,10 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
                         <span
                           className={
                             item.status === "added"
-                              ? "text-emerald-700"
+                              ? "text-ok-ink"
                               : item.status === "failed"
-                                ? "text-rose-700"
-                                : "text-slate-500"
+                                ? "text-danger-ink"
+                                : "text-muted"
                           }
                         >
                           {item.status === "added" ? "✓" : item.status === "failed" ? "✕" : "•"} {item.name}
@@ -612,7 +612,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
             ) : null}
 
             {packResult.warnings?.map((warning) => (
-              <p className="mt-1 font-semibold text-amber-800" key={warning}>
+              <p className="mt-1 font-semibold text-warn-ink" key={warning}>
                 ⚠ {warning}
               </p>
             ))}
@@ -622,7 +622,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
 
       <div className="flex flex-wrap items-center gap-3">
         <button
-          className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+          className="rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white hover:bg-accent-strong"
           onClick={() => {
             setForm(emptyForm());
             setFormErrors([]);
@@ -632,7 +632,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           + افزودن منبع جدید
         </button>
         <button
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-50"
           disabled={busy === "run-due"}
           onClick={handleRunDue}
           type="button"
@@ -640,7 +640,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           {busy === "run-due" ? "در حال دریافت..." : "دریافت منابع رسید (Due)"}
         </button>
         <button
-          className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+          className="rounded-xl border border-brand-line bg-brand-soft px-4 py-2.5 text-sm font-semibold text-brand-ink hover:bg-brand-soft"
           onClick={() => setImportOpen((v) => !v)}
           type="button"
         >
@@ -649,16 +649,16 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
       </div>
 
       {importOpen ? (
-        <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4">
-          <p className="text-xs leading-5 text-violet-900">
+        <section className="rounded-2xl border border-brand-line bg-brand-soft/40 p-4">
+          <p className="text-xs leading-5 text-brand-ink">
             اگر منبعی (مثل سایت‌های ایرانی میزبانی‌شده در داخل) از سرور شما قابل‌دسترس نیست: فایل RSS را با مرورگر یا
-            <code className="mx-1 rounded bg-white px-1 font-mono text-[10px]" dir="ltr">curl</code>
+            <code className="mx-1 rounded bg-surface px-1 font-mono text-[10px]" dir="ltr">curl</code>
             دریافت کنید، کل محتوای XML را اینجا Paste کنید و وارد نمایید. دقیقاً همان مسیر پردازش (نجارسازی،
             کانونیکال، ضدتکراری، ذخیره) اجرا می‌شود و هیچ ارسالی انجام نمی‌گیرد.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-[240px_1fr]">
             <select
-              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              className="h-10 rounded-lg border border-line bg-surface px-3 text-sm"
               onChange={(e) => setImportSourceId(e.target.value)}
               value={importSourceId}
             >
@@ -670,7 +670,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
               ))}
             </select>
             <textarea
-              className="min-h-28 rounded-lg border border-slate-200 bg-white p-3 font-mono text-xs"
+              className="min-h-28 rounded-lg border border-line bg-surface p-3 font-mono text-xs"
               dir="ltr"
               onChange={(e) => setImportXml(e.target.value)}
               placeholder="<rss> … کل XML فید را اینجا بچسبانید … </rss>"
@@ -679,7 +679,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           </div>
           <div className="mt-3 flex items-center gap-3">
             <button
-              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+              className="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-strong disabled:opacity-50"
               disabled={importBusy || !importXml.trim()}
               onClick={handleImport}
               type="button"
@@ -687,7 +687,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
               {importBusy ? "در حال ورود..." : "ورود به پایگاه داده"}
             </button>
             {importResult ? (
-              <span className={`text-xs font-bold ${importResult.kind === "ok" ? "text-emerald-700" : "text-rose-700"}`}>
+              <span className={`text-xs font-bold ${importResult.kind === "ok" ? "text-ok-ink" : "text-danger-ink"}`}>
                 {importResult.text}
               </span>
             ) : null}
@@ -698,7 +698,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
       {pageMessage ? (
         <p
           className={`rounded-xl border px-4 py-3 text-sm ${
-            pageMessage.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"
+            pageMessage.kind === "ok" ? "border-ok-line bg-ok-soft text-ok-ink" : "border-danger-line bg-danger-soft text-danger-ink"
           }`}
         >
           {pageMessage.text}
@@ -706,16 +706,16 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
       ) : null}
 
       {!form ? (
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
-          <h2 className="text-sm font-bold text-slate-900">منابع پیشنهادی حوزهٔ اعتبارسنجی و اقتصاد</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
+        <section className="rounded-2xl border border-ok-line bg-ok-soft/40 p-4">
+          <h2 className="text-sm font-bold text-ink">منابع پیشنهادی حوزهٔ اعتبارسنجی و اقتصاد</h2>
+          <p className="mt-1 text-xs leading-5 text-muted">
             یک منبع را انتخاب کنید تا فرم افزودن با مشخصات آن پر شود؛ قبل از ذخیره حتماً «تست اتصال» را بزنید.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {PRESET_SOURCES.map((preset) => (
               <button
                 key={preset.url}
-                className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                className="rounded-lg border border-ok-line bg-surface px-3 py-1.5 text-xs font-medium text-ok-ink hover:bg-ok-soft"
                 onClick={() =>
                   setForm({
                     ...emptyForm(),
@@ -735,14 +735,14 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
       ) : null}
 
       {form ? (
-        <section className="rounded-2xl border border-blue-200 bg-blue-50/30 p-5">
-          <h2 className="text-sm font-bold text-slate-900">{form.id ? "ویرایش منبع" : "منبع جدید"}</h2>
+        <section className="rounded-2xl border border-accent-line bg-accent-soft/30 p-5">
+          <h2 className="text-sm font-bold text-ink">{form.id ? "ویرایش منبع" : "منبع جدید"}</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <FieldInput label="نام منبع" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">نوع</label>
+              <label className="mb-1 block text-xs font-medium text-muted">نوع</label>
               <select
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm"
                 onChange={(e) => setForm({ ...form, type: e.target.value === "api" ? "api" : "rss" })}
                 value={form.type}
               >
@@ -752,9 +752,9 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
             </div>
             <FieldInput label="آدرس فید (URL)" value={form.url} onChange={(v) => setForm({ ...form, url: v })} dir="ltr" />
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">اولویت (۱=بالاترین)</label>
+              <label className="mb-1 block text-xs font-medium text-muted">اولویت (۱=بالاترین)</label>
               <select
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm"
                 onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
                 value={form.priority}
               >
@@ -769,9 +769,9 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
             <FieldInput label="فاصله دریافت (دقیقه)" value={String(form.fetchIntervalMinutes)} onChange={(v) => setForm({ ...form, fetchIntervalMinutes: Number(v) || 30 })} type="number" />
             <FieldInput label="حداکثر آیتم هر دریافت" value={String(form.maxItemsPerFetch)} onChange={(v) => setForm({ ...form, maxItemsPerFetch: Number(v) || 50 })} type="number" />
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-500">توضیحات</label>
+              <label className="mb-1 block text-xs font-medium text-muted">توضیحات</label>
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm"
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 value={form.description}
               />
@@ -783,7 +783,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           </div>
 
           {formErrors.length > 0 ? (
-            <ul className="mt-3 space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+            <ul className="mt-3 space-y-1 rounded-lg border border-danger-line bg-danger-soft p-3 text-xs text-danger-ink">
               {formErrors.map((err, i) => (
                 <li key={i}>• {err}</li>
               ))}
@@ -791,10 +791,10 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
           ) : null}
 
           <div className="mt-4 flex gap-2">
-            <button className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50" disabled={busy === "form"} onClick={handleSubmit} type="button">
+            <button className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white hover:bg-accent-strong disabled:opacity-50" disabled={busy === "form"} onClick={handleSubmit} type="button">
               {busy === "form" ? "در حال ذخیره..." : "ذخیره"}
             </button>
-            <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50" onClick={() => setForm(null)} type="button">
+            <button className="rounded-xl border border-line px-4 py-2 text-sm text-muted hover:bg-surface-2" onClick={() => setForm(null)} type="button">
               انصراف
             </button>
           </div>
@@ -802,16 +802,16 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-400">در حال بارگذاری...</p>
+        <p className="text-sm text-faint">در حال بارگذاری...</p>
       ) : sources.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-10 text-center text-sm text-slate-500">
+        <p className="rounded-2xl border border-dashed border-line bg-surface-2/70 p-10 text-center text-sm text-muted">
           هنوز منبعی ثبت نشده است. روی «افزودن منبع جدید» بزنید.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-line/80 bg-surface shadow-sm">
           <table className="w-full min-w-[900px] text-right text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-xs text-slate-500">
+              <tr className="border-b border-line-soft text-xs text-muted">
                 <th className="p-3 font-medium">منبع</th>
                 <th className="p-3 font-medium">سلامت</th>
                 <th className="p-3 font-medium">اولویت</th>
@@ -822,39 +822,39 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
             </thead>
             <tbody>
               {sources.map((source) => (
-                <tr className="border-b border-slate-50 align-top last:border-0" key={source.id}>
+                <tr className="border-b border-line-soft align-top last:border-0" key={source.id}>
                   <td className="p-3">
-                    <p className="font-bold text-slate-900">{source.name}</p>
-                    <p className="mt-0.5 max-w-[280px] truncate font-mono text-[11px] text-slate-400" dir="ltr" title={source.url}>
+                    <p className="font-bold text-ink">{source.name}</p>
+                    <p className="mt-0.5 max-w-[280px] truncate font-mono text-[11px] text-faint" dir="ltr" title={source.url}>
                       {source.url}
                     </p>
-                    <p className="mt-1 text-[11px] text-slate-400">
+                    <p className="mt-1 text-[11px] text-faint">
                       {source.type.toUpperCase()} · هر {source.fetchIntervalMinutes} دقیقه
                     </p>
                   </td>
                   <td className="p-3">
                     <StatusBadge tone={HEALTH_TONE[source.health]}>{HEALTH_LABEL[source.health]}</StatusBadge>
                     {source.healthDetail ? (
-                      <p className="mt-1 max-w-[220px] text-[11px] leading-5 text-amber-600">{source.healthDetail}</p>
+                      <p className="mt-1 max-w-[220px] text-[11px] leading-5 text-warn-ink">{source.healthDetail}</p>
                     ) : null}
                     {source.lastItemCount !== null ? (
-                      <p className="mt-1 text-[11px] text-slate-400">
+                      <p className="mt-1 text-[11px] text-faint">
                         آخرین دریافت: {source.lastItemCount} آیتم
                         {source.lastNewestPublishedAt ? ` · تازه‌ترین خبر: ${formatTime(source.lastNewestPublishedAt)}` : ""}
                       </p>
                     ) : null}
-                    {source.errorCount > 0 ? <p className="mt-1 text-[11px] text-rose-500">خطاهای متوالی/کل: {source.errorCount}</p> : null}
+                    {source.errorCount > 0 ? <p className="mt-1 text-[11px] text-danger-ink">خطاهای متوالی/کل: {source.errorCount}</p> : null}
                     {source.lastError ? (
-                      <p className="mt-1 max-w-[220px] truncate text-[11px] text-slate-400" title={source.lastError}>
+                      <p className="mt-1 max-w-[220px] truncate text-[11px] text-faint" title={source.lastError}>
                         {source.lastError}
                       </p>
                     ) : null}
                   </td>
-                  <td className="p-3 text-slate-600">{source.priority}</td>
-                  <td className="p-3 text-xs text-slate-600">
+                  <td className="p-3 text-muted">{source.priority}</td>
+                  <td className="p-3 text-xs text-muted">
                     {source.totalFetched} / {source.totalAccepted} / {source.totalDuplicates}
                   </td>
-                  <td className="p-3 text-xs text-slate-500">
+                  <td className="p-3 text-xs text-muted">
                     <p>تلاش: {formatTime(source.lastAttemptAt)}</p>
                     <p className="mt-0.5">موفق: {formatTime(source.lastSuccessAt)}</p>
                   </td>
@@ -892,7 +892,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
                         حذف
                       </MiniButton>
                     </div>
-                    {fetchReports[source.id] ? <p className="mt-2 max-w-[260px] text-[11px] text-slate-500">{fetchReports[source.id]}</p> : null}
+                    {fetchReports[source.id] ? <p className="mt-2 max-w-[260px] text-[11px] text-muted">{fetchReports[source.id]}</p> : null}
                     {testResults[source.id] ? <TestResultView result={testResults[source.id]} /> : null}
                   </td>
                 </tr>
@@ -902,23 +902,23 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
         </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-bold text-slate-950">تاریخچه دریافت‌ها (Ingestion Log)</h2>
+      <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm">
+        <h2 className="text-base font-bold text-ink">تاریخچه دریافت‌ها (Ingestion Log)</h2>
         {runs.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-400">هنوز رکوردی ثبت نشده است.</p>
+          <p className="mt-3 text-sm text-faint">هنوز رکوردی ثبت نشده است.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {runs.slice(0, 15).map((run) => (
-              <li className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2 text-xs" key={run.id}>
+              <li className="flex flex-wrap items-center gap-3 rounded-xl border border-line-soft bg-surface-2/60 px-3 py-2 text-xs" key={run.id}>
                 <StatusBadge tone={run.status === "success" ? "success" : run.status === "partial" ? "warning" : "danger"}>
                   {run.status === "success" ? "موفق" : run.status === "partial" ? "ناقص" : "ناموفق"}
                 </StatusBadge>
-                <span className="text-slate-400">{formatTime(run.startedAt)}</span>
+                <span className="text-faint">{formatTime(run.startedAt)}</span>
                 <span>
                   یافته: {run.itemsFound} · جدید: {run.itemsCreated}
                   {run.itemsFiltered ? ` · خارج از موضوع: ${run.itemsFiltered}` : ""} · تکراری: {run.duplicates} · خطا: {run.errors}
                 </span>
-                {run.errorMessage ? <span className="max-w-[400px] truncate text-rose-600" title={run.errorMessage}>{run.errorMessage}</span> : null}
+                {run.errorMessage ? <span className="max-w-[400px] truncate text-danger-ink" title={run.errorMessage}>{run.errorMessage}</span> : null}
               </li>
             ))}
           </ul>
@@ -930,7 +930,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
 
 function TestResultView({ result }: { result: TestResult }) {
   return (
-    <div className={`mt-2 rounded-lg border p-2.5 text-[11px] ${result.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+    <div className={`mt-2 rounded-lg border p-2.5 text-[11px] ${result.ok ? "border-ok-line bg-ok-soft text-ok-ink" : "border-danger-line bg-danger-soft text-danger-ink"}`}>
       {result.ok ? (
         <>
           <p className="font-bold">
@@ -957,10 +957,10 @@ function TestResultView({ result }: { result: TestResult }) {
 }
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone?: "success" | "warning" | "danger" }) {
-  const toneClass = tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : tone === "danger" ? "text-rose-700" : "text-slate-950";
+  const toneClass = tone === "success" ? "text-ok-ink" : tone === "warning" ? "text-warn-ink" : tone === "danger" ? "text-danger-ink" : "text-ink";
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs text-slate-500">{label}</p>
+    <div className="rounded-2xl border border-line/80 bg-surface px-4 py-3 shadow-sm">
+      <p className="text-xs text-muted">{label}</p>
       <p className={`mt-1 text-xl font-bold ${toneClass}`}>{value}</p>
     </div>
   );
@@ -981,9 +981,9 @@ function FieldInput({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-muted">{label}</label>
       <input
-        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none ${dir === "ltr" ? "font-mono text-xs" : ""}`}
+        className={`w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none ${dir === "ltr" ? "font-mono text-xs" : ""}`}
         dir={dir}
         onChange={(e) => onChange(e.target.value)}
         type={type}
@@ -1007,10 +1007,10 @@ function MiniButton({
   danger?: boolean;
 }) {
   const cls = primary
-    ? "bg-blue-600 text-white hover:bg-blue-700"
+    ? "bg-accent text-white hover:bg-accent-strong"
     : danger
-      ? "border border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
-      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50";
+      ? "border border-danger-line bg-surface text-danger-ink hover:bg-danger-soft"
+      : "border border-line bg-surface text-muted hover:bg-surface-2";
   return (
     <button className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-40 ${cls}`} disabled={disabled} onClick={onClick} type="button">
       {children}

@@ -27,18 +27,18 @@ export default async function NewsSourcesPage({ searchParams }: PageProps) {
   const clientKey = adminKeyForClient(access);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900" dir="rtl">
+    <div className="min-h-screen bg-canvas-2 text-ink" dir="rtl">
       <div className="lg:flex">
         <Sidebar />
 
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-10">
             {!access.gateConfigured ? (
-              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+              <div className="mb-6 rounded-2xl border border-warn-line bg-warn-soft px-5 py-4 text-sm text-warn-ink">
                 <p className="font-bold">هشدار امنیتی: احراز هویت واقعی هنوز متصل نشده است.</p>
                 <p className="mt-1 leading-6">
                   این صفحه با متغیر محیطی{" "}
-                  <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">ADMIN_ACCESS_KEY</code> قفل
+                  <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs">ADMIN_ACCESS_KEY</code> قفل
                   می‌شود؛ چون این متغیر تنظیم نشده، دسترسی برای همه باز است. برای محدودسازی، مقدار آن را در محیط
                   سرور تنظیم کنید؛ از آن پس هنگام باز کردن صفحات مدیریت، پاپ‌آپ ورود کلید نمایش داده می‌شود.
                 </p>

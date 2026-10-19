@@ -140,26 +140,26 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const adminKey = (Array.isArray(keyParam) ? keyParam[0] : keyParam)?.trim() ?? "";
   const dashboardStats = await loadDashboardStats();
   return (
-    <div dir="rtl" className="min-h-screen bg-[#f8fafc] text-slate-900">
+    <div dir="rtl" className="min-h-screen bg-canvas-2 text-ink">
       <div className="lg:flex">
         <Sidebar />
 
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1480px] p-4 sm:p-6 lg:p-10">
             <AdminKeyQuerySync adminKey={adminKey} />
-            <header className="flex flex-col gap-5 border-b border-slate-200/80 pb-7 sm:flex-row sm:items-start sm:justify-between">
+            <header className="flex flex-col gap-5 border-b border-line/80 pb-7 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="mb-3 text-sm font-medium text-blue-600">مرکز کنترل اخبار</p>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                <p className="mb-3 text-sm font-medium text-accent-ink">مرکز کنترل اخبار</p>
+                <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
                   دستیار هوشمند اخبار
                 </h1>
-                <p className="mt-2 text-sm text-slate-500 sm:text-base">
+                <p className="mt-2 text-sm text-muted sm:text-base">
                   مدیریت دریافت، تحلیل و ارسال اخبار
                 </p>
               </div>
 
-              <div className="flex w-fit items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm shadow-slate-200/40">
-                <span className="text-sm font-medium text-slate-500">وضعیت سیستم:</span>
+              <div className="flex w-fit items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 shadow-sm shadow-line/40">
+                <span className="text-sm font-medium text-muted">وضعیت سیستم:</span>
                 <StatusBadge>فعال</StatusBadge>
               </div>
             </header>
@@ -167,10 +167,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <section aria-labelledby="stats-heading" className="mt-7">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h2 id="stats-heading" className="text-lg font-bold text-slate-950">نمای کلی</h2>
-                  <p className="mt-1 text-sm text-slate-400">خلاصه وضعیت فعلی دستیار اخبار</p>
+                  <h2 id="stats-heading" className="text-lg font-bold text-ink">نمای کلی</h2>
+                  <p className="mt-1 text-sm text-faint">خلاصه وضعیت فعلی دستیار اخبار</p>
                 </div>
-                <span className="hidden text-xs text-slate-400 sm:block">به‌روزرسانی لحظه‌ای فعال نیست</span>
+                <span className="hidden text-xs text-faint sm:block">به‌روزرسانی لحظه‌ای فعال نیست</span>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -189,10 +189,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
             <DashboardActions adminKey={adminKey} />
 
-            <section aria-labelledby="activity-heading" className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-6">
+            <section aria-labelledby="activity-heading" className="mt-6 rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
               <div className="mb-5">
-                <h2 id="activity-heading" className="text-lg font-bold text-slate-950">آخرین فعالیت‌ها</h2>
-                <p className="mt-1 text-sm text-slate-400">رویدادهای اخیر دستیار در این بخش ثبت می‌شوند</p>
+                <h2 id="activity-heading" className="text-lg font-bold text-ink">آخرین فعالیت‌ها</h2>
+                <p className="mt-1 text-sm text-faint">رویدادهای اخیر دستیار در این بخش ثبت می‌شوند</p>
               </div>
               <ActivityList />
             </section>

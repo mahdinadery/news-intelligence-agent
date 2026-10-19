@@ -85,10 +85,10 @@ export function SchemaRepairCard({
   return (
     <section
       aria-live="polite"
-      className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-sm text-rose-900 shadow-sm sm:p-5"
+      className="rounded-2xl border border-danger-line bg-danger-soft/70 p-4 text-sm text-danger-ink shadow-sm sm:p-5"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-rose-500 ring-1 ring-rose-100">
+        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface text-danger-ink ring-1 ring-danger-line">
           <svg aria-hidden="true" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
             <path d="M12 3 2.7 19.2A1.8 1.8 0 0 0 4.3 22h15.4a1.8 1.8 0 0 0 1.6-2.8L12 3Z" strokeLinejoin="round" />
             <path d="M12 9v4.5M12 17h.01" strokeLinecap="round" />
@@ -97,38 +97,38 @@ export function SchemaRepairCard({
         <div className="min-w-0 flex-1">
           <h2 className="font-bold">{heading}</h2>
           <p className="mt-1 leading-6">{message}</p>
-          {hint ? <p className="mt-1 leading-6 text-rose-800/90">{hint}</p> : null}
+          {hint ? <p className="mt-1 leading-6 text-danger-ink/90">{hint}</p> : null}
           {detail ? (
-            <p className="mt-2 overflow-x-auto rounded-lg bg-white/80 px-3 py-2 font-mono text-[11px] leading-5 text-rose-800" dir="ltr">
+            <p className="mt-2 overflow-x-auto rounded-lg bg-surface/80 px-3 py-2 font-mono text-[11px] leading-5 text-danger-ink" dir="ltr">
               {detail}
             </p>
           ) : null}
-          {code ? <p className="mt-1 text-[11px] text-rose-500" dir="ltr">code: {code}</p> : null}
+          {code ? <p className="mt-1 text-[11px] text-danger-ink" dir="ltr">code: {code}</p> : null}
 
           {schemaMismatch ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
-                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                className="rounded-xl bg-danger px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-danger-strong disabled:cursor-not-allowed disabled:bg-danger-line"
                 disabled={state === "running"}
                 onClick={handleRepair}
                 type="button"
               >
                 {state === "running" ? "در حال همگام‌سازی…" : "همگام‌سازی خودکار اسکیما"}
               </button>
-              <span className="text-[11px] leading-5 text-rose-700/80">
+              <span className="text-[11px] leading-5 text-danger-ink/80">
                 فقط جدول/ستون‌های جدید اضافه می‌شوند؛ هیچ داده‌ای حذف یا بازنویسی نمی‌شود.
               </span>
             </div>
           ) : null}
 
           {state === "done" ? (
-            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+            <p className="mt-3 rounded-lg border border-ok-line bg-ok-soft px-3 py-2 text-xs font-bold text-ok-ink">
               اسکیما همگام شد ({result?.executed ?? "?"}/{result?.total ?? "?"} دستور). داده‌ها در حال بارگذاری مجدد…
             </p>
           ) : null}
 
           {state === "failed" ? (
-            <div className="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs text-rose-800">
+            <div className="mt-3 rounded-lg border border-danger-line bg-surface px-3 py-2 text-xs text-danger-ink">
               <p className="font-bold">{result?.message ?? transportError ?? "همگام‌سازی ناموفق بود."}</p>
               {result?.error ? (
                 <p className="mt-1 break-words font-mono text-[11px]" dir="ltr">
@@ -140,7 +140,7 @@ export function SchemaRepairCard({
           ) : null}
 
           {state === "done" && result?.warnings && result.warnings.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-[11px] text-amber-800">
+            <ul className="mt-2 space-y-1 text-[11px] text-warn-ink">
               {result.warnings.slice(0, 5).map((warning, index) => (
                 <li key={index}>• {warning}</li>
               ))}

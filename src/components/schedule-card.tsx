@@ -106,10 +106,10 @@ const DESTINATION_LABELS: Record<Destination, string> = {
 };
 
 const DIAGNOSIS_TONES = {
-  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  error: "border-rose-200 bg-rose-50 text-rose-900",
-  info: "border-sky-200 bg-sky-50 text-sky-900",
+  success: "border-ok-line bg-ok-soft text-ok-ink",
+  warning: "border-warn-line bg-warn-soft text-warn-ink",
+  error: "border-danger-line bg-danger-soft text-danger-ink",
+  info: "border-accent bg-accent-soft text-accent-ink",
 } as const;
 
 function authHeaders(adminKey: string): Record<string, string> {
@@ -385,11 +385,11 @@ export function ScheduleCard({
   return (
     <section
       aria-labelledby="schedule-heading"
-      className="mt-6 rounded-2xl border border-sky-200/80 bg-white p-5 shadow-sm shadow-sky-100/50 sm:p-6"
+      className="mt-6 rounded-2xl border border-accent/80 bg-surface p-5 shadow-sm shadow-accent-line/50 sm:p-6"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-sky-600 text-white shadow-md shadow-sky-600/20">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-md shadow-accent/20">
             <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="8.5" />
               <path d="M12 7v5l3.2 2" strokeLinecap="round" strokeLinejoin="round" />
@@ -397,16 +397,16 @@ export function ScheduleCard({
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-bold text-slate-950" id="schedule-heading">
+              <h2 className="text-base font-bold text-ink" id="schedule-heading">
                 ارسال خودکار زمان‌بندی‌شده (تحلیل + بله)
               </h2>
               <StatusBadge tone={config.enabled ? "success" : "muted"}>
                 {config.enabled ? "زمان‌بندی فعال" : "خاموش"}
               </StatusBadge>
             </div>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
               در هر زمان مشخص، خبرهای تازه دریافت، تحلیل و در صورت عبور از حد نصاب‌ها بدون تأیید دستی به بله ارسال
-              می‌شوند. نوبت‌ها به وقت <b className="text-slate-700">{config.timezone}</b> اجرا می‌شوند و اجرای تکراری
+              می‌شوند. نوبت‌ها به وقت <b className="text-ink-soft">{config.timezone}</b> اجرا می‌شوند و اجرای تکراری
               همان نوبت ممکن نیست.
             </p>
           </div>
@@ -415,7 +415,7 @@ export function ScheduleCard({
         <div className="flex flex-wrap items-center gap-2">
           <button
             className={`rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition-all ${
-              running ? "cursor-not-allowed bg-slate-100 text-slate-400" : "bg-sky-600 text-white hover:bg-sky-700"
+              running ? "cursor-not-allowed bg-surface-3 text-faint" : "bg-accent text-white hover:bg-accent-strong"
             }`}
             disabled={running}
             onClick={handleRunNow}
@@ -424,14 +424,14 @@ export function ScheduleCard({
             {running ? "در حال اجرا…" : "اجرای فوری چرخه کامل"}
           </button>
           <button
-            className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-bold text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl border border-accent bg-accent-soft px-4 py-2.5 text-sm font-bold text-accent-ink transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
             disabled={saving}
             onClick={handleSave}
             type="button"
           >
             {saving ? "در حال ذخیره…" : "ذخیره زمان‌بندی"}
           </button>
-          <span className={`text-xs ${dirty ? "text-amber-600" : "text-emerald-600"}`}>
+          <span className={`text-xs ${dirty ? "text-warn-ink" : "text-ok-ink"}`}>
             {saving
               ? "در حال ذخیره…"
               : dirty
@@ -447,8 +447,8 @@ export function ScheduleCard({
         <p
           className={`mt-4 rounded-xl border px-4 py-3 text-sm leading-6 ${
             message.kind === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
+              ? "border-ok-line bg-ok-soft text-ok-ink"
+              : "border-danger-line bg-danger-soft text-danger-ink"
           }`}
         >
           {message.text}
@@ -457,32 +457,32 @@ export function ScheduleCard({
 
       <div
         className={`mt-4 rounded-xl border p-4 ${
-          status?.cronStale ? "border-amber-200 bg-amber-50" : "border-sky-100 bg-sky-50/50"
+          status?.cronStale ? "border-warn-line bg-warn-soft" : "border-accent-line bg-accent-soft/50"
         }`}
       >
-        <p className="text-sm font-bold text-slate-800">⏱️ کار پیوسته بدون باز بودن صفحه</p>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
+        <p className="text-sm font-bold text-ink-soft">⏱️ کار پیوسته بدون باز بودن صفحه</p>
+        <p className="mt-1 text-xs leading-5 text-muted">
           این سامانه روی سرور اجرا می‌شود؛ کرون GitHub Actions هر ۵ دقیقه سرور را صدا می‌زند و ارسال‌ها بدون باز بودن
           این صفحه انجام می‌شوند. وضعیت زیر ثابت می‌کند کرون واقعاً در حال تماس است.
         </p>
         <p className="mt-2 text-xs leading-5">
           {status?.lastTickAt ? (
-            <span className={status.cronStale ? "font-bold text-amber-700" : "text-emerald-700"}>
+            <span className={status.cronStale ? "font-bold text-warn-ink" : "text-ok-ink"}>
               ضربان کرون: آخرین تماس {formatInZone(status.lastTickAt, config.timezone)}
               {status.cronStale ? " — بیش از ۱۵ دقیقه بی‌تماس!" : " ✓"}
             </span>
           ) : (
-            <span className="font-bold text-amber-700">هنوز هیچ تماسی از کرون خارجی ثبت نشده است.</span>
+            <span className="font-bold text-warn-ink">هنوز هیچ تماسی از کرون خارجی ثبت نشده است.</span>
           )}
         </p>
         {status?.cronStale ? (
-          <p className="mt-2 text-xs leading-5 text-amber-800">
+          <p className="mt-2 text-xs leading-5 text-warn-ink">
             برای فعال‌سازی: در مخزن GitHub ← Settings ← Secrets and variables ← Actions دو متغیر{" "}
-            <code className="rounded bg-white px-1 font-mono text-[10px]" dir="ltr">
+            <code className="rounded bg-surface px-1 font-mono text-[10px]" dir="ltr">
               APP_URL
             </code>{" "}
             (آدرس Render بدون انتهای <code dir="ltr">/</code>) و{" "}
-            <code className="rounded bg-white px-1 font-mono text-[10px]" dir="ltr">
+            <code className="rounded bg-surface px-1 font-mono text-[10px]" dir="ltr">
               ADMIN_ACCESS_KEY
             </code>{" "}
             را ست کنید و در تب Actions ورک‌فلوی «Scheduled auto-publish» را فعال نگه دارید. توجه: GitHub پس از حدود ۶۰
@@ -491,11 +491,11 @@ export function ScheduleCard({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-4 border-t border-slate-100 pt-4 lg:grid-cols-3">
-        <div className="rounded-xl bg-slate-50 p-3.5">
-          <p className="text-xs font-semibold text-slate-500">وضعیت</p>
+      <div className="mt-5 grid gap-4 border-t border-line-soft pt-4 lg:grid-cols-3">
+        <div className="rounded-xl bg-surface-2 p-3.5">
+          <p className="text-xs font-semibold text-muted">وضعیت</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-800">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-ink-soft">
               <input
                 checked={config.enabled}
                 className="h-4 w-4 accent-sky-600"
@@ -505,15 +505,15 @@ export function ScheduleCard({
               فعال باشد
             </label>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            نوبت بعدی: <b className="text-slate-800">{config.enabled ? nextRunLabel : "—"}</b>
+          <p className="mt-2 text-xs text-muted">
+            نوبت بعدی: <b className="text-ink-soft">{config.enabled ? nextRunLabel : "—"}</b>
           </p>
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-3.5">
-          <p className="text-xs font-semibold text-slate-500">مقصد ارسال خودکار</p>
+        <div className="rounded-xl bg-surface-2 p-3.5">
+          <p className="text-xs font-semibold text-muted">مقصد ارسال خودکار</p>
           <select
-            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
+            className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none"
             onChange={(event) => setConfig({ ...config, destination: event.target.value as Destination })}
             value={config.destination}
           >
@@ -523,36 +523,36 @@ export function ScheduleCard({
               </option>
             ))}
           </select>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-muted">
             بله:{" "}
             {baleReady ? (
-              <b className="text-emerald-700">آماده ✓</b>
+              <b className="text-ok-ink">آماده ✓</b>
             ) : (
-              <b className="text-rose-700">
+              <b className="text-danger-ink">
                 تنظیم نشده{baleMissing.length > 0 ? ` (${baleMissing.join(", ")})` : ""}
               </b>
             )}
           </p>
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-3.5">
-          <p className="text-xs font-semibold text-slate-500">آخرین اجرا</p>
-          <p className="mt-2 text-xs text-slate-600">
+        <div className="rounded-xl bg-surface-2 p-3.5">
+          <p className="text-xs font-semibold text-muted">آخرین اجرا</p>
+          <p className="mt-2 text-xs text-muted">
             {lastRun ? (
               <>
                 {formatInZone(lastRun.startedAt, config.timezone)}
-                <span className="mx-1 text-slate-300">·</span>
-                <span className={lastRun.ok ? "text-emerald-700" : "text-amber-700"}>
+                <span className="mx-1 text-faint">·</span>
+                <span className={lastRun.ok ? "text-ok-ink" : "text-warn-ink"}>
                   {lastRun.send?.sent ?? 0} ارسال / {lastRun.analysis?.analyzed ?? 0} تحلیل
                   {lastRun.bulletin ? (
-                    <span className="mr-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                    <span className="mr-2 rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">
                       {lastRun.bulletin.sent
                         ? `بولتن: ${lastRun.bulletin.itemCount} خبر ارسال شد`
                         : `بولتن ارسال نشد (${lastRun.bulletin.reason ?? "—"})`}
                     </span>
                   ) : null}
                   {lastRun.gapSearch ? (
-                    <span className="mr-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                    <span className="mr-2 rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">
                       {lastRun.gapSearch.ran
                         ? `جست‌وجوی هدفمند: ${lastRun.gapSearch.found} یافت / ${lastRun.gapSearch.analyzed} تحلیل / ${lastRun.gapSearch.sent} ارسال`
                         : `جست‌وجوی هدفمند اجرا نشد (${lastRun.gapSearch.reason ?? "—"}${lastRun.gapSearch.detail ? `: ${lastRun.gapSearch.detail}` : ""})`}
@@ -564,7 +564,7 @@ export function ScheduleCard({
               "هنوز اجرا نشده است"
             )}
           </p>
-          <p className="mt-2 text-[11px] leading-5 text-slate-400">
+          <p className="mt-2 text-[11px] leading-5 text-faint">
             اجرای خودکار فقط وقتی رخ می‌دهد که این کارت ذخیره و فعال شده باشد و کرون بیرونی هر چند دقیقه یک‌بار تیک
             بزند.
           </p>
@@ -585,7 +585,7 @@ export function ScheduleCard({
       ) : null}
 
       {lastRun?.send?.rejected && lastRun.send.rejected.length > 0 ? (
-        <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-700">
+        <details className="mt-3 rounded-xl border border-line bg-surface-2/70 p-3 text-xs text-ink-soft">
           <summary className="cursor-pointer font-bold">
             چرا خبری ارسال نشد؟ ({lastRun.send.rejected.length} نمونه از خبرهای ردشده)
           </summary>
@@ -596,7 +596,7 @@ export function ScheduleCard({
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-[11px] leading-5 text-slate-400">
+          <p className="mt-2 text-[11px] leading-5 text-faint">
             برای ارسال، همهٔ حد نصاب‌ها (اهمیت، مرتبط بودن و در صورت تنظیم تازگی) باید هم‌زمان برقرار باشند. حد
             نصاب‌ها را در «تنظیمات پیشرفته» و کلیدواژه‌های ممنوع را در «پیکربندی AI» تنظیم کنید.
           </p>
@@ -606,9 +606,9 @@ export function ScheduleCard({
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <div>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-800">زمان‌های اجرا (به وقت {config.timezone})</p>
+            <p className="text-sm font-bold text-ink-soft">زمان‌های اجرا (به وقت {config.timezone})</p>
             <button
-              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-bold text-muted hover:bg-surface-2"
               onClick={() => {
                 addTime();
                 setTimesEditing(true);
@@ -620,13 +620,13 @@ export function ScheduleCard({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-medium text-slate-500">تکرار سریع:</span>
+            <span className="text-[11px] font-medium text-muted">تکرار سریع:</span>
             {INTERVAL_PRESETS.map((minutes) => (
               <button
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                   interval === minutes
-                    ? "border-sky-300 bg-sky-50 text-sky-700"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+                    ? "border-accent bg-accent-soft text-accent-ink"
+                    : "border-line bg-surface-2 text-muted hover:border-accent hover:bg-accent-soft hover:text-accent-ink"
                 }`}
                 key={minutes}
                 onClick={() => {
@@ -641,20 +641,20 @@ export function ScheduleCard({
           </div>
 
           {interval && !timesEditing ? (
-            <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-6 text-emerald-900">
+            <div className="mt-2 rounded-lg border border-ok-line bg-ok-soft px-3 py-2 text-xs leading-6 text-ok-ink">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
                   زمان‌بندی فعلی: <b>{intervalLabel(interval)}</b> ({config.times.length} نوبت در روز)
                 </span>
                 <button
-                  className="rounded-md border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
+                  className="rounded-md border border-ok-line bg-surface px-2 py-0.5 text-[11px] font-bold text-ok-ink hover:bg-ok-soft"
                   onClick={() => setTimesEditing(true)}
                   type="button"
                 >
                   ویرایش دستی زمان‌ها
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-emerald-800/80">
+              <p className="mt-1 text-[11px] text-ok-ink/80">
                 در هر نوبت، خبرهای تازه تحلیل می‌شوند و فقط در صورت وجود خبر واجد شرایط ارسالی انجام می‌شود.
               </p>
             </div>
@@ -662,14 +662,14 @@ export function ScheduleCard({
             <>
               <div className="mt-2 space-y-2">
                 {config.times.length === 0 ? (
-                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <p className="rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-xs text-warn-ink">
                     حداقل یک زمان اضافه کنید تا زمان‌بندی بتواند اجرا شود.
                   </p>
                 ) : null}
                 {config.times.map((time, index) => (
                   <div className="flex items-center gap-2" key={`${index}-${time}`}>
                     <input
-                      className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
+                      className="w-36 rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
                       onChange={(event) => updateTime(index, event.target.value)}
                       step={300}
                       type="time"
@@ -677,7 +677,7 @@ export function ScheduleCard({
                     />
                     <button
                       aria-label="حذف زمان"
-                      className="rounded-lg px-2 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-50 disabled:opacity-40"
+                      className="rounded-lg px-2 py-1.5 text-xs font-bold text-danger-ink hover:bg-danger-soft disabled:opacity-40"
                       disabled={config.times.length <= 1}
                       onClick={() => removeTime(index)}
                       type="button"
@@ -690,7 +690,7 @@ export function ScheduleCard({
 
               {interval ? (
                 <button
-                  className="mt-2 text-[11px] font-bold text-emerald-700 underline-offset-2 hover:underline"
+                  className="mt-2 text-[11px] font-bold text-ok-ink underline-offset-2 hover:underline"
                   onClick={() => setTimesEditing(false)}
                   type="button"
                 >
@@ -701,9 +701,9 @@ export function ScheduleCard({
           )}
 
           <label className="mt-3 block">
-            <span className="mb-1 block text-xs font-medium text-slate-500">منطقه زمانی</span>
+            <span className="mb-1 block text-xs font-medium text-muted">منطقه زمانی</span>
             <select
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none"
               onChange={(event) => setConfig({ ...config, timezone: event.target.value })}
               value={config.timezone}
             >
@@ -716,14 +716,14 @@ export function ScheduleCard({
           </label>
         </div>
 
-        <div className="rounded-xl border border-slate-200 p-4">
+        <div className="rounded-xl border border-line p-4">
           <button
-            className="flex w-full items-center justify-between text-sm font-bold text-slate-800"
+            className="flex w-full items-center justify-between text-sm font-bold text-ink-soft"
             onClick={() => setAdvancedOpen((value) => !value)}
             type="button"
           >
             <span>تنظیمات پیشرفته (حد نصاب‌ها و حجم هر اجرا)</span>
-            <span className="text-slate-400">{advancedOpen ? "−" : "+"}</span>
+            <span className="text-faint">{advancedOpen ? "−" : "+"}</span>
           </button>
 
           {advancedOpen ? (
@@ -763,7 +763,7 @@ export function ScheduleCard({
                 onChange={(value) => setConfig({ ...config, maxSend: value })}
                 value={config.maxSend}
               />
-              <label className="flex items-start gap-2 text-xs leading-5 text-slate-600 sm:col-span-2">
+              <label className="flex items-start gap-2 text-xs leading-5 text-muted sm:col-span-2">
                 <input
                   checked={config.requireAiRecommendation}
                   className="mt-0.5 h-4 w-4 accent-sky-600"
@@ -772,7 +772,7 @@ export function ScheduleCard({
                 />
                 <span>
                   فقط خبرهایی ارسال شوند که هوش مصنوعی هم صریحاً ارسال را توصیه کرده است (
-                  <code className="rounded bg-slate-100 px-1 font-mono text-[10px]" dir="ltr">
+                  <code className="rounded bg-surface-3 px-1 font-mono text-[10px]" dir="ltr">
                     shouldSend = true
                   </code>
                   ).
@@ -780,21 +780,21 @@ export function ScheduleCard({
               </label>
             </div>
           ) : (
-            <p className="mt-2 text-xs leading-6 text-slate-500">
+            <p className="mt-2 text-xs leading-6 text-muted">
               پیش‌فرض: اهمیت ≥ {config.minImportance}٪، مرتبط بودن ≥ {config.minRelevance}٪، حداکثر{" "}
               {config.maxAnalyze} تحلیل و {config.maxSend} ارسال در هر نوبت.
             </p>
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 p-4">
-          <h3 className="text-sm font-bold text-slate-800">جست‌وجوی هدفمند (پر کردن شکاف پوشش)</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
+        <div className="rounded-xl border border-line p-4">
+          <h3 className="text-sm font-bold text-ink-soft">جست‌وجوی هدفمند (پر کردن شکاف پوشش)</h3>
+          <p className="mt-1 text-xs leading-5 text-muted">
             وقتی در یک نوبت هیچ خبری ارسال نشود، بازو خودش دنبال موضوعات پوشش می‌گردد، نتایج را از همان فیلتر
             موضوعی و قانون سخت‌گیرانهٔ ارسال عبور می‌دهد و فقط خبرهای واجد شرایط را می‌فرستد. حداکثر ۵ آیتم در هر
             نوبت، با وقفهٔ حداقل ۳ ساعت بین جست‌وجوها.
           </p>
-          <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-slate-600">
+          <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted">
             <input
               checked={config.gapSearchEnabled}
               className="mt-0.5 h-4 w-4 accent-sky-600"
@@ -804,12 +804,12 @@ export function ScheduleCard({
             <span>وقتی خبری برای ارسال نبود، جست‌وجوی هدفمند انجام شود.</span>
           </label>
           {config.gapSearchEnabled ? (
-            <label className="mt-3 block text-xs leading-5 text-slate-600">
-              <span className="mb-1 block font-medium text-slate-700">
+            <label className="mt-3 block text-xs leading-5 text-muted">
+              <span className="mb-1 block font-medium text-ink-soft">
                 عبارت‌های جست‌وجو (هر خط یک عبارت؛ خالی = برداشت خودکار از موضوعات پوشش)
               </span>
               <textarea
-                className="min-h-[84px] w-full rounded-lg border border-slate-200 p-2 font-mono text-[12px] focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-200"
+                className="min-h-[84px] w-full rounded-lg border border-line p-2 font-mono text-[12px] focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-line"
                 dir="rtl"
                 onChange={(event) =>
                   setConfig({
@@ -827,18 +827,18 @@ export function ScheduleCard({
           ) : null}
         </div>
 
-        <div className="rounded-xl border border-slate-200 p-4">
-          <h3 className="text-sm font-bold text-slate-800">حالت انتشار</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
+        <div className="rounded-xl border border-line p-4">
+          <h3 className="text-sm font-bold text-ink-soft">حالت انتشار</h3>
+          <p className="mt-1 text-xs leading-5 text-muted">
             «بولتن»: همهٔ خبرهای واجد شرایط منتظر می‌مانند و سرِ ساعت‌های تعیین‌شده در یک پیام گواردیجست می‌شوند
             (عنوان + یک‌خطی + چرا مهم + لینک، با یک جمع‌بندی از هوش مصنوعی). «هر دو»: تک‌پیام‌ها فوری می‌روند و بولتن،
             جمع‌بندی همان خبرها در ساعت‌های بولتن است.
           </p>
 
-          <label className="mt-3 block text-xs leading-5 text-slate-600">
-            <span className="mb-1 block font-medium text-slate-700">نحوهٔ انتشار در کانال</span>
+          <label className="mt-3 block text-xs leading-5 text-muted">
+            <span className="mb-1 block font-medium text-ink-soft">نحوهٔ انتشار در کانال</span>
             <select
-              className="w-full rounded-lg border border-slate-200 p-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-200"
+              className="w-full rounded-lg border border-line p-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent-line"
               onChange={(event) => setConfig({ ...config, publishMode: event.target.value as PublishMode })}
               value={config.publishMode}
             >
@@ -850,14 +850,14 @@ export function ScheduleCard({
 
           {config.publishMode !== "single" ? (
             <div className="mt-3">
-              <span className="mb-1 block text-xs font-medium text-slate-700">
+              <span className="mb-1 block text-xs font-medium text-ink-soft">
                 ساعت‌های انتشار بولتن (به وقت {config.timezone})
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 {config.bulletinTimes.map((time, index) => (
                   <span key={index} className="flex items-center gap-1">
                     <input
-                      className="w-[72px] rounded-lg border border-slate-200 p-1.5 text-center font-mono text-xs focus:border-sky-300 focus:outline-none"
+                      className="w-[72px] rounded-lg border border-line p-1.5 text-center font-mono text-xs focus:border-accent focus:outline-none"
                       dir="ltr"
                       onChange={(event) => {
                         const next = [...config.bulletinTimes];
@@ -868,7 +868,7 @@ export function ScheduleCard({
                     />
                     <button
                       aria-label="حذف ساعت"
-                      className="rounded px-1.5 py-0.5 text-xs text-rose-500 hover:bg-rose-50"
+                      className="rounded px-1.5 py-0.5 text-xs text-danger-ink hover:bg-danger-soft"
                       onClick={() =>
                         setConfig({
                           ...config,
@@ -882,7 +882,7 @@ export function ScheduleCard({
                   </span>
                 ))}
                 <button
-                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted hover:bg-surface-2 disabled:opacity-50"
                   disabled={config.bulletinTimes.length >= 12}
                   onClick={() => setConfig({ ...config, bulletinTimes: [...config.bulletinTimes, "12:00"] })}
                   type="button"
@@ -892,7 +892,7 @@ export function ScheduleCard({
               </div>
 
               <button
-                className="mt-3 rounded-lg bg-sky-600 px-3 py-2 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                className="mt-3 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-strong disabled:opacity-50"
                 disabled={bulletinRunning}
                 onClick={handleRunBulletin}
                 type="button"
@@ -905,7 +905,7 @@ export function ScheduleCard({
       </div>
 
       {lastRun && lastRun.errors.length > 0 ? (
-        <details className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+        <details className="mt-4 rounded-xl border border-warn-line bg-warn-soft/70 p-3 text-xs text-warn-ink">
           <summary className="cursor-pointer font-bold">خطاهای آخرین اجرا ({lastRun.errors.length})</summary>
           <ul className="mt-2 space-y-1">
             {lastRun.errors.map((error, index) => (
@@ -917,7 +917,7 @@ export function ScheduleCard({
         </details>
       ) : null}
 
-      <p className="mt-4 text-[11px] leading-5 text-slate-400">
+      <p className="mt-4 text-[11px] leading-5 text-faint">
         برای ارسال واقعی به بله، متغیرهای <code className="font-mono" dir="ltr">BALE_BOT_TOKEN</code> و{" "}
         <code className="font-mono" dir="ltr">BALE_CHAT_ID</code> باید روی سرور تنظیم شده باشند. اجرای زمان‌بندی‌شده
         توسط کرون بیرونی (GitHub Actions) فعال می‌شود و به باز بودن دائمی سرور نیاز ندارد.
@@ -942,9 +942,9 @@ function NumberField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
       <input
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-400 focus:outline-none"
+        className="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
         max={max}
         min={min}
         onChange={(event) => onChange(Number(event.target.value))}
