@@ -28,14 +28,14 @@ test("buildBulletinMessage: header, intro, and per-item minimal columns", () => 
 
   assert.ok(text.startsWith("🗞️ بولتن خبری"));
   const introAt = text.indexOf("امروز محور اصلی");
-  const firstTitleAt = text.indexOf("1️⃣ [انتشار رتبه‌بندی");
-  const secondTitleAt = text.indexOf("2️⃣ [خبر دوم");
+  const firstTitleAt = text.indexOf("1️⃣ انتشار رتبه‌بندی");
+  const secondTitleAt = text.indexOf("2️⃣ خبر دوم");
   assert.ok(introAt > 0);
   assert.ok(firstTitleAt > introAt);
   assert.ok(secondTitleAt > firstTitleAt);
   assert.ok(text.includes("خلاصه کوتاه خبر."));
   assert.ok(text.includes("چرا مهم است: به سبد اعتباری بانک‌ها مربوط است."));
-  assert.ok(text.includes("🔗 https://example.com/news/1"));
+  assert.ok(text.includes("[لینک اصلی خبر](https://example.com/news/1)"));
 });
 
 test("buildBulletinMessage: no intro block when AI brief is missing", () => {

@@ -99,19 +99,19 @@ export function buildBulletinMessage(args: {
 
   const introText = compact(intro, 600);
   if (introText) {
-    lines.push("", introText);
+    lines.push("", escapeMd(introText));
   }
 
   items.forEach((item, index) => {
     const marker = NUMBER_EMOJI[index] ?? `${index + 1}.`;
-    lines.push("", `${marker} ${mdLink(compact(item.title, 160), item.url)}`);
+    lines.push("", `${marker} ${escapeMd(compact(item.title, 160))}`);
     const oneLiner = compact(item.oneLiner, 220);
-    if (oneLiner) lines.push(oneLiner);
+    if (oneLiner) lines.push(escapeMd(oneLiner));
     const why = compact(item.whyItMatters, 220);
-    if (why) lines.push(`چرا مهم است: ${why}`);
+    if (why) lines.push(`چرا مهم است: ${escapeMd(why)}`);
     const entities = (item.entityTags ?? []).slice(0, 4).join("، ");
-    if (entities) lines.push(`نهادها: ${entities}`);
-    const otherSources = (item.corroborationSources ?? []).slice(0, 3);
+    if (entities) lines.push(`نهادها: ${escapeMd(entities)}`);
+    const otherSources = (item.corroborationSources ?? []).slice(0, 3).map((name) => escapeMd(name));
     if (otherSources.length > 0) {
       lines.push(
         `تأییدشده توسط ${Math.max(2, otherSources.length + 1).toLocaleString("fa-IR")} منبع: ${otherSources.join("، ")}`,
@@ -119,7 +119,8 @@ export function buildBulletinMessage(args: {
     } else if (item.corroborated) {
       lines.push("تأییدشده توسط چند منبع ✓");
     }
-    lines.push(`🔗 ${item.url}`);
+    // Per-item link: the label «لینک اصلی خبر» IS the hyperlink (user spec).
+    lines.push(mdLink("لینک اصلی خبر", item.url));
   });
 
   return lines.join("\n");
