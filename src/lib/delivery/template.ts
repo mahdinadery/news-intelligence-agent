@@ -12,7 +12,7 @@
 
 import type { NewsRow } from "@/db/schema";
 import { sanitizeWhyItMatters } from "../ai/why-guard";
-import { buildNewsMessage, stripEmptyLabelBlocks } from "./message";
+import { buildNewsMessage, mdLink, stripEmptyLabelBlocks, type MessageExtras } from "./message";
 
 /** Only variables that exist on the current data model are supported. */
 export const PUBLISHING_TEMPLATE_VARS = [
@@ -50,14 +50,12 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 const MAX_FIELD_LENGTH = 900;
 
-function value(
-  varName: PublishingTemplateVar,
-  article: NewsRow,
-  linkFor?: (url: string) => string,
-): string {
+function value(varName: PublishingTemplateVar, article: NewsRow): string {
   switch (varName) {
     case "title":
-      return article.normalizedTitle ?? article.title;
+      // The title is the hyperlink to the ORIGINAL news URL («لینک خبر در
+      // لینک اصلی خبر هایپرلینک» — no short links).
+      return mdLink(article.normalizedTitle ?? article.title, article.url);
     case "summary":
       return article.summary ?? "—";
     case "category":
@@ -82,7 +80,7 @@ function value(
     case "sourceName":
       return article.source;
     case "originalUrl":
-      return linkFor?.(article.url) || article.url;
+      return article.url;
     case "publishedAt":
       return article.publishedAt ? article.publishedAt.toISOString().slice(0, 10) : "—";
   }
@@ -101,14 +99,14 @@ function compact(text: string, limit = MAX_FIELD_LENGTH): string {
 export function renderPublishingMessage(
   template: string | null | undefined,
   article: NewsRow,
-  linkFor?: (url: string) => string,
+  extras: MessageExtras = {},
 ): string {
   const source = template?.trim();
-  if (!source) return buildNewsMessage(article, linkFor ? { linkFor } : {});
+  if (!source) return buildNewsMessage(article, extras);
 
   const rendered = source.replace(/\{([a-zA-Z]+)\}/g, (match, rawKey: string) => {
     if (!(PUBLISHING_TEMPLATE_VARS as readonly string[]).includes(rawKey)) return match;
-    return compact(value(rawKey as PublishingTemplateVar, article, linkFor));
+    return compact(value(rawKey as PublishingTemplateVar, article));
   });
 
   // Optional fields that came back empty leave dangling «label:» lines —

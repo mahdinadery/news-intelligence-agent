@@ -16,7 +16,6 @@ import { readActiveOperationalSettings } from "@/lib/ai/config-service";
 import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
 import { sendBulletinDelivery } from "@/lib/delivery";
 import { buildBulletinMessage, MAX_BULLETIN_ITEMS, pickBulletinItems } from "@/lib/delivery/bulletin";
-import { ensureShortLinks, linkResolver } from "@/lib/delivery/short-link";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { expandTargets } from "@/lib/delivery/types";
 import {
@@ -189,7 +188,7 @@ async function selectRecapItems(config: AgentScheduleConfig): Promise<NewsRow[]>
 async function sendBulletin(
   config: AgentScheduleConfig,
   items: NewsRow[],
-  options: { recordRows: boolean; trigger: "schedule" | "manual" },
+  options: { recordRows: boolean; recordIds?: string[]; trigger: "schedule" | "manual" },
 ): Promise<ScheduleBulletinSummary> {
   // Batch lookup of other outlets carrying each corroborated item's event —
   // the digest lists them under the chosen story.
@@ -227,9 +226,7 @@ async function sendBulletin(
     {},
   );
 
-  const linkMap = await ensureShortLinks(items.map((item) => item.url));
   const text = buildBulletinMessage({
-    linkFor: linkMap.size > 0 ? linkResolver(linkMap) : undefined,
     intro,
     items: items.map((item) => ({
       id: item.id,
@@ -251,7 +248,9 @@ async function sendBulletin(
 
   const result = await sendBulletinDelivery({
     text,
-    newsIds: items.map((item) => item.id),
+    // Ledger rows only for the never-delivered subset (recap items already
+    // carry their own rows from the per-item sends).
+    newsIds: options.recordIds ?? items.map((item) => item.id),
     target: config.destination,
     trigger: options.trigger === "schedule" ? "auto" : "manual",
     recordRows: options.recordRows,
@@ -275,11 +274,25 @@ async function runBulletinPhase(
   trigger: "schedule" | "manual",
 ): Promise<{ summary: ScheduleBulletinSummary; gapSearch?: ScheduleGapSummary | null }> {
   if (config.publishMode === "both") {
+    // "both": the digest wraps up what the singles already sent. When the
+    // recap window is empty (nothing single-sent since the last digest), fall
+    // back to never-delivered qualifying items so the digest still goes out —
+    // silently skipping here is what made «بولتن» look broken in practice.
     const recaps = await selectRecapItems(config);
-    if (recaps.length === 0) {
+    if (recaps.length > 0) {
+      return { summary: await sendBulletin(config, recaps, { recordRows: false, trigger }) };
+    }
+    const fresh = await selectBulletinCandidates(config);
+    if (fresh.length === 0) {
       return { summary: { attempted: true, sent: false, itemCount: 0, reason: "nothing_new" } };
     }
-    return { summary: await sendBulletin(config, recaps, { recordRows: false, trigger }) };
+    return {
+      summary: await sendBulletin(config, fresh, {
+        recordRows: true,
+        recordIds: fresh.map((item) => item.id),
+        trigger,
+      }),
+    };
   }
 
   // "bulletin" mode — or a manual digest run from any mode.
@@ -294,6 +307,16 @@ async function runBulletinPhase(
   }
 
   if (items.length === 0) {
+    // Recap fallback: the qualifying items may already have gone out as
+    // singles (manual sends, entity bulletins, a mode switch). A digest of
+    // what was sent is always better than a silently skipped slot.
+    const recaps = await selectRecapItems(config);
+    if (recaps.length > 0) {
+      return {
+        summary: await sendBulletin(config, recaps, { recordRows: false, trigger }),
+        gapSearch,
+      };
+    }
     return {
       summary: { attempted: true, sent: false, itemCount: 0, reason: "no_qualifying_items" },
       gapSearch,
@@ -301,7 +324,11 @@ async function runBulletinPhase(
   }
 
   return {
-    summary: await sendBulletin(config, items, { recordRows: true, trigger }),
+    summary: await sendBulletin(config, items, {
+      recordRows: true,
+      recordIds: items.map((item) => item.id),
+      trigger,
+    }),
     gapSearch,
   };
 }

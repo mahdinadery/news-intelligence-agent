@@ -39,6 +39,20 @@ export type BulletinItem = {
 
 const NUMBER_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
 
+/**
+ * Markdown hyperlink helpers (title = link to the ORIGINAL source URL; no
+ * short links). Duplicated from message.ts on purpose: this module is
+ * imported by the node test runner and may not take runtime relative imports.
+ */
+function escapeMd(text: string): string {
+  return text.replace(/([\\_*\[\]`])/g, "\\$1");
+}
+
+function mdLink(text: string, url: string): string {
+  const safeUrl = url.replace(/[() ]/g, (char) => (char === " " ? "%20" : char === "(" ? "%28" : "%29"));
+  return `[${escapeMd(text)}](${safeUrl})`;
+}
+
 function compact(text: string | null | undefined, max: number): string {
   const clean = (text ?? "").replace(/\s+/g, " ").trim();
   return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
@@ -68,10 +82,8 @@ export function buildBulletinMessage(args: {
   generatedAt: Date;
   /** IANA timezone for the header date (e.g. "Asia/Tehran"). */
   timezone: string;
-  /** Maps a long URL to its display (short) form; identity when absent. */
-  linkFor?: (url: string) => string;
 }): string {
-  const { intro, items, generatedAt, timezone, linkFor } = args;
+  const { intro, items, generatedAt, timezone } = args;
 
   let dateLabel = generatedAt.toISOString().slice(0, 10);
   try {
@@ -92,7 +104,7 @@ export function buildBulletinMessage(args: {
 
   items.forEach((item, index) => {
     const marker = NUMBER_EMOJI[index] ?? `${index + 1}.`;
-    lines.push("", `${marker} ${compact(item.title, 160)}`);
+    lines.push("", `${marker} ${mdLink(compact(item.title, 160), item.url)}`);
     const oneLiner = compact(item.oneLiner, 220);
     if (oneLiner) lines.push(oneLiner);
     const why = compact(item.whyItMatters, 220);
@@ -107,7 +119,7 @@ export function buildBulletinMessage(args: {
     } else if (item.corroborated) {
       lines.push("تأییدشده توسط چند منبع ✓");
     }
-    lines.push(`🔗 ${linkFor?.(item.url) || item.url}`);
+    lines.push(`🔗 ${item.url}`);
   });
 
   return lines.join("\n");

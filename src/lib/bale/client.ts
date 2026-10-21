@@ -162,7 +162,10 @@ export async function callBaleApi<T>(
  * Flow: env credentials -> `https://tapi.bale.ai/bot<token>/sendMessage` -> parsed
  * Telegram-compatible envelope -> safe success/error result.
  */
-export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
+export async function sendBaleMessage(
+  text: string,
+  options: { parseMode?: "Markdown" | "HTML" | null } = {},
+): Promise<BaleSendResult> {
   const message = text.trim();
   if (!message) {
     return failure("empty_message", "Message text is empty.");
@@ -177,10 +180,19 @@ export async function sendBaleMessage(text: string): Promise<BaleSendResult> {
     return failure("missing_chat_id", "BALE_CHAT_ID is not configured.");
   }
 
-  const response = await callBaleApi<{ message_id?: unknown }>("sendMessage", {
-    chat_id: chatId,
-    text: message,
-  });
+  const body: Record<string, unknown> = { chat_id: chatId, text: message };
+  if (options.parseMode) body.parse_mode = options.parseMode;
+
+  let response = await callBaleApi<{ message_id?: unknown }>("sendMessage", body);
+
+  // Hyperlinks must never cost a delivery: if Bale rejects the parse_mode
+  // (unbalanced markup in an operator's free-text template), retry as plain.
+  if (!response.ok && options.parseMode && (response.kind === "api_rejected" || response.kind === "http_error")) {
+    response = await callBaleApi<{ message_id?: unknown }>("sendMessage", {
+      chat_id: chatId,
+      text: message,
+    });
+  }
 
   if (!response.ok) {
     return failure(response.kind, response.message, response.detail);

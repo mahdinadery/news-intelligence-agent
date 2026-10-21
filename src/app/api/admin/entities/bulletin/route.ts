@@ -14,7 +14,6 @@ import { news } from "@/db/schema";
 import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
 import { sendBulletinDelivery } from "@/lib/delivery";
 import { buildBulletinMessage, pickBulletinItems } from "@/lib/delivery/bulletin";
-import { ensureShortLinks, linkResolver } from "@/lib/delivery/short-link";
 import { coerceScheduleConfig } from "@/lib/agent/schedule";
 import { evaluateArticle } from "@/lib/agent/rules";
 import { collapseEventGroups } from "@/lib/news/corroboration";
@@ -68,9 +67,7 @@ export async function POST(request: Request) {
       {},
     );
 
-    const linkMap = await ensureShortLinks(items.map((item) => item.url));
     const text = buildBulletinMessage({
-      linkFor: linkMap.size > 0 ? linkResolver(linkMap) : undefined,
       intro,
       items: items.map((item) => ({
         id: item.id,
