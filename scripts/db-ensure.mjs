@@ -25,6 +25,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
+import { buildPoolOptions } from "../src/db/pool-config.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -469,7 +470,8 @@ if (isDirectRun) {
     process.exit(1);
   }
 
-  const pool = new Pool({ connectionString: databaseUrl, max: 1, connectionTimeoutMillis: 10_000 });
+  // `hostaddr=` URL support is shared with the app pool (src/db/pool-config.ts).
+  const pool = new Pool({ ...buildPoolOptions(databaseUrl), max: 1, connectionTimeoutMillis: 10_000 });
 
     try {
       const client = await pool.connect();

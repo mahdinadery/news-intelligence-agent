@@ -56,6 +56,19 @@ test("missing column (42703) is also a schema mismatch", () => {
   assert.equal(diagnosis.code, "42703");
 });
 
+test("DNS failures (ENOTFOUND) get the hostaddr workaround hint", () => {
+  const error = drizzleError(
+    'select "category" from "news" group by "category"',
+    pgError("getaddrinfo ENOTFOUND postgres.entfrvcttibstalvtvi.example", "ENOTFOUND"),
+  );
+
+  const diagnosis = withDatabaseUrl("postgresql://u:p@h:5432/db", () => diagnoseDbError(error));
+  assert.equal(diagnosis.status, 503);
+  assert.equal(diagnosis.code, "ENOTFOUND");
+  assert.match(diagnosis.hint, /hostaddr/, "hint must mention the hostaddr workaround");
+  assert.match(diagnosis.hint, /DNS/);
+});
+
 test("connection failures are diagnosed as 503 and are not schema mismatches", () => {
   const error = drizzleError("select 1", pgError("connect ECONNREFUSED 127.0.0.1:5432", "ECONNREFUSED"));
 
