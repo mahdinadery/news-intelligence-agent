@@ -15,7 +15,8 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { deliverToBale } from "./bale";
 import { deliverToLocal } from "./local";
 import { buildNewsMessage, type MessageExtras } from "./message";
-import { ensureShortLinks, linkResolver } from "./short-link";
+import { renderPublishingMessage } from "./template";
+import { getActiveAiConfig } from "@/lib/ai/config-service";
 import type {
   DeliveryDestination,
   DeliverySendResult,
@@ -223,13 +224,16 @@ export async function sendNewsDelivery(
   }
 
   const extras = await loadMessageExtras(article);
-  // Short links for the message only — best-effort; a failure keeps originals.
-  const linkMap = await ensureShortLinks([
-    article.url,
-    ...(extras.corroborationItems ?? []).map((item) => item.url),
-  ]);
-  if (linkMap.size > 0) extras.linkFor = linkResolver(linkMap);
-  const message = buildNewsMessage(article, extras);
+  // The active publishing template («قالب انتشار») shapes EVERY send — the
+  // auto path used to ignore it and always rendered the built-in layout. An
+  // empty template falls back to the built-in layout (with Phase-3 extras).
+  let message: string;
+  try {
+    const config = await getActiveAiConfig();
+    message = renderPublishingMessage(config.publishingTemplate, article, extras);
+  } catch {
+    message = buildNewsMessage(article, extras);
+  }
   const destinations = target === "both" ? DESTINATIONS : [target];
 
   // Independent per-destination attempts.

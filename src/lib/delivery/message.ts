@@ -12,6 +12,21 @@ import type { NewsRow } from "@/db/schema";
 const MAX_SUMMARY_LENGTH = 600;
 
 /**
+ * Markdown hyperlink helpers (Bale renders `parse_mode: "Markdown"`). The
+ * title is the hyperlink to the ORIGINAL source URL — no short links. Kept
+ * local because this module is imported by the node test runner and cannot
+ * pull runtime relative imports (bulletin.ts duplicates the same 8 lines).
+ */
+export function escapeMd(text: string): string {
+  return text.replace(/([\\_*\[\]`])/g, "\\$1");
+}
+
+export function mdLink(text: string, url: string): string {
+  const safeUrl = url.replace(/[() ]/g, (char) => (char === " " ? "%20" : char === "(" ? "%28" : "%29"));
+  return `[${escapeMd(text)}](${safeUrl})`;
+}
+
+/**
  * Display-layer noise filter for rows analyzed before the prompt fix (the
  * legacy prompt produced «برای مخاطب هدف اهمیت مشخصی ندارد» as filler). The
  * full rule set lives in src/lib/ai/why-guard.ts; this module cannot import
@@ -73,13 +88,10 @@ export type MessageExtras = {
   entityTags?: string[];
   /** Titles of previously delivered related stories (follow-ups). */
   relatedTitles?: string[];
-  /** Maps a long source URL to its display (short) form; identity when absent. */
-  linkFor?: (url: string) => string;
 };
 
 export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): string {
   const why = usefulWhy(article.whyItMatters);
-  const link = (url: string) => extras.linkFor?.(url) || url;
   const entities = (extras.entityTags ?? article.entityTags ?? []).slice(0, 6).join("، ");
   const related = (extras.relatedTitles ?? []).slice(0, 2);
 
@@ -91,15 +103,15 @@ export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): 
       ? [
           "",
           `منابع این خبر (${(others.length + 1).toLocaleString("fa-IR")}):`,
-          `• ${compact(article.source, 60)} (انتخاب‌شده): ${link(article.url)}`,
-          ...others.map((item) => `• ${compact(item.source, 60)}: ${link(item.url)}`),
+          `• ${compact(article.source, 60)} (انتخاب‌شده): ${article.url}`,
+          ...others.map((item) => `• ${compact(item.source, 60)}: ${item.url}`),
         ]
-      : ["", "🔗 منبع:", link(article.url)];
+      : ["", "🔗 منبع:", article.url];
 
   return [
     "📰 عنوان خبر",
     "",
-    compact(article.title, 300),
+    mdLink(compact(article.title, 300), article.url),
     "",
     "خلاصه:",
     compact(article.summary, MAX_SUMMARY_LENGTH),

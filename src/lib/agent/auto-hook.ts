@@ -1,4 +1,7 @@
+import { expandTargets, type DeliveryTarget } from "@/lib/delivery/types";
 import { runAutoDeliveryPass } from "./index";
+import { resolveAutoSendRule } from "./resolve-rule";
+import { readScheduleRecord } from "./schedule-store";
 
 /**
  * Shared, failure-proof hook so the auto-delivery pass can run after an event
@@ -35,9 +38,30 @@ function disabled(destination = "", enabled = true): AutoSendSummary {
   };
 }
 
+/**
+ * «فقط بولتن» (hold_all): while the schedule is enabled in bulletin mode, a
+ * per-item auto send to an overlapping destination must wait for the digest —
+ * otherwise this post-analysis hook leaks singles and the digest later finds
+ * nothing left to pack (the "bulletin doesn't work" symptom).
+ */
+async function holdsForBulletin(destination: DeliveryTarget): Promise<boolean> {
+  try {
+    const record = await readScheduleRecord();
+    if (!record.enabled || record.publishMode !== "bulletin") return false;
+    const held = new Set(expandTargets(record.destination));
+    return expandTargets(destination).some((target) => held.has(target));
+  } catch {
+    return false;
+  }
+}
+
 export async function maybeRunAutoSend(newsIds?: string[]): Promise<AutoSendSummary> {
   try {
-    const result = await runAutoDeliveryPass({ newsIds });
+    const rule = await resolveAutoSendRule();
+    if (rule.enabled && (await holdsForBulletin(rule.destination))) {
+      return disabled(rule.destination, false);
+    }
+    const result = await runAutoDeliveryPass({ newsIds, rule });
 
     return {
       attempted: true,

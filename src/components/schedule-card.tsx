@@ -327,11 +327,19 @@ export function ScheduleCard({
 
       setLastRun(data.summary);
       const bulletin = data.summary.bulletin;
+      const reasonLabel =
+        bulletin?.reason === "no_qualifying_items"
+          ? "خبر واجد شرایط نبود"
+          : bulletin?.reason === "nothing_new"
+            ? "خبر تازه‌ای نبود"
+            : bulletin?.reason === "delivery_failed"
+              ? "ارسال ناموفق بود"
+              : (bulletin?.reason ?? "—");
       setMessage({
         kind: bulletin?.sent ? "ok" : "err",
         text: bulletin?.sent
-          ? `بولتن با ${bulletin.itemCount} خبر ارسال شد.`
-          : `بولتن ارسال نشد (${bulletin?.reason ?? "—"}).`,
+          ? `بولتن با ${bulletin.itemCount.toLocaleString("fa-IR")} خبر ارسال شد.`
+          : `بولتن ارسال نشد (${reasonLabel}).`,
       });
     } catch {
       setMessage({ kind: "err", text: "ارتباط با سرور برقرار نشد." });

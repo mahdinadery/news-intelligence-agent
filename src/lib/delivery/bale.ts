@@ -11,7 +11,9 @@ import type { ProviderOutcome } from "./types";
  */
 
 export async function deliverToBale(text: string): Promise<ProviderOutcome> {
-  const result = await sendBaleMessage(text);
+  // Markdown parse mode renders the title hyperlinks; sendBaleMessage falls
+  // back to plain text automatically if Bale rejects the markup.
+  const result = await sendBaleMessage(text, { parseMode: "Markdown" });
 
   if (result.ok) {
     return { ok: true, providerMessageId: result.messageId, errorMessage: null };
