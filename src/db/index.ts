@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { buildPoolOptions } from "./pool-config";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -14,7 +15,9 @@ const globalForDb = globalThis as typeof globalThis & {
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
-    connectionString: databaseUrl,
+    // Supports the libpq-style `hostaddr=` workaround (connect by raw IP when
+    // the server cannot resolve the DB hostname — see src/db/pool-config.ts).
+    ...buildPoolOptions(databaseUrl),
     max: 5,
     // Fail fast instead of hanging the build/healthcheck if Postgres is slow or unreachable.
     connectionTimeoutMillis: 5_000,

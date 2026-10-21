@@ -153,14 +153,34 @@ export function diagnoseDbError(error: unknown): DbErrorDiagnosis {
     };
   }
 
+  // DNS failures get their own hint: on Iran-hosted servers the foreign DB
+  // hostname often cannot be resolved at all (getaddrinfo ENOTFOUND) while the
+  // host itself is reachable by IP — the `hostaddr=` URL parameter bypasses DNS.
+  if (
+    codes.some((entry) => entry === "ENOTFOUND" || entry === "EAI_AGAIN") ||
+    lower.includes("getaddrinfo") ||
+    lower.includes("enotfound")
+  ) {
+    return {
+      detail,
+      hint:
+        "نام میزبان پایگاه داده از این سرور قابل resolve نیست (خطای DNS — معمولاً روی سرورهای داخل ایران برای میزبان‌های خارجی). " +
+        "راه‌حل: IP میزبان دیتابیس را (از بیرون از سرور، مثلاً با nslookup) پیدا کنید و پارامتر hostaddr را به DATABASE_URL اضافه کنید — " +
+        "اتصال بدون DNS و با همان نام امن (TLS) برقرار می‌شود: " +
+        "postgres://user:pass@HOST/db?sslmode=require&hostaddr=1.2.3.4 — " +
+        "اگر IP در دسترس نبود، میزبان دیتابیس را به DNS در دسترس منتقل کنید.",
+      status: 503,
+      code,
+      schemaMismatch: false,
+    };
+  }
+
   if (
     codes.some((entry) => entry.startsWith("ECONN") || CONNECTION_CODES.has(entry)) ||
     lower.includes("econnrefused") ||
     lower.includes("connection terminated") ||
     lower.includes("timeout exceeded") ||
-    lower.includes("connect_timeout") ||
-    lower.includes("getaddrinfo") ||
-    lower.includes("enotfound")
+    lower.includes("connect_timeout")
   ) {
     return {
       detail,
