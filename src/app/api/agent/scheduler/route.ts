@@ -1,4 +1,5 @@
 import { checkAdminAccess } from "@/lib/admin/access";
+import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { getBaleConfigStatus } from "@/lib/bale/client";
 import {
   computeDueBulletinSlot,
@@ -133,13 +134,18 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     console.error("[scheduler] save failed:", String(error).slice(0, 200));
+    // Classify the failure so the operator sees the actionable cause (e.g. the
+    // DNS/hostaddr recipe) instead of a bare "save failed".
+    const diagnosis = diagnoseDbError(error);
     return Response.json(
       {
         success: false,
         message: "ذخیره زمان‌بندی ناموفق بود.",
-        detail: String(error).slice(0, 200),
+        hint: diagnosis.hint,
+        code: diagnosis.code ?? null,
+        detail: diagnosis.detail.slice(0, 300),
       },
-      { status: 500 },
+      { status: diagnosis.status },
     );
   }
 }
