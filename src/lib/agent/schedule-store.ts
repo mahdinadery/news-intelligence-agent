@@ -144,17 +144,29 @@ export async function readScheduleRecord(): Promise<AgentScheduleRecord> {
 export async function saveScheduleConfig(config: AgentScheduleConfig): Promise<AgentScheduleRecord> {
   const existing = await readScheduleRecord();
 
-  if (existing.id) {
-    const [updated] = await db
-      .update(agentSchedules)
-      .set(valuesFor(config))
-      .where(eq(agentSchedules.id, existing.id))
-      .returning();
-    return toRecord(updated);
-  }
+  const write = async (): Promise<AgentScheduleRecord> => {
+    if (existing.id) {
+      const [updated] = await db
+        .update(agentSchedules)
+        .set(valuesFor(config))
+        .where(eq(agentSchedules.id, existing.id))
+        .returning();
+      return toRecord(updated);
+    }
+    const [created] = await db.insert(agentSchedules).values(valuesFor(config)).returning();
+    return toRecord(created);
+  };
 
-  const [created] = await db.insert(agentSchedules).values(valuesFor(config)).returning();
-  return toRecord(created);
+  try {
+    return await write();
+  } catch (error) {
+    // A drifted (older) schema must self-repair here too — otherwise every
+    // save fails permanently with a generic 500 until someone runs db:ensure.
+    if (!isSchemaMismatchError(error)) throw error;
+    const repair = await ensureSchemaOnce();
+    if (!repair.ok) throw error;
+    return await write();
+  }
 }
 
 /**

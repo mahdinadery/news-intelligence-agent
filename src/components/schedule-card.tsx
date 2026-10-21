@@ -85,6 +85,8 @@ type ApiResponse = {
   baleMissing?: string[];
   description?: string[];
   message?: string;
+  /** Actionable cause (e.g. the DNS/hostaddr recipe) when a save fails. */
+  hint?: string;
   errors?: string[];
   summary?: RunSummary;
 };
@@ -252,12 +254,13 @@ export function ScheduleCard({
 
         if (!response.ok || !data.success) {
           const details = data.errors?.length ? ` — ${data.errors.join(" · ")}` : "";
+          const hint = data.hint ? `\n${data.hint}` : "";
           setMessage({
             kind: "err",
             text:
               response.status === 401
                 ? "برای ذخیرهٔ زمان‌بندی باید کلید مدیریتی را وارد کرده باشید. یک‌بار با ?key=... وارد داشبورد شوید یا از صفحه «پیکربندی AI» کلید را وارد کنید."
-                : `${data.message ?? "ذخیره زمان‌بندی ناموفق بود."}${details}`,
+                : `${data.message ?? "ذخیره زمان‌بندی ناموفق بود."}${details}${hint}`,
           });
           return;
         }
@@ -451,9 +454,17 @@ export function ScheduleCard({
         </div>
       </div>
 
+      {status && status.persisted === false ? (
+        <p className="mt-4 whitespace-pre-line rounded-xl border border-warn-line bg-warn-soft px-4 py-3 text-sm leading-6 text-warn-ink">
+          {
+            "⚠️ تنظیمات هنوز در پایگاه داده ذخیره نشده است — احتمالاً اتصال به پایگاه داده برقرار نیست. تا زمان رفع، تغییرات فقط در همین صفحه می‌ماند."
+          }
+        </p>
+      ) : null}
+
       {message ? (
         <p
-          className={`mt-4 rounded-xl border px-4 py-3 text-sm leading-6 ${
+          className={`mt-4 whitespace-pre-line rounded-xl border px-4 py-3 text-sm leading-6 ${
             message.kind === "ok"
               ? "border-ok-line bg-ok-soft text-ok-ink"
               : "border-danger-line bg-danger-soft text-danger-ink"
