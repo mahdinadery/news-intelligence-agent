@@ -363,8 +363,19 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 اهمیت: {importanceScore} از ۱۰۰
 
-منبع: {sourceName}
 {originalUrl}`;
+
+/**
+ * Footer migration for stored publishing templates: the old default footer
+ * «منبع: {sourceName}» + «{originalUrl}» becomes just «{originalUrl}» — which
+ * renders as the hyperlinked «لینک اصلی خبر». Only the exact legacy pair is
+ * rewritten; every other operator-authored line is preserved as-is.
+ */
+const LEGACY_TEMPLATE_FOOTER = /منبع:[ \t]*\{sourceName\}[ \t]*\r?\n[ \t]*\{originalUrl\}/g;
+
+export function upgradeLegacyTemplateFooter(template: string): string {
+  return template.replace(LEGACY_TEMPLATE_FOOTER, "{originalUrl}");
+}
 
 export const DEFAULT_CONFIG_NAME = "پیکربندی پیش‌فرض";
 export const DEFAULT_MODEL_PLACEHOLDER = ""; // empty => env AI_API_MODEL / AI_MODEL / built-in fallback

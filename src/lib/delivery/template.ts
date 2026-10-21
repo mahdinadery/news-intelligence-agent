@@ -12,7 +12,7 @@
 
 import type { NewsRow } from "@/db/schema";
 import { sanitizeWhyItMatters } from "../ai/why-guard";
-import { buildNewsMessage, mdLink, stripEmptyLabelBlocks, type MessageExtras } from "./message";
+import { buildNewsMessage, escapeMd, mdLink, stripEmptyLabelBlocks, type MessageExtras } from "./message";
 
 /** Only variables that exist on the current data model are supported. */
 export const PUBLISHING_TEMPLATE_VARS = [
@@ -45,7 +45,6 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 اهمیت: {importanceScore} از ۱۰۰
 
-منبع: {sourceName}
 {originalUrl}`;
 
 const MAX_FIELD_LENGTH = 900;
@@ -53,13 +52,11 @@ const MAX_FIELD_LENGTH = 900;
 function value(varName: PublishingTemplateVar, article: NewsRow): string {
   switch (varName) {
     case "title":
-      // The title is the hyperlink to the ORIGINAL news URL («لینک خبر در
-      // لینک اصلی خبر هایپرلینک» — no short links).
-      return mdLink(article.normalizedTitle ?? article.title, article.url);
+      return escapeMd(article.normalizedTitle ?? article.title);
     case "summary":
-      return article.summary ?? "—";
+      return escapeMd(article.summary ?? "—");
     case "category":
-      return article.category ?? "عمومی";
+      return escapeMd(article.category ?? "عمومی");
     case "importanceScore":
     case "relevanceScore":
     case "noveltyScore": {
@@ -72,15 +69,16 @@ function value(varName: PublishingTemplateVar, article: NewsRow): string {
       return score === null || score === undefined ? "—" : String(score);
     }
     case "mainEvent":
-      return article.mainEvent ?? "";
+      return escapeMd(article.mainEvent ?? "");
     case "whyItMatters":
       // Sanitized at parse time; re-guarded here for legacy rows so template
       // messages never show the canned filler either.
-      return sanitizeWhyItMatters(article.whyItMatters) ?? "";
+      return escapeMd(sanitizeWhyItMatters(article.whyItMatters) ?? "");
     case "sourceName":
-      return article.source;
+      return escapeMd(article.source);
     case "originalUrl":
-      return article.url;
+      // The label «لینک اصلی خبر» IS the hyperlink to the original news URL.
+      return mdLink("لینک اصلی خبر", article.url);
     case "publishedAt":
       return article.publishedAt ? article.publishedAt.toISOString().slice(0, 10) : "—";
   }

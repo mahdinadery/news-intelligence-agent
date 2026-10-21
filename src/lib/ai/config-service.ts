@@ -23,6 +23,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_TEMPERATURE,
   DEFAULT_TOPIC_FILTER,
+  upgradeLegacyTemplateFooter,
   upgradeLegacyWhyItMattersInstruction,
   type ActiveAiConfig,
   type AiAutoSendPolicy,
@@ -78,7 +79,7 @@ function toActiveConfig(row: AiConfigurationRow): ActiveAiConfig {
     features: normalized.features,
     decisionRules: row.decisionRules,
     outputSchema: normalized.outputSchema,
-    publishingTemplate: row.publishingTemplate ?? "",
+    publishingTemplate: upgradeLegacyTemplateFooter(row.publishingTemplate ?? ""),
     // Rows written before these columns existed read as null -> safe defaults.
     topicFilter: row.topicFilter ?? DEFAULT_TOPIC_FILTER,
     autoSendPolicy: row.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY,

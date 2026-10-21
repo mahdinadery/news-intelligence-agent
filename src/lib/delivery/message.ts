@@ -98,29 +98,32 @@ export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): 
   // Multi-source: ONE chosen story, every outlet listed underneath with its
   // link (the chosen copy first). Single-source keeps the classic one-liner.
   const others = (extras.corroborationItems ?? []).slice(0, 4);
+  const mainLink = mdLink("لینک اصلی خبر", article.url);
   const sourcesBlock =
     others.length > 0
       ? [
           "",
           `منابع این خبر (${(others.length + 1).toLocaleString("fa-IR")}):`,
-          `• ${compact(article.source, 60)} (انتخاب‌شده): ${article.url}`,
-          ...others.map((item) => `• ${compact(item.source, 60)}: ${item.url}`),
+          `• ${mdLink(`${compact(article.source, 60)} (انتخاب‌شده)`, article.url)}`,
+          ...others.map((item) => `• ${mdLink(compact(item.source, 60), item.url)}`),
+          "",
+          mainLink,
         ]
-      : ["", "🔗 منبع:", article.url];
+      : ["", mainLink];
 
   return [
     "📰 عنوان خبر",
     "",
-    mdLink(compact(article.title, 300), article.url),
+    escapeMd(compact(article.title, 300)),
     "",
     "خلاصه:",
-    compact(article.summary, MAX_SUMMARY_LENGTH),
-    ...(why ? ["", "چرا مهم است:", compact(why, 300)] : []),
-    ...(entities ? ["", "نهادها:", entities] : []),
-    ...related.flatMap((title) => ["", "مرتبط با:", compact(title, 140)]),
+    escapeMd(compact(article.summary, MAX_SUMMARY_LENGTH)),
+    ...(why ? ["", "چرا مهم است:", escapeMd(compact(why, 300))] : []),
+    ...(entities ? ["", "نهادها:", escapeMd(entities)] : []),
+    ...related.flatMap((title) => ["", "مرتبط با:", escapeMd(compact(title, 140))]),
     "",
     "دسته:",
-    compact(article.category, 60),
+    escapeMd(compact(article.category, 60)),
     "",
     "اهمیت:",
     formatImportance(article.importanceScore),
