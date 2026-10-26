@@ -194,6 +194,9 @@ export type AdminNewsDetail = {
     shouldSend: boolean | null;
     reason: string | null;
     errorMessage: string | null;
+    promptTokens: number | null;
+    completionTokens: number | null;
+    totalTokens: number | null;
     createdAt: string;
   }>;
   duplicateOf: { id: string; title: string } | null;
@@ -263,6 +266,9 @@ export async function getAdminNewsDetail(id: string): Promise<AdminNewsDetail | 
       shouldSend: row.shouldSend,
       reason: row.reason,
       errorMessage: row.errorMessage,
+      promptTokens: row.promptTokens ?? null,
+      completionTokens: row.completionTokens ?? null,
+      totalTokens: row.totalTokens ?? null,
       createdAt: row.createdAt.toISOString(),
     })),
   };

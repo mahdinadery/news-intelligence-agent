@@ -14,8 +14,8 @@
 import { db } from "@/db";
 import { aiAnalyses, news, type NewsRow } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
-import { resolveEffectiveModel, runAiAnalysis } from "../ai/client";
-import { gradeRelevance, isBorderlineRelevance } from "../ai/grader";
+import { mergeTokenUsage, resolveEffectiveModel, runAiAnalysis, type AiTokenUsage } from "../ai/client";
+import { gradeRelevanceWithUsage, isBorderlineRelevance } from "../ai/grader";
 import { getActiveAiConfig } from "../ai/config-service";
 
 export type AnalyzeResult =
@@ -35,6 +35,7 @@ async function recordAnalysisHistory(input: {
   model: string;
   status: "success" | "failed";
   errorMessage?: string | null;
+  usage?: AiTokenUsage | null;
   analysis?: {
     summary: string;
     category: string;
@@ -56,6 +57,9 @@ async function recordAnalysisHistory(input: {
       model: input.model,
       status: input.status,
       errorMessage: input.errorMessage ?? null,
+      promptTokens: input.usage?.promptTokens ?? null,
+      completionTokens: input.usage?.completionTokens ?? null,
+      totalTokens: input.usage?.totalTokens ?? null,
       summary: input.analysis?.summary ?? null,
       category: input.analysis?.category ?? null,
       importance: input.analysis?.importance ?? null,
@@ -167,15 +171,17 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
   // Phase 3 (#9): borderline relevance gets ONE cheap second opinion. The
   // grader can only veto ("rejected") — it never raises a score.
   let relevanceGrade: string | null = null;
+  let combinedUsage: AiTokenUsage | null = result.usage;
   if (isBorderlineRelevance(relevance)) {
     try {
-      const verdict = await gradeRelevance({
+      const gradeOutcome = await gradeRelevanceWithUsage({
         title: article.title,
         summary,
         audienceFocus: config.audienceFocus,
       });
-      if (verdict === "no") relevanceGrade = "rejected";
-      else if (verdict === "yes") relevanceGrade = "confirmed";
+      combinedUsage = mergeTokenUsage(result.usage, gradeOutcome.usage);
+      if (gradeOutcome.verdict === "no") relevanceGrade = "rejected";
+      else if (gradeOutcome.verdict === "yes") relevanceGrade = "confirmed";
     } catch {
       relevanceGrade = null;
     }
@@ -222,6 +228,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       configurationVersion: config.version,
       model: result.model ?? resolveEffectiveModel(config.model),
       status: "success",
+      usage: combinedUsage,
       analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, entities, shouldSend, reason },
     });
 

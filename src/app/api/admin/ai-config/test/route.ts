@@ -166,6 +166,7 @@ export async function POST(request: Request) {
   return Response.json({
     success: true,
     model: completion.model,
+    usage: completion.usage,
     promptUsed: { systemPrompt, userPrompt },
     rawResponse: completion.rawText,
     validation:

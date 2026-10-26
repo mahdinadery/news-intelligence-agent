@@ -1,4 +1,4 @@
-import { getNewsStats } from "@/lib/news/ingest";
+import { getAiTokenUsageStats, getNewsStats } from "@/lib/news/ingest";
 import { getNewsFeedUrl } from "@/lib/news/rss";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,18 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const stats = await getNewsStats();
+    let tokenUsage = {
+      totalTokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      todayTokens: 0,
+      analyzedCount: 0,
+    };
+    try {
+      tokenUsage = await getAiTokenUsageStats();
+    } catch {
+      // Best-effort if the token columns are not yet synced.
+    }
 
     return Response.json({
       success: true,
@@ -20,6 +32,7 @@ export async function GET() {
       lastFetchCount: stats.lastFetchCount,
       lastFetchedAt: stats.lastFetchedAt,
       sources: stats.sources,
+      tokenUsage,
       feedConfigured: getNewsFeedUrl().ok,
     });
   } catch (error) {

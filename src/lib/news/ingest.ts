@@ -12,7 +12,7 @@
  */
 
 import { db } from "@/db";
-import { news } from "@/db/schema";
+import { aiAnalyses, news } from "@/db/schema";
 import { desc, sql } from "drizzle-orm";
 import { ingestAllActiveSources } from "./source-ingest";
 
@@ -88,6 +88,37 @@ export async function getNewsStats(): Promise<NewsStats> {
     lastFetchCount,
     lastFetchedAt,
     sources: totals?.sources ?? 0,
+  };
+}
+
+export type AiTokenUsageSummary = {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  todayTokens: number;
+  analyzedCount: number;
+};
+
+/**
+ * Aggregate AI token consumption across all recorded analyses in `ai_analyses`.
+ */
+export async function getAiTokenUsageStats(): Promise<AiTokenUsageSummary> {
+  const [row] = await db
+    .select({
+      totalTokens: sql<number>`coalesce(sum(${aiAnalyses.totalTokens}), 0)::int`,
+      promptTokens: sql<number>`coalesce(sum(${aiAnalyses.promptTokens}), 0)::int`,
+      completionTokens: sql<number>`coalesce(sum(${aiAnalyses.completionTokens}), 0)::int`,
+      todayTokens: sql<number>`coalesce(sum(${aiAnalyses.totalTokens}) FILTER (WHERE ${aiAnalyses.createdAt} >= date_trunc('day', now())), 0)::int`,
+      analyzedCount: sql<number>`count(${aiAnalyses.totalTokens})::int`,
+    })
+    .from(aiAnalyses);
+
+  return {
+    totalTokens: row?.totalTokens ?? 0,
+    promptTokens: row?.promptTokens ?? 0,
+    completionTokens: row?.completionTokens ?? 0,
+    todayTokens: row?.todayTokens ?? 0,
+    analyzedCount: row?.analyzedCount ?? 0,
   };
 }
 

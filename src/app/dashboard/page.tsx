@@ -6,7 +6,7 @@ import { DashboardCard } from "@/components/dashboard-card";
 import { Sidebar } from "@/components/sidebar";
 import { StatusBadge } from "@/components/status-badge";
 import { getDeliveryStats } from "@/lib/delivery/publishing";
-import { getNewsStats } from "@/lib/news/ingest";
+import { getAiTokenUsageStats, getNewsStats, type AiTokenUsageSummary } from "@/lib/news/ingest";
 import { listRecentRuns, listSourcesForAdmin, summarizeSources } from "@/lib/news/sources-service";
 
 export const dynamic = "force-dynamic";
@@ -48,10 +48,20 @@ const clockIcon = (
   </svg>
 );
 
+const tokenIcon = (
+  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+  </svg>
+);
+
 function formatTime(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("fa-IR");
+}
+
+function formatNumber(num: number): string {
+  return num.toLocaleString("fa-IR");
 }
 
 /**
@@ -64,6 +74,7 @@ async function loadDashboardStats(): Promise<StatCard[]> {
   let totalStored = 0;
   let sentCount: number | null = null;
   let lastRunAt: string | null = null;
+  let tokenUsage: AiTokenUsageSummary | null = null;
 
   try {
     const summary = summarizeSources(await listSourcesForAdmin());
@@ -93,6 +104,12 @@ async function loadDashboardStats(): Promise<StatCard[]> {
     // keep null
   }
 
+  try {
+    tokenUsage = await getAiTokenUsageStats();
+  } catch {
+    // keep null
+  }
+
   return [
     {
       label: "منابع خبری",
@@ -114,6 +131,16 @@ async function loadDashboardStats(): Promise<StatCard[]> {
       detail: "در تمام مقاصد",
       accent: "amber",
       icon: sendIcon,
+    },
+    {
+      label: "مصرف توکن AI",
+      value: tokenUsage === null ? "—" : formatNumber(tokenUsage.totalTokens),
+      detail:
+        tokenUsage === null
+          ? "در دسترس نیست"
+          : `امروز: ${formatNumber(tokenUsage.todayTokens)} · ورودی: ${formatNumber(tokenUsage.promptTokens)} / خروجی: ${formatNumber(tokenUsage.completionTokens)}`,
+      accent: "violet",
+      icon: tokenIcon,
     },
     {
       label: "آخرین اجرای Agent",
@@ -173,7 +200,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <span className="hidden text-xs text-faint sm:block">به‌روزرسانی لحظه‌ای فعال نیست</span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 {dashboardStats.map((stat) => (
                   <DashboardCard
                     accent={stat.accent}
