@@ -207,3 +207,33 @@ test("baseline list is conservative and non-empty", () => {
     assert.equal(BASELINE_BLOCKED_KEYWORDS.includes(forbidden), false);
   }
 });
+
+test("government budget allocation and Kalabarg news are blocked and not confused with credit scoring", () => {
+  const kalabarg = evaluateTopicFilter(
+    { title: "تخصیص اعتبار کالابرگ الکترونیکی برای دهک‌های درآمدی" },
+    null,
+  );
+  assert.equal(kalabarg.verdict, "skip");
+  assert.equal(kalabarg.reason, "matched_blocked_keyword");
+
+  const roadBridge = evaluateTopicFilter(
+    { title: "تخصیص اعتبار ساخت جاده و پل در استان‌های مرزی" },
+    filter({ topics: [topic({ label: "اعتبارسنجی", keywords: ["اعتبارسنجی", "بانک مرکزی"] })] }),
+  );
+  assert.equal(roadBridge.verdict, "skip");
+  assert.equal(roadBridge.reason, "matched_blocked_keyword");
+
+  const civilBudget = evaluateTopicFilter(
+    { title: "افزایش اعتبارات عمرانی و اعتبارات استانی در لایحه جدید" },
+    null,
+  );
+  assert.equal(civilBudget.verdict, "skip");
+  assert.equal(civilBudget.reason, "matched_blocked_keyword");
+
+  // Real credit rating news still passes!
+  const realCreditRating = evaluateTopicFilter(
+    { title: "صدور گواهی رتبه‌بندی اعتباری ناشران توسط شرکت اعتبارسنجی" },
+    filter({ topics: [topic({ label: "اعتبارسنجی", keywords: ["اعتبارسنجی", "رتبه‌بندی اعتباری"] })] }),
+  );
+  assert.equal(realCreditRating.verdict, "pass");
+});
