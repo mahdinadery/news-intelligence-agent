@@ -15,15 +15,29 @@
 import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { buildAIAnalysisPrompt, type ArticleInput } from "./prompt-builder";
 import { parseAiOutput, type ParsedAiOutput } from "./output-parser";
-import { callAiChatCompletion, resolveEffectiveModel, type CompletionErrorKind } from "./completion";
+import {
+  callAiChatCompletion,
+  mergeTokenUsage,
+  resolveEffectiveModel,
+  type AiTokenUsage,
+  type CompletionErrorKind,
+} from "./completion";
 import type { ActiveAiConfig } from "./config-types";
 
 export type AiAnalysisOutput = ParsedAiOutput;
+export type { AiTokenUsage };
+export { mergeTokenUsage };
 
 export type AiErrorKind = CompletionErrorKind | "invalid_json";
 
 export type AiAnalysisResult =
-  | { ok: true; analysis: AiAnalysisOutput; promptUsed: { systemPrompt: string; userPrompt: string }; model: string }
+  | {
+      ok: true;
+      analysis: AiAnalysisOutput;
+      promptUsed: { systemPrompt: string; userPrompt: string };
+      model: string;
+      usage: AiTokenUsage | null;
+    }
   | { ok: false; kind: AiErrorKind; message: string; detail?: string | null };
 
 /** Check if the AI provider has been configured. */
@@ -75,7 +89,13 @@ export async function runAiAnalysis(
 
   try {
     const analysis = parseAiOutput(completion.rawText, config.outputSchema);
-    return { ok: true, analysis, promptUsed: { systemPrompt, userPrompt }, model: completion.model };
+    return {
+      ok: true,
+      analysis,
+      promptUsed: { systemPrompt, userPrompt },
+      model: completion.model,
+      usage: completion.usage,
+    };
   } catch (parseError) {
     return {
       ok: false,

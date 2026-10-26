@@ -171,6 +171,13 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
                   {latest.reason ? <p className="text-xs text-muted">دلیل: {latest.reason}</p> : null}
                   <p className="text-[11px] text-faint">
                     پیکربندی نسخه {latest.configurationVersion ?? "—"} · مدل {latest.model ?? "—"} · {formatFull(latest.createdAt)}
+                    {latest.totalTokens !== null ? (
+                      <>
+                        {" "}· توکن مصرفی: {latest.totalTokens.toLocaleString("fa-IR")} (ورودی:{" "}
+                        {(latest.promptTokens ?? 0).toLocaleString("fa-IR")} / خروجی:{" "}
+                        {(latest.completionTokens ?? 0).toLocaleString("fa-IR")})
+                      </>
+                    ) : null}
                   </p>
                 </div>
               ) : (
@@ -192,6 +199,11 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
                           </StatusBadge>
                           <span className="text-faint">{formatFull(analysis.createdAt)}</span>
                           <span className="text-faint">config v{analysis.configurationVersion ?? "?"} · {analysis.model ?? "—"}</span>
+                          {analysis.totalTokens !== null ? (
+                            <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-muted">
+                              توکن: {analysis.totalTokens.toLocaleString("fa-IR")} ({(analysis.promptTokens ?? 0).toLocaleString("fa-IR")} + {(analysis.completionTokens ?? 0).toLocaleString("fa-IR")})
+                            </span>
+                          ) : null}
                         </div>
                         {analysis.status === "success" ? (
                           <p className="mt-1.5 text-muted">

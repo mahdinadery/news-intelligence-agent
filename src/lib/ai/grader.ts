@@ -7,7 +7,7 @@
  * gray-area importance can never smuggle an off-topic item into the channel.
  */
 
-import { callAiChatCompletion } from "./completion";
+import { callAiChatCompletion, type AiTokenUsage } from "./completion";
 import { isBorderlineRelevance, parseGradeVerdict, type GradeVerdict } from "./grade-rules";
 
 const GRADER_SYSTEM_PROMPT =
@@ -15,17 +15,21 @@ const GRADER_SYSTEM_PROMPT =
 
 export { isBorderlineRelevance };
 
+export type GradeRelevanceOutcome = {
+  verdict: GradeVerdict | null;
+  usage: AiTokenUsage | null;
+};
+
 /**
- * Asks the yes/no relevance question. Returns null when the AI is not
- * configured, fails, or answers unparseably — null means "keep the original
- * scores" (the grader can only veto, never silently invent a grade).
+ * Asks the yes/no relevance question and returns both the parsed verdict and
+ * token usage for the call.
  */
-export async function gradeRelevance(input: {
+export async function gradeRelevanceWithUsage(input: {
   title: string;
   summary: string | null;
   audienceFocus?: string | null;
-}): Promise<GradeVerdict | null> {
-  if (!process.env.AI_API_KEY?.trim()) return null;
+}): Promise<GradeRelevanceOutcome> {
+  if (!process.env.AI_API_KEY?.trim()) return { verdict: null, usage: null };
 
   const focus =
     input.audienceFocus?.trim() ||
@@ -50,9 +54,26 @@ export async function gradeRelevance(input: {
       maxTokens: 16,
     });
 
-    if (!completion.ok) return null;
-    return parseGradeVerdict(completion.rawText);
+    if (!completion.ok) return { verdict: null, usage: null };
+    return {
+      verdict: parseGradeVerdict(completion.rawText),
+      usage: completion.usage,
+    };
   } catch {
-    return null;
+    return { verdict: null, usage: null };
   }
+}
+
+/**
+ * Asks the yes/no relevance question. Returns null when the AI is not
+ * configured, fails, or answers unparseably — null means "keep the original
+ * scores" (the grader can only veto, never silently invent a grade).
+ */
+export async function gradeRelevance(input: {
+  title: string;
+  summary: string | null;
+  audienceFocus?: string | null;
+}): Promise<GradeVerdict | null> {
+  const outcome = await gradeRelevanceWithUsage(input);
+  return outcome.verdict;
 }

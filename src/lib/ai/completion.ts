@@ -21,14 +21,60 @@ export type CompletionErrorKind =
   | "http_error"
   | "api_error";
 
+export type AiTokenUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+};
+
 export type CompletionResult =
-  | { ok: true; rawText: string; model: string }
+  | { ok: true; rawText: string; model: string; usage: AiTokenUsage | null }
   | {
       ok: false;
       kind: CompletionErrorKind;
       message: string;
       detail?: string | null;
     };
+
+/**
+ * Extracts normalized token counts from an OpenAI-compatible `usage` object.
+ * Returns null when the provider omitted usage metrics.
+ */
+export function extractTokenUsage(usagePayload: unknown): AiTokenUsage | null {
+  if (!usagePayload || typeof usagePayload !== "object") return null;
+  const raw = usagePayload as Record<string, unknown>;
+
+  const promptRaw = Number(raw.prompt_tokens ?? raw.promptTokens);
+  const completionRaw = Number(raw.completion_tokens ?? raw.completionTokens);
+  const totalRaw = Number(raw.total_tokens ?? raw.totalTokens);
+
+  const hasPrompt = Number.isFinite(promptRaw) && promptRaw >= 0;
+  const hasCompletion = Number.isFinite(completionRaw) && completionRaw >= 0;
+  const hasTotal = Number.isFinite(totalRaw) && totalRaw >= 0;
+
+  if (!hasPrompt && !hasCompletion && !hasTotal) return null;
+
+  const promptTokens = hasPrompt ? Math.round(promptRaw) : 0;
+  const completionTokens = hasCompletion ? Math.round(completionRaw) : 0;
+  const totalTokens = hasTotal ? Math.round(totalRaw) : promptTokens + completionTokens;
+
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+/** Sums two token-usage snapshots (e.g. primary analysis + borderline grader). */
+export function mergeTokenUsage(
+  first: AiTokenUsage | null | undefined,
+  second: AiTokenUsage | null | undefined,
+): AiTokenUsage | null {
+  if (!first && !second) return null;
+  if (!first) return second ?? null;
+  if (!second) return first;
+  return {
+    promptTokens: first.promptTokens + second.promptTokens,
+    completionTokens: first.completionTokens + second.completionTokens,
+    totalTokens: first.totalTokens + second.totalTokens,
+  };
+}
 
 function sanitizeSecrets(text: string): string {
   const key = process.env.AI_API_KEY?.trim();
@@ -173,6 +219,7 @@ export async function callAiChatCompletion(params: {
         ok: true,
         rawText: rawContent,
         model,
+        usage: extractTokenUsage(payload?.usage),
       };
     } catch (error) {
       clearTimeout(timer);

@@ -12,6 +12,11 @@ type TestResponse = {
   message?: string;
   detail?: string | null;
   model?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } | null;
   promptUsed?: { systemPrompt: string; userPrompt: string };
   rawResponse?: string;
   validation?: {
@@ -190,6 +195,13 @@ export function AiConfigTestPanel({ draftConfig, adminKey }: Props) {
             <>
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
                 <span>مدل استفاده‌شده: {result.model}</span>
+                {result.usage ? (
+                  <span className="rounded-full bg-surface-3 px-2.5 py-1 font-medium text-ink-soft">
+                    مصرف توکن: {result.usage.totalTokens.toLocaleString("fa-IR")} (ورودی:{" "}
+                    {result.usage.promptTokens.toLocaleString("fa-IR")} · خروجی:{" "}
+                    {result.usage.completionTokens.toLocaleString("fa-IR")})
+                  </span>
+                ) : null}
                 <button
                   className="rounded-md border border-line px-2 py-1 hover:bg-surface-2"
                   onClick={() => setShowPrompt(!showPrompt)}
