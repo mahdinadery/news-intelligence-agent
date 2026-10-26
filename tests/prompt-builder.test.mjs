@@ -109,6 +109,9 @@ test("default audience focus anchors relevance to the credit-rating audience", (
   assert.ok(systemPrompt.includes("تعریف مخاطب و ملاک امتیاز مرتبط بودن"));
   assert.ok(systemPrompt.includes(DEFAULT_AUDIENCE_FOCUS));
   assert.ok(systemPrompt.includes("شرکت اعتبارسنجی"));
+  // Disambiguation: government budget allocation / Kalabarg / road & bridge is NOT credit rating.
+  assert.ok(systemPrompt.includes("تخصیص اعتبار کالابرگ"));
+  assert.ok(systemPrompt.includes("تخصیص اعتبار ساخت جاده و پل"));
   // Hard rules: importance never compensates for low relevance.
   assert.ok(systemPrompt.includes("relevance زیر ۳۰"));
   assert.ok(systemPrompt.includes("باید relevance پایین و shouldSend=false بگیرد") || systemPrompt.includes("shouldSend=false بگیرد"));

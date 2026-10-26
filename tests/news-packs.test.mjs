@@ -149,6 +149,9 @@ test("appendAudienceNote adds the company context exactly once", () => {
 test("pack ships a deny-list of off-topic keywords", () => {
   assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("ورزش"));
   assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("حوادث"));
+  assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("تخصیص اعتبار"));
+  assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("کالابرگ"));
+  assert.ok((CREDIT_RATING_PACK.blockedKeywords ?? []).includes("اعتبارات عمرانی"));
 });
 
 test("mergeBlockedKeywords appends only new keywords", () => {
