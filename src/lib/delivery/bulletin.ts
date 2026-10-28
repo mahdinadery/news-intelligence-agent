@@ -20,7 +20,21 @@
 /** Upper bound of items packed into one digest (roadmap: 3–5). */
 export const MAX_BULLETIN_ITEMS = 5;
 
+export const BULLETIN_TEMPLATE_VARS = ["title", "date", "intro", "items", "count"] as const;
+export const BULLETIN_ITEM_TEMPLATE_VARS = ["number", "title", "summary", "whyItMatters", "whyBlock", "entities", "entitiesBlock", "sources", "originalUrl", "importanceScore"] as const;
+export const DEFAULT_BULLETIN_TEMPLATE = "🗞️ {title} — {date}\n\n{intro}\n\n{items}";
+export const DEFAULT_BULLETIN_ITEM_TEMPLATE = "{number} {title}\n{summary}\n{whyBlock}\n{entitiesBlock}\n{sources}\n{originalUrl}";
+
+export function unknownBulletinVariables(template: string, allowed: readonly string[]): string[] {
+  return [...new Set([...template.matchAll(/\{([a-zA-Z]+)\}/g)].map(match => match[1]).filter(key => !allowed.includes(key)))];
+}
+function renderTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{([a-zA-Z]+)\}/g, (match, key: string) => values[key] ?? match).replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export type BulletinSettings = {
+  template: string;
+  itemTemplate: string;
   title: string;
   maxItems: number;
   showSummary: boolean;
@@ -33,6 +47,7 @@ export type BulletinSettings = {
 };
 
 export const DEFAULT_BULLETIN_SETTINGS: BulletinSettings = {
+  template: "", itemTemplate: "",
   title: "بولتن خبری", maxItems: 5, showSummary: true, showWhy: true,
   showEntities: true, showSources: true, aiIntro: true,
   introPrompt: "تو سردبیر یک بولتن خبری تخصصی اعتبارسنجی و رتبه‌بندی اعتباری هستی. یک جمع‌بندی فارسی ۲ تا ۴ جمله‌ای از خبرهای داده‌شده و اثر مستندشان بر ریسک اعتباری بنویس. ارتباط حدسی نساز. فقط متن جمع‌بندی، بدون عنوان یا فهرست یا Markdown.",
@@ -47,6 +62,15 @@ export function validateBulletinSettings(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return ["تنظیمات بولتن نامعتبر است."];
   const settings = value as Partial<BulletinSettings>;
   const errors: string[] = [];
+  for (const [key, allowed] of [["template", BULLETIN_TEMPLATE_VARS], ["itemTemplate", BULLETIN_ITEM_TEMPLATE_VARS]] as const) {
+    const template = settings[key];
+    if (template === undefined) continue;
+    if (typeof template !== "string" || template.length > 8000) { errors.push(`قالب بولتن ${key} باید متن با حداکثر ۸۰۰۰ نویسه باشد.`); continue; }
+    const unknown = unknownBulletinVariables(template, allowed);
+    if (unknown.length) errors.push(`متغیر ناشناخته در قالب بولتن ${key}: ${unknown.join("، ")}`);
+    if (key === "template" && template.trim() && !template.includes("{items}")) errors.push("قالب کل بولتن باید متغیر {items} را داشته باشد.");
+  }
+
   if (settings.title !== undefined && (typeof settings.title !== "string" || !settings.title.trim() || settings.title.length > 100)) errors.push("عنوان بولتن باید یک تا ۱۰۰ نویسه باشد.");
   if (settings.maxItems !== undefined && (!Number.isInteger(settings.maxItems) || settings.maxItems < 1 || settings.maxItems > 5)) errors.push("تعداد خبر بولتن باید یک تا پنج باشد.");
   if (settings.introMaxTokens !== undefined && (!Number.isInteger(settings.introMaxTokens) || settings.introMaxTokens < 50 || settings.introMaxTokens > 500)) errors.push("سقف توکن مقدمه باید ۵۰ تا ۵۰۰ باشد.");
@@ -142,7 +166,9 @@ export function buildBulletinMessage(args: {
     lines.push("", escapeMd(introText));
   }
 
+  const renderedItems: string[] = [];
   items.forEach((item, index) => {
+    const start = lines.length;
     const marker = NUMBER_EMOJI[index] ?? `${index + 1}.`;
     lines.push("", `${marker} ${escapeMd(compact(item.title, 160))}`);
     const oneLiner = compact(item.oneLiner, 220);
@@ -161,7 +187,28 @@ export function buildBulletinMessage(args: {
     }
     // Per-item link: the label «لینک اصلی خبر» IS the hyperlink (user spec).
     lines.push(mdLink("لینک اصلی خبر", item.url));
+    const defaultItem = lines.slice(start).join("\n").trim();
+    let customItem = settings.itemTemplate.trim() ? renderTemplate(settings.itemTemplate, {
+      number: marker, title: escapeMd(compact(item.title, 160)),
+      summary: settings.showSummary ? escapeMd(oneLiner) : "",
+      whyItMatters: settings.showWhy ? escapeMd(why) : "",
+      whyBlock: settings.showWhy && why ? `چرا مهم است: ${escapeMd(why)}` : "",
+      entities: settings.showEntities ? escapeMd(entities) : "",
+      entitiesBlock: settings.showEntities && entities ? `نهادها: ${escapeMd(entities)}` : "",
+      sources: settings.showSources ? (otherSources.length ? `تأییدشده توسط ${Math.max(2, otherSources.length + 1).toLocaleString("fa-IR")} منبع: ${otherSources.join("، ")}` : item.corroborated ? "تأییدشده توسط چند منبع ✓" : "") : "",
+      originalUrl: mdLink("لینک اصلی خبر", item.url),
+      importanceScore: item.importanceScore == null ? "—" : String(item.importanceScore),
+    }) : defaultItem;
+    // Keep the source link even when a custom item layout omits its placeholder.
+    if (settings.itemTemplate.trim() && !settings.itemTemplate.includes("{originalUrl}")) customItem += `\n${mdLink("لینک اصلی خبر", item.url)}`;
+    renderedItems.push(customItem);
+
   });
 
-  return lines.join("\n");
+  if (!settings.template.trim() && !settings.itemTemplate.trim()) return lines.join("\n");
+  return renderTemplate(settings.template.trim() || DEFAULT_BULLETIN_TEMPLATE, {
+    title: escapeMd(settings.title), date: dateLabel,
+    intro: settings.aiIntro ? escapeMd(introText) : "",
+    items: renderedItems.join("\n\n"), count: String(items.length),
+  });
 }
