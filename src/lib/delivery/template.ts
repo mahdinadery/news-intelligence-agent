@@ -18,6 +18,7 @@ import { buildNewsMessage, escapeMd, mdLink, stripEmptyLabelBlocks, type Message
 export const PUBLISHING_TEMPLATE_VARS = [
   "title",
   "summary",
+  "hashtags",
   "category",
   "importanceScore",
   "relevanceScore",
@@ -45,7 +46,9 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 اهمیت: {importanceScore} از ۱۰۰
 
-{originalUrl}`;
+{originalUrl}
+
+{hashtags}`;
 
 const MAX_FIELD_LENGTH = 900;
 
@@ -53,6 +56,8 @@ function value(varName: PublishingTemplateVar, article: NewsRow): string {
   switch (varName) {
     case "title":
       return escapeMd(article.normalizedTitle ?? article.title);
+    case "hashtags":
+      return escapeMd(article.hashtags ?? "");
     case "summary":
       return escapeMd(article.summary ?? "—");
     case "category":

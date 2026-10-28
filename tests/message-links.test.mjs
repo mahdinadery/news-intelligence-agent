@@ -90,3 +90,10 @@ test("legacy template footer «منبع: {sourceName} + {originalUrl}» migrates
 test("no short links anywhere", () => {
   assert.ok(!buildNewsMessage(row()).includes("/s/"));
 });
+
+test('hashtag underscores stay readable while ordinary Markdown is escaped', async () => {
+  const { escapeMd } = await import('../src/lib/delivery/message.ts');
+  assert.equal(escapeMd('#بازار_سهام #نقدینگی'), '#بازار_سهام #نقدینگی');
+  assert.equal(escapeMd('#بازار\\_سهام'), '#بازار_سهام');
+  assert.equal(escapeMd('ordinary_name *text*'), 'ordinary\\_name \\*text\\*');
+});

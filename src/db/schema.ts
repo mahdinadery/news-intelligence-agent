@@ -132,6 +132,7 @@ export const news = pgTable(
     relevanceGrade: text("relevance_grade"),
     // Phase 3: entity extraction (#7) — Persian names of banks/companies/
     // institutions mentioned in the story (from the AI output).
+    hashtags: text("hashtags"),
     entityTags: jsonb("entity_tags").$type<string[]>(),
     // Snapshot of which AI config version produced the current analysis.
     aiConfigVersion: integer("ai_config_version"),
@@ -175,6 +176,7 @@ export const aiAnalyses = pgTable(
     novelty: integer("novelty"),
     mainEvent: text("main_event"),
     whyItMatters: text("why_it_matters"),
+    hashtags: text("hashtags"),
     entities: jsonb("entities").$type<string[]>(),
     shouldSend: boolean("should_send"),
     reason: text("reason"),

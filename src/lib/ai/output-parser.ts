@@ -12,6 +12,7 @@ import type { AiOutputSchema } from "./config-types";
 import { sanitizeWhyItMatters } from "./why-guard";
 
 export type ParsedAiOutput = {
+  hashtags: string | null;
   summary: string;
   category: string;
   importance: number;
@@ -25,6 +26,14 @@ export type ParsedAiOutput = {
   shouldSend: boolean;
   reason: string;
 };
+
+/** Canonical, bounded hashtags; remove legacy Markdown escaping and discard prose. */
+export function normalizeHashtags(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const tags = value.replace(/\\_/g, "_").match(/#[\p{L}\p{N}_\u200c]+/gu) ?? [];
+  const clean = [...new Set(tags.filter(tag => tag.length > 1 && tag.length <= 80 && /[\p{L}\p{N}]/u.test(tag)))].slice(0, 6);
+  return clean.length ? clean.join(" ") : null;
+}
 
 /** Normalizes an AI "entities" field (string[] or comma-separated string). */
 export function coerceEntities(value: unknown): string[] | null {
@@ -156,6 +165,7 @@ export function validateAiOutputAgainstSchema(
     ok: true,
     issues,
     value: {
+      hashtags: normalizeHashtags(parsed.hashtags),
       summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "",
       category: typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : "سایر",
       importance: clampScore(parsed.importance),

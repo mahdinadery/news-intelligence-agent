@@ -267,6 +267,8 @@ const STEPS = [
   { name: "column news.similarity_key", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "similarity_key" text` },
   { name: "column news.corroboration_count", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "corroboration_count" integer DEFAULT 0 NOT NULL` },
   { name: "column news.relevance_grade", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "relevance_grade" text` },
+  { name: "column news.hashtags", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "hashtags" text` },
+  { name: "column ai_analyses.hashtags", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "hashtags" text` },
   { name: "column news.entity_tags", sql: `ALTER TABLE "news" ADD COLUMN IF NOT EXISTS "entity_tags" jsonb` },
   { name: "column ai_analyses.entities", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "entities" jsonb` },
   { name: "column ai_analyses.why_it_matters", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "why_it_matters" text` },

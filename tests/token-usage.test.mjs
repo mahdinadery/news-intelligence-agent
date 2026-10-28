@@ -58,3 +58,9 @@ test("db-ensure: includes ai_analyses token columns", () => {
   assert.ok(stepNames.includes("column ai_analyses.completion_tokens"));
   assert.ok(stepNames.includes("column ai_analyses.total_tokens"));
 });
+
+test('db ensure adds independent hashtag columns without replacing existing data', () => {
+  for (const name of ['column news.hashtags', 'column ai_analyses.hashtags']) {
+    assert.ok(STEPS.some(step => step.name === name && step.sql.includes('IF NOT EXISTS')));
+  }
+});

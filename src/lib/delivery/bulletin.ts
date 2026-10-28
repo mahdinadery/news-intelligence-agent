@@ -21,9 +21,9 @@
 export const MAX_BULLETIN_ITEMS = 5;
 
 export const BULLETIN_TEMPLATE_VARS = ["title", "date", "intro", "items", "count"] as const;
-export const BULLETIN_ITEM_TEMPLATE_VARS = ["number", "title", "summary", "whyItMatters", "whyBlock", "entities", "entitiesBlock", "sources", "originalUrl", "importanceScore"] as const;
+export const BULLETIN_ITEM_TEMPLATE_VARS = ["number", "title", "summary", "whyItMatters", "whyBlock", "entities", "entitiesBlock", "sources", "originalUrl", "importanceScore", "hashtags"] as const;
 export const DEFAULT_BULLETIN_TEMPLATE = "🗞️ {title} — {date}\n\n{intro}\n\n{items}";
-export const DEFAULT_BULLETIN_ITEM_TEMPLATE = "{number} {title}\n{summary}\n{whyBlock}\n{entitiesBlock}\n{sources}\n{originalUrl}";
+export const DEFAULT_BULLETIN_ITEM_TEMPLATE = "{number} {title}\n{summary}\n{whyBlock}\n{entitiesBlock}\n{sources}\n{originalUrl}\n{hashtags}";
 
 export function unknownBulletinVariables(template: string, allowed: readonly string[]): string[] {
   return [...new Set([...template.matchAll(/\{([a-zA-Z]+)\}/g)].map(match => match[1]).filter(key => !allowed.includes(key)))];
@@ -82,6 +82,7 @@ export function validateBulletinSettings(value: unknown): string[] {
 }
 
 export type BulletinItem = {
+  hashtags?: string | null;
   id: string;
   title: string;
   /** Compact one-liner (usually the stored summary). */
@@ -106,7 +107,9 @@ const NUMBER_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
  * imported by the node test runner and may not take runtime relative imports.
  */
 function escapeMd(text: string): string {
-  return text.replace(/([\\_*\[\]`])/g, "\\$1");
+  return text.split(/(#[\p{L}\p{N}_\\\u200c]+)/gu).map((part, index) =>
+    index % 2 ? part.replace(/\\_/g, "_").replace(/\\/g, "") : part.replace(/([\\_*\[\]`])/g, "\\$1")
+  ).join("");
 }
 
 function mdLink(text: string, url: string): string {
@@ -187,6 +190,7 @@ export function buildBulletinMessage(args: {
     }
     // Per-item link: the label «لینک اصلی خبر» IS the hyperlink (user spec).
     lines.push(mdLink("لینک اصلی خبر", item.url));
+    if (item.hashtags) lines.push(escapeMd(item.hashtags));
     const defaultItem = lines.slice(start).join("\n").trim();
     let customItem = settings.itemTemplate.trim() ? renderTemplate(settings.itemTemplate, {
       number: marker, title: escapeMd(compact(item.title, 160)),
@@ -197,6 +201,7 @@ export function buildBulletinMessage(args: {
       entitiesBlock: settings.showEntities && entities ? `نهادها: ${escapeMd(entities)}` : "",
       sources: settings.showSources ? (otherSources.length ? `تأییدشده توسط ${Math.max(2, otherSources.length + 1).toLocaleString("fa-IR")} منبع: ${otherSources.join("، ")}` : item.corroborated ? "تأییدشده توسط چند منبع ✓" : "") : "",
       originalUrl: mdLink("لینک اصلی خبر", item.url),
+      hashtags: escapeMd(item.hashtags ?? ""),
       importanceScore: item.importanceScore == null ? "—" : String(item.importanceScore),
     }) : defaultItem;
     // Keep the source link even when a custom item layout omits its placeholder.
