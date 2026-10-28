@@ -237,3 +237,11 @@ test("government budget allocation and Kalabarg news are blocked and not confuse
   );
   assert.equal(realCreditRating.verdict, "pass");
 });
+
+test('operator baseline override replaces defaults even when topic filter is off', () => {
+  const filter = { enabled: false, mode: 'include', topics: [], baselineBlockedKeywords: ['نمونه ممنوع'] };
+  assert.equal(evaluateTopicFilter({title:'خبر فوتبال'}, filter).verdict, 'pass');
+  assert.equal(evaluateTopicFilter({title:'نمونه ممنوع'}, filter).verdict, 'skip');
+  assert.equal(evaluateTopicFilter({title:'خبر فوتبال'}, {...filter, baselineBlockedKeywords: []}).verdict, 'pass');
+  assert.equal(evaluateTopicFilter({title:'خبر فوتبال'}, null).verdict, 'skip');
+});

@@ -36,3 +36,9 @@ test("parseGradeVerdict: unparseable replies yield null (keep original scores)",
   assert.equal(parseGradeVerdict("شاید مرتبط باشد"), null);
   assert.equal(parseGradeVerdict("مرتبط"), null);
 });
+
+test('dashboard grader toggle and range control when the second opinion runs', () => {
+  assert.equal(isBorderlineRelevance(60, {graderEnabled:false}), false);
+  assert.equal(isBorderlineRelevance(80, {graderMin:75, graderMax:85}), true);
+  assert.equal(isBorderlineRelevance(60, {graderMin:75, graderMax:85}), false);
+});

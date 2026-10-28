@@ -18,7 +18,9 @@ type TestResponse = {
     totalTokens: number;
   } | null;
   promptUsed?: { systemPrompt: string; userPrompt: string };
+  operationalPreview?: { topicGate: { verdict: string; reason: string; blockedKeywords?: string[]; matchedTopics: string[] }; graderWouldRun: boolean; shadowEvaluation: import("@/lib/ai/shadow-evaluation").ShadowEvaluation | null };
   rawResponse?: string;
+  publishingPreview?: string | null;
   validation?: {
     valid: boolean;
     issues: ValidationIssue[];
@@ -235,6 +237,23 @@ export function AiConfigTestPanel({ draftConfig, adminKey }: Props) {
                 </pre>
               </div>
 
+              {result.operationalPreview ? (
+                <div className="rounded-xl border border-line p-3 text-sm" dir="rtl">
+                  <h4 className="font-bold">پیش‌نمایش قواعد اجرایی</h4>
+                  <p>فیلتر اولیه: {result.operationalPreview.topicGate.verdict === "pass" ? "عبور" : "حذف پیش از AI"} — {result.operationalPreview.topicGate.reason}</p>
+                  <p>تطبیق: {[...(result.operationalPreview.topicGate.blockedKeywords ?? []), ...result.operationalPreview.topicGate.matchedTopics].join("، ") || "ندارد"}</p>
+                  <p>داور دوم: {result.operationalPreview.graderWouldRun ? "در تحلیل واقعی اجرا می‌شود" : "اجرا نمی‌شود"}</p>
+                  <p className="text-xs text-muted">تست عمداً حتی برای خبر فیلترشده، AI را اجرا می‌کند و توکن مصرف می‌کند. این پیش‌نمایش از عنوان و توضیح استفاده می‌کند؛ فیلتر دریافت خبر متن کامل موجود را هم می‌بیند.</p>
+                  {result.operationalPreview.shadowEvaluation ? <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(result.operationalPreview.shadowEvaluation, null, 2)}</pre> : <p>ارزیابی آزمایشی خاموش است.</p>}
+                </div>
+              ) : null}
+              {result.publishingPreview ? (
+                <div className="rounded-xl border border-line p-3">
+                  <h4 className="font-bold">پیش‌نمایش قالب انتشار با خروجی همین تست</h4>
+                  <p className="text-xs text-muted">فقط پیش‌نمایش؛ ذخیره یا ارسال نمی‌شود. لینک خبر در این پیش‌نمایش نمونه است.</p>
+                  <pre className="mt-2 whitespace-pre-wrap text-sm" dir="rtl">{result.publishingPreview}</pre>
+                </div>
+              ) : null}
               {result.validation?.valid ? (
                 <div className="rounded-xl border border-ok-line bg-ok-soft p-3">
                   <p className="text-sm font-bold text-ok-ink">✓ خروجی با ساختار تعریف‌شده مطابقت دارد</p>

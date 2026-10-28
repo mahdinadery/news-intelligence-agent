@@ -133,9 +133,11 @@ function buildOutputContract(config: PromptableConfig): { template: string; enab
     if (!feature?.enabled || !schemaField.enabled) continue;
 
     enabledFields.push(schemaField.name);
-    const typeHint = describeType(schemaField.type, schemaField.min, schemaField.max);
+    const typeHint = describeType(schemaField.type,
+      Math.max(schemaField.min ?? 0, feature.scaleMin ?? 0),
+      Math.min(schemaField.max ?? 100, feature.scaleMax ?? 100));
     const requiredHint = schemaField.required ? "الزامی" : "اختیاری";
-    lines.push(`  "${schemaField.name}": ${typeHint} — ${requiredHint} — ${feature.instruction}`);
+    lines.push(`  "${schemaField.name}": ${typeHint} — ${requiredHint} — ${schemaField.description} — ${feature.instruction}`);
   }
 
   return { template: lines.join("\n"), enabledFields };

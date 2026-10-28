@@ -59,26 +59,9 @@ function extractJsonText(rawText: string): string {
  * (src/lib/news/analyze.ts catches this and maps it to `kind: "invalid_json"`).
  */
 export function parseAiOutput(rawText: string, outputSchema: AiOutputSchema): ParsedAiOutput {
-  const parsed = JSON.parse(extractJsonText(rawText));
-  const isEnabled = (name: string) => outputSchema.some((field) => field.name === name && field.enabled);
-
-  const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
-  if (isEnabled("summary") && !summary) {
-    throw new Error("Missing required field 'summary' in AI output.");
-  }
-
-  return {
-    summary,
-    category: typeof parsed.category === "string" && parsed.category.trim() ? parsed.category.trim() : "سایر",
-    importance: clampScore(parsed.importance),
-    relevance: clampScore(parsed.relevance),
-    novelty: clampScore(parsed.novelty),
-    mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
-    whyItMatters: sanitizeWhyItMatters(parsed.whyItMatters),
-    entities: coerceEntities(parsed.entities),
-    shouldSend: Boolean(parsed.shouldSend),
-    reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
-  };
+  const result = validateAiOutputAgainstSchema(rawText, outputSchema);
+  if (!result.ok) throw new Error(result.issues.map(issue => `${issue.field}: ${issue.message}`).join("; "));
+  return result.value;
 }
 
 export type OutputValidationIssue = { field: string; message: string };
@@ -127,7 +110,7 @@ export function validateAiOutputAgainstSchema(
       continue;
     }
 
-    if (field.type === "string" && typeof value !== "string") {
+    if (field.type === "string" && typeof value !== "string" && !(field.name === "entities" && Array.isArray(value) && value.every(v => typeof v === "string"))) {
       issues.push({ field: field.name, message: `نوع مقدار باید متن (string) باشد، دریافت شد: ${typeof value}.` });
     }
 
@@ -137,7 +120,7 @@ export function validateAiOutputAgainstSchema(
 
     if (field.type === "number") {
       const num = Number(value);
-      if (!Number.isFinite(num)) {
+      if (typeof value !== "number" || !Number.isFinite(num)) {
         issues.push({ field: field.name, message: "نوع مقدار باید عدد باشد." });
       } else if (field.min !== undefined && num < field.min) {
         issues.push({ field: field.name, message: `مقدار (${num}) کمتر از حداقل مجاز (${field.min}) است.` });
@@ -158,12 +141,17 @@ export function validateAiOutputAgainstSchema(
     }
   }
 
-  const blocking = issues.filter((issue) => outputSchema.find((f) => f.name === issue.field)?.required);
+  // Invalid present values are errors even for optional fields; quality-guard
+  // warnings on optional prose remain non-blocking.
+  const blocking = issues.filter(issue => !issue.message.startsWith("جملهٔ کلیشه‌ای") || outputSchema.find(f => f.name === issue.field)?.required);
 
   if (blocking.length > 0) {
     return { ok: false, issues, rawText };
   }
 
+  // Ignore unsolicited/disabled fields instead of persisting the model's extras.
+  const enabled = new Set<string>(outputSchema.filter(field => field.enabled).map(field => field.name));
+  parsed = Object.fromEntries(Object.entries(parsed).filter(([name]) => enabled.has(name)));
   return {
     ok: true,
     issues,
@@ -176,7 +164,7 @@ export function validateAiOutputAgainstSchema(
       mainEvent: typeof parsed.mainEvent === "string" && parsed.mainEvent.trim() ? parsed.mainEvent.trim() : null,
       whyItMatters: sanitizeWhyItMatters(parsed.whyItMatters),
       entities: coerceEntities(parsed.entities),
-      shouldSend: Boolean(parsed.shouldSend),
+      shouldSend: parsed.shouldSend === true,
       reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
     },
   };

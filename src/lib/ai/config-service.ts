@@ -320,6 +320,18 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
   if (!rules) {
     errors.push("قوانین تصمیم‌گیری تعریف نشده است.");
   } else {
+    if (rules.shadowMinImportance !== undefined && (!Number.isInteger(rules.shadowMinImportance) || rules.shadowMinImportance < 0 || rules.shadowMinImportance > 100)) errors.push("آستانه اهمیت آزمایشی باید عدد صحیح صفر تا صد باشد.");
+    for (const key of ["freshHours", "recentHours"] as const) {
+      if (rules[key] !== undefined && (!Number.isInteger(rules[key]) || rules[key]! < 1 || rules[key]! > 8760)) errors.push(`تنظیم ${key} باید عدد صحیح یک تا ۸۷۶۰ ساعت باشد.`);
+    }
+    if ((rules.freshHours ?? 24) > (rules.recentHours ?? 72)) errors.push("بازه تازه نباید از بازه اخیر بیشتر باشد.");
+    for (const key of ["graderEnabled", "shadowEvaluationEnabled"] as const) {
+      if (rules[key] !== undefined && typeof rules[key] !== "boolean") errors.push(`تنظیم ${key} باید روشن یا خاموش باشد.`);
+    }
+    for (const key of ["graderMin", "graderMax"] as const) {
+      if (rules[key] !== undefined && (!Number.isInteger(rules[key]) || rules[key]! < 0 || rules[key]! > 100)) errors.push(`تنظیم ${key} باید عدد صحیح صفر تا صد باشد.`);
+    }
+    if ((rules.graderMin ?? 55) > (rules.graderMax ?? 70)) errors.push("حداقل امتیاز داوری نباید بیشتر از حداکثر باشد.");
     if (rules.combine !== undefined && rules.combine !== "all" && rules.combine !== "any") {
       errors.push("حالت ترکیب قوانین تصمیم‌گیری باید «all» (همه شرط‌ها) یا «any» (یکی کافی است) باشد.");
     }
@@ -346,6 +358,16 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
       if (field.type === "number" && field.min !== undefined && field.max !== undefined && field.min >= field.max) {
         errors.push(`بازه عددی فیلد «${field.name}» نامعتبر است.`);
       }
+    }
+    for (const field of input.outputSchema) {
+      const feature = input.features?.[field.name];
+      if (field.enabled && feature?.enabled && field.type === "number" &&
+          Math.max(field.min ?? 0, feature.scaleMin ?? 0) >= Math.min(field.max ?? 100, feature.scaleMax ?? 100)) {
+        errors.push(`بازه ویژگی و ساختار خروجی «${field.name}» هم‌پوشانی معتبر ندارد.`);
+      }
+    }
+    if (!input.features?.summary?.enabled || !input.features?.shouldSend?.enabled) {
+      errors.push("ویژگی‌های summary و shouldSend برای عملکرد سامانه باید فعال بمانند.");
     }
     // Required-but-disabled fields would silently break the existing parser/DB contract.
     const disabledButRequiredByPipeline = input.outputSchema.filter(
@@ -380,6 +402,10 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
       }
     }
 
+    const baseline = topicFilter.baselineBlockedKeywords;
+    if (baseline !== undefined && (!Array.isArray(baseline) || baseline.length > 200 || baseline.some(word => typeof word !== "string" || !word.trim() || word.length > 100))) {
+      errors.push("فهرست ممنوع پایه باید حداکثر ۲۰۰ عبارت غیرخالی با طول حداکثر ۱۰۰ نویسه باشد.");
+    }
     const blocked = topicFilter.blockedKeywords;
     if (blocked !== undefined) {
       if (!Array.isArray(blocked)) {

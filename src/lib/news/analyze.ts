@@ -174,7 +174,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
   // grader can only veto ("rejected") — it never raises a score.
   let relevanceGrade: string | null = null;
   let combinedUsage: AiTokenUsage | null = result.usage;
-  if (isBorderlineRelevance(relevance)) {
+  if (isBorderlineRelevance(relevance, config.decisionRules)) {
     try {
       const gradeOutcome = await gradeRelevanceWithUsage({
         title: article.title,

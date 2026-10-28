@@ -211,7 +211,7 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
                             <p>ارتباط: {({ direct: "مستقیم", impact: "اثر مشخص", unrelated: "نامرتبط", uncertain: "مبهم" })[analysis.shadowEvaluation.relation]}</p>
                             <p>شاهد: {analysis.shadowEvaluation.evidence ?? "شاهد معتبر موجود نیست"}</p>
                             <p>اهمیت: {analysis.shadowEvaluation.importance} از ۱۰۰</p>
-                            <p>زمان: {({ fresh: "کمتر از ۲۴ ساعت", recent: "۱ تا ۳ روز", old: "قدیمی‌تر از ۳ روز", unknown: "نامشخص", future: "تاریخ آینده؛ بررسی لازم" })[analysis.shadowEvaluation.freshness]}</p>
+                            <p>زمان: {({ fresh: "تازه طبق تنظیمات تحلیل", recent: "اخیر طبق تنظیمات تحلیل", old: "قدیمی طبق تنظیمات تحلیل", unknown: "نامشخص", future: "تاریخ آینده؛ بررسی لازم" })[analysis.shadowEvaluation.freshness]}</p>
                             <p>پیشنهاد: {({ candidate: "نامزد ارسال", reject: "عدم ارسال", review: "نیازمند بررسی" })[analysis.shadowEvaluation.decision]}</p>
                           </div>
                         ) : null}
