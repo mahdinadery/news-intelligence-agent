@@ -44,3 +44,11 @@ test('schema ensure includes additive shadow migration', async () => {
 test('low importance remains rejected even for direct relevant news', () => {
   assert.equal(evaluateShadow({ ...base, impact: 1, reach: 1, urgency: 0 }, text, date, now).decision, 'reject');
 });
+
+test('dashboard importance threshold and freshness windows affect the shadow decision', () => {
+  const policy = { shadowMinImportance: 90, freshHours: 1, recentHours: 4 };
+  assert.equal(evaluateShadow(base, text, date, now, policy).decision, 'reject');
+  assert.equal(evaluateShadow(base, text, date, now, {...policy, shadowMinImportance: 80}).decision, 'candidate');
+  assert.equal(freshnessAt(date, now, policy).freshness, 'recent');
+  assert.equal(freshnessAt(date, now, {freshHours:1, recentHours:1}).freshness, 'old');
+});

@@ -16,9 +16,10 @@ export const GRADE_BORDERLINE_MAX = 70;
 export type GradeVerdict = "yes" | "no";
 
 /** True when a relevance score sits in the gray band that needs a re-check. */
-export function isBorderlineRelevance(score: number | null | undefined): boolean {
+export function isBorderlineRelevance(score: number | null | undefined, rules?: { graderEnabled?: boolean; graderMin?: number; graderMax?: number }): boolean {
+  if (rules?.graderEnabled === false) return false;
   if (typeof score !== "number" || !Number.isFinite(score)) return false;
-  return score >= GRADE_BORDERLINE_MIN && score <= GRADE_BORDERLINE_MAX;
+  return score >= (rules?.graderMin ?? GRADE_BORDERLINE_MIN) && score <= (rules?.graderMax ?? GRADE_BORDERLINE_MAX);
 }
 
 /**

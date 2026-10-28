@@ -12,8 +12,9 @@
  * prompt text.
  */
 
+import { effectiveOutputSchema } from "./effective-schema";
 import { evaluateShadow, SHADOW_INSTRUCTION, type ShadowEvaluation } from "./shadow-evaluation";
-import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
+import { baselineKeywords } from "@/lib/news/topic-filter";
 import { buildAIAnalysisPrompt, type ArticleInput } from "./prompt-builder";
 import { parseAiOutput, type ParsedAiOutput } from "./output-parser";
 import {
@@ -74,10 +75,10 @@ export async function runAiAnalysis(
   // BASELINE_BLOCKED_KEYWORDS lives in topic-filter.ts (matching side); passing
   // it in keeps prompt-builder.ts dependency-free for the Node test runner.
   const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(config, article, {
-    baselineBlockedKeywords: BASELINE_BLOCKED_KEYWORDS,
+    baselineBlockedKeywords: baselineKeywords(config.topicFilter),
   });
 
-  const shadowEnabled = process.env.AI_SHADOW_EVALUATION === "true";
+  const shadowEnabled = config.decisionRules.shadowEvaluationEnabled ?? (process.env.AI_SHADOW_EVALUATION === "true");
   const effectiveSystemPrompt = shadowEnabled
     ? systemPrompt.replace("هیچ کلید یا متن اضافه‌ای اضافه نکن.", "") + "\n" + SHADOW_INSTRUCTION
     : systemPrompt;
@@ -94,14 +95,15 @@ export async function runAiAnalysis(
   }
 
   try {
-    const analysis = parseAiOutput(completion.rawText, config.outputSchema);
+    const analysis = parseAiOutput(completion.rawText, effectiveOutputSchema(config.outputSchema, config.features));
+    if (!config.decisionRules.enableAutoRecommendation) analysis.shouldSend = false;
     let shadowEvaluation: ShadowEvaluation | null = null;
     if (shadowEnabled) {
       try {
         const raw = JSON.parse(completion.rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
-        shadowEvaluation = evaluateShadow(raw.shadow, [article.title, article.description].filter(Boolean).join("\n"), article.publishedAt, Date.now());
+        shadowEvaluation = evaluateShadow(raw.shadow, [article.title, article.description].filter(Boolean).join("\n"), article.publishedAt, Date.now(), config.decisionRules);
       } catch {
-        shadowEvaluation = evaluateShadow(null, "", article.publishedAt, Date.now());
+        shadowEvaluation = evaluateShadow(null, "", article.publishedAt, Date.now(), config.decisionRules);
       }
     }
     return {

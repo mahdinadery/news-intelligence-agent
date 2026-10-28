@@ -52,6 +52,11 @@ export const BASELINE_BLOCKED_KEYWORDS: readonly string[] = [
   "اعتبار کالابرگ",
 ];
 
+/** Operator override replaces the built-in baseline, including an explicit empty list. */
+export function baselineKeywords(filter: AiTopicFilterConfig | null | undefined): readonly string[] {
+  return filter?.baselineBlockedKeywords ?? BASELINE_BLOCKED_KEYWORDS;
+}
+
 /**
  * Normalizes text for Persian-friendly matching:
  * - lowercases Latin text
@@ -132,7 +137,7 @@ export function evaluateTopicFilter(
 ): TopicFilterOutcome {
   const haystack = normalizeForMatch([article.title, article.description, article.content].filter(Boolean).join(" \u2000 "));
 
-  const baselineHits = BASELINE_BLOCKED_KEYWORDS.filter((keyword) => haystack.includes(normalizeForMatch(keyword)));
+  const baselineHits = baselineKeywords(filter).filter((keyword) => haystack.includes(normalizeForMatch(keyword)));
   if (baselineHits.length > 0) {
     return { verdict: "skip", reason: "matched_blocked_keyword", matchedTopics: [], blockedKeywords: [...baselineHits] };
   }
@@ -189,7 +194,7 @@ export function isTopicFilterActive(filter: AiTopicFilterConfig | null | undefin
  * part and is used by the admin UI.)
  */
 export function isTopicGateActive(filter: AiTopicFilterConfig | null | undefined): boolean {
-  return BASELINE_BLOCKED_KEYWORDS.length > 0 || isTopicFilterActive(filter);
+  return baselineKeywords(filter).length > 0 || isTopicFilterActive(filter);
 }
 
 /** Preset topic suggestions offered by the admin UI (labels + starter keywords). */

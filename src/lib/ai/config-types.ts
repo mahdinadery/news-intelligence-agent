@@ -44,6 +44,14 @@ export type AiFeaturesConfig = Record<AiFeatureKey, AiFeatureConfig>;
  * the AI *recommends* — it never sends anything (Milestone 5 scope).
  */
 export type AiDecisionRules = {
+  /** Missing preserves the environment fallback; explicit false disables shadow. */
+  shadowEvaluationEnabled?: boolean;
+  shadowMinImportance?: number;
+  freshHours?: number;
+  recentHours?: number;
+  graderEnabled?: boolean;
+  graderMin?: number;
+  graderMax?: number;
   minImportanceToSend: number;
   minRelevanceToSend: number;
   minNoveltyToSend: number;
@@ -103,6 +111,8 @@ export type AiTopicRule = {
 export type AiTopicFilterMode = "include" | "exclude";
 
 export type AiTopicFilterConfig = {
+  /** Missing uses built-in defaults; [] explicitly disables baseline keywords. */
+  baselineBlockedKeywords?: string[];
   /** Master switch. false => filter inactive, everything passes. */
   enabled: boolean;
   /**

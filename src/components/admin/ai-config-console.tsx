@@ -646,7 +646,7 @@ export function AiConfigConsole({ adminKey }: Props) {
         <p className="mt-1 text-sm text-muted">
           پیش از مرحله پرهزینه تحلیل هوش مصنوعی، اخبار با قواعد ساده کلیدواژه‌ای غربال می‌شوند. اخبار نامرتبط ذخیره اما
           با وضعیت «خارج از موضوع» علامت‌گذاری می‌شوند و هرگز به AI ارسال نمی‌شوند (قابل بازگشت به صف از مدیریت اخبار).
-          وقتی فیلتر غیرفعال باشد، موضوعات و کلمات ممنوع سفارشی اعمال نمی‌شوند؛ فهرست ممنوع همیشگی همچنان فعال است.
+          وقتی فیلتر غیرفعال باشد، موضوعات و کلمات ممنوع سفارشی اعمال نمی‌شوند؛ فهرست ممنوع پایه، در صورت غیرخالی بودن، همچنان اعمال می‌شود.
           برای اعمال تغییرات، «ذخیره و فعال‌سازی» را بزنید؛ ذخیرهٔ پیش‌نویس به‌تنهایی رفتار برنامه را تغییر نمی‌دهد.
           تغییرات در پردازش بعدی اعمال می‌شوند و اخبار قبلاً حذف‌شده خودکار به صف برنمی‌گردند.
         </p>
@@ -768,12 +768,20 @@ export function AiConfigConsole({ adminKey }: Props) {
             (وضعیت «خارج از موضوع») و هیچ‌وقت ارسال نمی‌شود — حتی اگر موضوع دیگری را هم پوشش دهد.
           </p>
           <p className="mt-2 rounded-lg border border-danger-line bg-danger-soft/60 px-3 py-2 text-[11px] leading-5 text-danger-ink">
-            <b>کلیدواژه‌های ممنوع همیشگی</b> (در کد، حتی وقتی این فیلتر غیرفعال است):{" "}
-            {BASELINE_BLOCKED_KEYWORDS.join("، ")}. این فهرست کوچک و ثابت است و نیازی به تنظیم ندارد.
+            <b>کلیدواژه‌های ممنوع پایه</b> (حتی با فیلتر موضوعی خاموش):{" "}
+            این فهرست حتی با خاموش بودن فیلتر موضوعی اعمال می‌شود. اکنون قابل ویرایش است؛ خالی کردن آن یعنی حذف محدودیت‌های پیش‌فرض.
           </p>
         </div>
 
         <div className="mt-4 space-y-3">
+          <label className="mt-3 block text-sm font-bold">فهرست ممنوع پایه (قابل کنترل)</label>
+          <KeywordListEditor
+            className="mt-2 w-full rounded-lg border border-line p-3 text-sm"
+            rows={3}
+            values={draft.topicFilter?.baselineBlockedKeywords ?? [...BASELINE_BLOCKED_KEYWORDS]}
+            onValuesChange={baselineBlockedKeywords => setDraft({ ...draft, topicFilter: { ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER), baselineBlockedKeywords } })}
+          />
+          <button type="button" className="my-2 text-xs text-muted" onClick={() => setDraft({ ...draft, topicFilter: { ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER), baselineBlockedKeywords: [...BASELINE_BLOCKED_KEYWORDS] } })}>بازنشانی فهرست پایه به پیش‌فرض</button>
           {(draft.topicFilter?.topics ?? []).length === 0 ? (
             <p className="rounded-xl border border-dashed border-line bg-surface-2/70 px-4 py-6 text-center text-sm text-faint">
               هنوز موضوعی تعریف نشده است. تا زمانی که موضوعی با کلیدواژه نداشته باشید، فیلتری اعمال نمی‌شود.
@@ -982,7 +990,7 @@ export function AiConfigConsole({ adminKey }: Props) {
       {/* F. Output Schema */}
       <section className="rounded-2xl border border-line/80 bg-surface p-5 shadow-sm shadow-line/40 sm:p-6">
         <h2 className="text-base font-bold text-ink">ساختار خروجی (Output Schema)</h2>
-        <p className="mt-1 text-sm text-muted">فیلدهای مورد انتظار در پاسخ JSON هوش مصنوعی.</p>
+        <p className="mt-1 text-sm text-muted">فیلدهای مورد انتظار در پاسخ JSON هوش مصنوعی. فقط فیلدهایی که هم اینجا و هم در ویژگی‌های تحلیل فعال‌اند، مصرف و ذخیره می‌شوند. تغییرات پس از ذخیره و فعال‌سازی، روی تحلیل‌های بعدی اعمال می‌شوند.</p>
         <div className="mt-4 space-y-2">
           {draft.outputSchema.map((field, index) => (
             <AiConfigOutputFieldRow
@@ -1014,6 +1022,8 @@ export function AiConfigConsole({ adminKey }: Props) {
         <p className="mt-1 text-sm text-muted">
           ظاهری که خبر تحلیل‌شده با آن ارسال می‌شود. این متن روی همان نسخه پیکربندی ذخیره می‌شود؛ تغییر آن
           خلاصه، امتیازها یا تحلیل خبر را دست نمی‌کند و هیچ ارسال خودکاری انجام نمی‌دهد.
+          قالب فعال برای پیام‌های جدید استفاده می‌شود؛ پیام‌های از قبل ساخته‌شده و بولتن تجمیعی تغییر نمی‌کنند.
+          پیش‌نمایش قالب با پاسخ واقعی مدل در بخش تست پیکربندی نمایش داده می‌شود.
         </p>
         <textarea
           className="mt-3 w-full resize-y rounded-xl border border-line px-3 py-2.5 font-mono text-xs leading-6 text-ink-soft focus:border-accent focus:outline-none"
@@ -1039,6 +1049,24 @@ export function AiConfigConsole({ adminKey }: Props) {
         <p className="mt-2 text-[11px] text-faint">
           خالی گذاشتن این فیلد یعنی استفاده از چیدمان داخلی قبلی (سازگاری با پیکربندی‌های پیشین).
         </p>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-surface p-5 space-y-3">
+        <h2 className="font-bold">کنترل‌های تکمیلی تحلیل</h2>
+        <label className="block text-sm">ارزیابی آزمایشی (داخل همان درخواست؛ توکن بیشتر، بدون اثر مستقیم بر ارسال)
+          <select className="mx-2 rounded border border-line p-2" value={draft.decisionRules.shadowEvaluationEnabled === undefined ? "env" : String(draft.decisionRules.shadowEvaluationEnabled)} onChange={event => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, shadowEvaluationEnabled: event.target.value === "env" ? undefined : event.target.value === "true" } })}>
+            <option value="env">پیروی از تنظیم محیط سرور</option><option value="true">روشن</option><option value="false">خاموش</option>
+          </select>
+        </label>
+        <label className="block text-sm"><input type="checkbox" checked={draft.decisionRules.graderEnabled !== false} onChange={event => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, graderEnabled: event.target.checked } })} /> داور دوم برای امتیازهای مرزی (یک درخواست اضافه)</label>
+        <div className="flex gap-3">
+          {(["graderMin", "graderMax"] as const).map(key => <label key={key} className="text-sm">{key === "graderMin" ? "حداقل امتیاز داوری" : "حداکثر امتیاز داوری"}<input type="number" min={0} max={100} className="mx-2 w-20 rounded border border-line p-2" value={draft.decisionRules[key] ?? (key === "graderMin" ? 55 : 70)} onChange={event => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, [key]: Number(event.target.value) } })} /></label>)}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {([{key: "shadowMinImportance", label: "حداقل اهمیت آزمایشی", fallback: 60, max: 100}, {key: "freshHours", label: "بازه خبر تازه (ساعت)", fallback: 24, max: 8760}, {key: "recentHours", label: "بازه خبر اخیر (ساعت)", fallback: 72, max: 8760}] as const).map(item => <label key={item.key} className="text-sm">{item.label}<input type="number" min={item.key === "shadowMinImportance" ? 0 : 1} max={item.max} className="mx-2 w-20 rounded border border-line p-2" value={draft.decisionRules[item.key] ?? item.fallback} onChange={event => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, [item.key]: Number(event.target.value) } })} /></label>)}
+        </div>
+        <p className="text-xs text-muted">بازه‌های زمانی و حداقل اهمیت بالا فقط پیشنهاد ارزیابی آزمایشی را تغییر می‌دهند؛ شرط ارسال واقعی نیستند. وزن اهمیت فعلاً ثابت است: شدت ۵۰٪، گستردگی ۳۰٪، فوریت ۲۰٪.</p>
+        <p className="text-xs text-muted">تست، نیاز به داور دوم را نمایش می‌دهد اما درخواست داور را اجرا نمی‌کند. نتیجهٔ ارزیابی آزمایشی نیز در پیش‌نمایش دیده می‌شود.</p>
       </section>
 
       {/* Test Configuration */}

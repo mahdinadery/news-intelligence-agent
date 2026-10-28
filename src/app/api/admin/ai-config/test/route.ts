@@ -1,12 +1,16 @@
+import { SHADOW_INSTRUCTION, evaluateShadow } from "@/lib/ai/shadow-evaluation";
+import { isBorderlineRelevance } from "@/lib/ai/grade-rules";
+import { effectiveOutputSchema } from "@/lib/ai/effective-schema";
 import { checkAdminAccess } from "@/lib/admin/access";
 import { callAiChatCompletion } from "@/lib/ai/completion";
 import { getActiveAiConfig, validateAiConfigInput } from "@/lib/ai/config-service";
 import type { AiConfigInput } from "@/lib/ai/config-types";
-import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
+import { baselineKeywords, evaluateTopicFilter } from "@/lib/news/topic-filter";
 import { buildAIAnalysisPrompt } from "@/lib/ai/prompt-builder";
 import { validateAiOutputAgainstSchema } from "@/lib/ai/output-parser";
 import { db } from "@/db";
-import { news } from "@/db/schema";
+import { news, type NewsRow } from "@/db/schema";
+import { renderPublishingMessage } from "@/lib/delivery/template";
 import { desc, eq, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -141,11 +145,13 @@ export async function POST(request: Request) {
   }
 
   const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(configForPrompt, article, {
-    baselineBlockedKeywords: BASELINE_BLOCKED_KEYWORDS,
+    baselineBlockedKeywords: baselineKeywords(configForPrompt.topicFilter),
   });
 
+  const shadowEnabled = configForPrompt.decisionRules.shadowEvaluationEnabled ?? (process.env.AI_SHADOW_EVALUATION === "true");
+  const effectiveSystemPrompt = shadowEnabled ? systemPrompt.replace("هیچ کلید یا متن اضافه‌ای اضافه نکن.", "") + "\n" + SHADOW_INSTRUCTION : systemPrompt;
   const completion = await callAiChatCompletion({
-    systemPrompt,
+    systemPrompt: effectiveSystemPrompt,
     userPrompt,
     model: configForPrompt.model,
     temperature: configForPrompt.temperature,
@@ -157,18 +163,44 @@ export async function POST(request: Request) {
       success: false,
       message: completion.message,
       detail: completion.detail ?? null,
-      promptUsed: { systemPrompt, userPrompt },
+      promptUsed: { systemPrompt: effectiveSystemPrompt, userPrompt },
     });
   }
 
-  const validation = validateAiOutputAgainstSchema(completion.rawText, configForPrompt.outputSchema);
+  const validation = validateAiOutputAgainstSchema(completion.rawText, effectiveOutputSchema(configForPrompt.outputSchema, configForPrompt.features));
 
+  if (validation.ok && !configForPrompt.decisionRules.enableAutoRecommendation) validation.value.shouldSend = false;
+
+  let shadowEvaluation = null;
+  if (shadowEnabled) {
+    let rawShadow: unknown = null;
+    try { rawShadow = JSON.parse(completion.rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")).shadow; } catch { /* invalid shadow becomes review */ }
+    shadowEvaluation = evaluateShadow(rawShadow, [article.title, article.description].filter(Boolean).join("\n"), article.publishedAt, Date.now(), configForPrompt.decisionRules);
+  }
   return Response.json({
     success: true,
+    operationalPreview: {
+      topicGate: evaluateTopicFilter(article, configForPrompt.topicFilter),
+      graderWouldRun: validation.ok && isBorderlineRelevance(validation.value.relevance, configForPrompt.decisionRules),
+      shadowEvaluation,
+    },
     model: completion.model,
     usage: completion.usage,
-    promptUsed: { systemPrompt, userPrompt },
+    promptUsed: { systemPrompt: effectiveSystemPrompt, userPrompt },
     rawResponse: completion.rawText,
+    publishingPreview: validation.ok ? renderPublishingMessage(configForPrompt.publishingTemplate, {
+      title: article.title,
+      source: article.source,
+      url: "https://example.com/preview",
+      publishedAt: article.publishedAt && Number.isFinite(Date.parse(article.publishedAt)) ? new Date(article.publishedAt) : null,
+      summary: validation.value.summary,
+      category: validation.value.category,
+      importanceScore: validation.value.importance,
+      relevanceScore: validation.value.relevance,
+      noveltyScore: validation.value.novelty,
+      mainEvent: validation.value.mainEvent,
+      whyItMatters: validation.value.whyItMatters,
+    } as NewsRow) : null,
     validation:
       validation.ok
         ? { valid: true, issues: validation.issues, parsed: validation.value }

@@ -15,15 +15,15 @@ export type ShadowEvaluation = {
   decision: "candidate" | "reject" | "review";
 };
 
-export function freshnessAt(publishedAt: string | null, now: number) {
+export function freshnessAt(publishedAt: string | null, now: number, policy?: { freshHours?: number; recentHours?: number }) {
   const time = publishedAt ? Date.parse(publishedAt) : NaN;
   if (!Number.isFinite(time)) return { freshness: "unknown" as const, ageHours: null };
   const ageHours = (now - time) / 3_600_000;
-  const freshness = ageHours < 0 ? "future" : ageHours <= 24 ? "fresh" : ageHours <= 72 ? "recent" : "old";
+  const freshness = ageHours < 0 ? "future" : ageHours <= (policy?.freshHours ?? 24) ? "fresh" : ageHours <= (policy?.recentHours ?? 72) ? "recent" : "old";
   return { freshness, ageHours } as const;
 }
 
-export function evaluateShadow(raw: unknown, sourceText: string, publishedAt: string | null, now: number): ShadowEvaluation {
+export function evaluateShadow(raw: unknown, sourceText: string, publishedAt: string | null, now: number, policy?: { shadowMinImportance?: number; freshHours?: number; recentHours?: number }): ShadowEvaluation {
   const value = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   let relation: ShadowEvaluation["relation"] = ["direct", "impact", "unrelated", "uncertain"].includes(String(value.relation))
     ? value.relation as ShadowEvaluation["relation"] : "uncertain";
@@ -34,8 +34,8 @@ export function evaluateShadow(raw: unknown, sourceText: string, publishedAt: st
   const components = valid ? { impact: value.impact as number, reach: value.reach as number, urgency: value.urgency as number } : null;
   if ((relation === "direct" || relation === "impact") && (!evidence || !valid)) relation = "uncertain";
   const importance = components ? Math.round((components.impact * .5 + components.reach * .3 + components.urgency * .2) * 25) : 0;
-  const timing = freshnessAt(publishedAt, now);
+  const timing = freshnessAt(publishedAt, now, policy);
   const decision = relation === "unrelated" ? "reject" : relation === "uncertain" || !["fresh", "recent"].includes(timing.freshness)
-    ? "review" : importance >= 60 ? "candidate" : "reject";
+    ? "review" : importance >= (policy?.shadowMinImportance ?? 60) ? "candidate" : "reject";
   return { version: SHADOW_VERSION, relation, evidence, importance, components, ...timing, decision };
 }
