@@ -1,5 +1,6 @@
 "use client";
 
+import { KeywordListEditor } from "./keyword-list-editor";
 import type { AiTopicRule } from "@/lib/ai/config-types";
 
 type Props = {
@@ -37,19 +38,17 @@ export function AiConfigTopicRow({ value, onChange, onRemove }: Props) {
           حذف موضوع
         </button>
       </div>
-      <input
+      <KeywordListEditor
         className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none"
-        onChange={(event) =>
+        onValuesChange={(keywords) =>
           onChange({
             ...value,
-            keywords: event.target.value
-              .split(/[,،]/)
-              .map((keyword) => keyword.trim())
-              .filter(Boolean),
+            keywords,
           })
         }
+        rows={1}
         placeholder="کلیدواژه‌ها با جداکننده ویرگول (مثلاً: خودرو، قیمت خودرو، خودروساز)"
-        value={value.keywords.join("، ")}
+        values={value.keywords}
       />
       <p className="mt-1.5 text-[11px] text-faint">
         تطبیق با هر یک از کلیدواژه‌ها کافی است (جست‌وجوی ساده متنی، بدون فراخوانی هوش مصنوعی).

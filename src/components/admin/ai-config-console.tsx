@@ -21,6 +21,7 @@ import {
   type ActiveAiConfig,
 } from "@/lib/ai/config-types";
 import { DEFAULT_AUDIENCE_FOCUS } from "@/lib/ai/prompt-builder";
+import { KeywordListEditor } from "./keyword-list-editor";
 import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { PUBLISHING_TEMPLATE_VARS, findUnknownTemplateVars } from "@/lib/delivery/template";
 import { CREDIT_RATING_PACK } from "@/lib/news/news-packs";
@@ -645,7 +646,9 @@ export function AiConfigConsole({ adminKey }: Props) {
         <p className="mt-1 text-sm text-muted">
           پیش از مرحله پرهزینه تحلیل هوش مصنوعی، اخبار با قواعد ساده کلیدواژه‌ای غربال می‌شوند. اخبار نامرتبط ذخیره اما
           با وضعیت «خارج از موضوع» علامت‌گذاری می‌شوند و هرگز به AI ارسال نمی‌شوند (قابل بازگشت به صف از مدیریت اخبار).
-          وقتی فیلتر غیرفعال یا بدون کلیدواژه باشد، همه اخبار رد می‌شوند (هیچ خبری از دست نمی‌رود).
+          وقتی فیلتر غیرفعال باشد، موضوعات و کلمات ممنوع سفارشی اعمال نمی‌شوند؛ فهرست ممنوع همیشگی همچنان فعال است.
+          برای اعمال تغییرات، «ذخیره و فعال‌سازی» را بزنید؛ ذخیرهٔ پیش‌نویس به‌تنهایی رفتار برنامه را تغییر نمی‌دهد.
+          تغییرات در پردازش بعدی اعمال می‌شوند و اخبار قبلاً حذف‌شده خودکار به صف برنمی‌گردند.
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -721,24 +724,21 @@ export function AiConfigConsole({ adminKey }: Props) {
             </label>
             <span className="text-[11px] text-danger-ink">در هر دو حالت فیلتر اعمال می‌شود</span>
           </div>
-          <textarea
+          <KeywordListEditor
             className="mt-2 w-full resize-y rounded-lg border border-danger-line bg-surface px-3 py-2 text-sm focus:border-danger focus:outline-none"
             id="blocked-keywords"
-            onChange={(event) =>
+            onValuesChange={(blockedKeywords) =>
               setDraft({
                 ...draft,
                 topicFilter: {
                   ...(draft.topicFilter ?? DEFAULT_TOPIC_FILTER),
-                  blockedKeywords: event.target.value
-                    .split(/[,،\n]/)
-                    .map((keyword) => keyword.trim())
-                    .filter(Boolean),
+                  blockedKeywords,
                 },
               })
             }
             placeholder="مثلاً: ورزش، فوتبال، سرگرمی، حوادث"
             rows={2}
-            value={(draft.topicFilter?.blockedKeywords ?? []).join("، ")}
+            values={draft.topicFilter?.blockedKeywords ?? []}
           />
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-medium text-danger-ink">افزودن سریع:</span>
@@ -940,23 +940,21 @@ export function AiConfigConsole({ adminKey }: Props) {
             />
           </Field>
           <Field label="دسته‌های مجاز (جدا با ویرگول؛ خالی = همه)">
-            <input
+            <KeywordListEditor
               className="w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-surface-2 disabled:text-faint"
               disabled={!draft.autoSendPolicy?.useCustom}
-              onChange={(event) =>
+              onValuesChange={(categories) =>
                 setDraft({
                   ...draft,
                   autoSendPolicy: {
                     ...(draft.autoSendPolicy ?? DEFAULT_AUTO_SEND_POLICY),
-                    categories: event.target.value
-                      .split(/[,،]/)
-                      .map((category) => category.trim())
-                      .filter(Boolean),
+                    categories,
                   },
                 })
               }
+              rows={1}
               placeholder="مثال: اقتصاد، بازار"
-              value={(draft.autoSendPolicy?.categories ?? []).join("، ")}
+              values={draft.autoSendPolicy?.categories ?? []}
             />
           </Field>
           <Field label="الزام پیشنهاد AI (shouldSend)">
