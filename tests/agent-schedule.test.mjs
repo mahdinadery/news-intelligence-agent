@@ -5,6 +5,7 @@ import {
   DEFAULT_AGENT_SCHEDULE,
   coerceScheduleConfig,
   computeDueSlot,
+  computeDueBulletinSlot,
   computeNextRun,
   describeSchedule,
   effectiveGraceMinutes,
@@ -233,4 +234,21 @@ test("normalizeTime accepts Persian and Arabic-Indic digits", () => {
 
 test("normalizeTimes keeps Persian-digit entries instead of dropping them", () => {
   assert.deepEqual(normalizeTimes(["۸:۰۰", "۱۴:۳۰", "۱۴:۳۰"]), ["08:00", "14:30"]);
+});
+
+
+test('bulletin catches up after cron delay beyond normal grace, within same local day', () => {
+  const config = schedule({publishMode:'bulletin',bulletinTimes:['08:00','14:00']});
+  const result = computeDueBulletinSlot({now:new Date('2026-10-28T14:30:00Z'),config});
+  assert.equal(result.due,true);
+  assert.equal(result.slotKey,'B2026-10-28T14:00');
+});
+test('bulletin catch-up does not run earlier slots after later slot claimed', () => {
+  const config = schedule({publishMode:'bulletin',bulletinTimes:['08:00','14:00']});
+  const result = computeDueBulletinSlot({now:new Date('2026-10-28T14:30:00Z'),config,lastBulletinSlot:'B2026-10-28T14:00'});
+  assert.equal(result.due,false);
+});
+test('bulletin does not backfill yesterday before first slot today', () => {
+  const config = schedule({publishMode:'bulletin',bulletinTimes:['08:00']});
+  assert.equal(computeDueBulletinSlot({now:new Date('2026-10-28T01:00:00Z'),config,lastBulletinSlot:'B2026-10-27T08:00'}).due,false);
 });

@@ -8,6 +8,7 @@ import {
 } from "@/lib/agent/schedule";
 import {
   claimBulletinSlot,
+  releaseEmptyBulletinSlot,
   claimSlot,
   markTickSeen,
   readScheduleRecord,
@@ -95,6 +96,9 @@ export async function POST(request: Request) {
         passKind: "bulletin",
       });
       await recordRunResult(record.id, bulletinSummary);
+      if (["nothing_new", "no_qualifying_items"].includes(bulletinSummary.bulletin?.reason ?? "")) {
+        await releaseEmptyBulletinSlot(record.id, bulletinDue.slotKey);
+      }
       return Response.json({
         success: true,
         ran: true,

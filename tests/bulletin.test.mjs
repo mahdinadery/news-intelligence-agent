@@ -178,3 +178,14 @@ test('bulletin templates validate unknown variables, type, length and required i
   assert.deepEqual(validateBulletinSettings({template:'{title}\n{items}',itemTemplate:'{title}\n{originalUrl}'}),[]);
   assert.deepEqual(validateBulletinSettings({template:'',itemTemplate:''}),[]);
 });
+
+
+test('daily ranking prioritizes both relevance and importance, capped at five', () => {
+  const rows = [
+    {id:'imbalanced', importanceScore:100, relevanceScore:51, publishedAt:null},
+    ...Array.from({length:6},(_,i)=>({id:String(i),importanceScore:85-i,relevanceScore:85-i,publishedAt:null})),
+  ];
+  const result = pickBulletinItems(rows,5);
+  assert.equal(result.length,5);
+  assert.deepEqual(result.map(row=>row.id),['0','1','2','3','4']);
+});

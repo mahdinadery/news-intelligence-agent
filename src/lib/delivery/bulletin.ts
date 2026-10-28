@@ -126,13 +126,17 @@ function compact(text: string | null | undefined, max: number): string {
  * Ranks candidates and takes the top `max`: highest importance first, newest
  * first on ties. Pure — the caller supplies already rule-approved items.
  */
-export function pickBulletinItems<T extends { importanceScore: number | null; publishedAt: Date | null }>(
+export function pickBulletinItems<T extends { importanceScore: number | null; relevanceScore?: number | null; publishedAt: Date | null }>(
   items: T[],
   max: number = MAX_BULLETIN_ITEMS,
 ): T[] {
   return [...items]
     .sort((a, b) => {
-      const importance = (b.importanceScore ?? 0) - (a.importanceScore ?? 0);
+      // Prioritize balance: neither importance nor relevance can compensate
+      // for a weak score in the other dimension.
+      const balanced = Math.min(b.importanceScore ?? 0, b.relevanceScore ?? b.importanceScore ?? 0) - Math.min(a.importanceScore ?? 0, a.relevanceScore ?? a.importanceScore ?? 0);
+      if (balanced !== 0) return balanced;
+      const importance = ((b.importanceScore ?? 0) + (b.relevanceScore ?? 0)) - ((a.importanceScore ?? 0) + (a.relevanceScore ?? 0));
       if (importance !== 0) return importance;
       return (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0);
     })

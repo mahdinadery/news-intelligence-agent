@@ -386,7 +386,6 @@ export function computeDueBulletinSlot(args: {
   if (!config.enabled || !modeWantsBulletin) return { due: false, reason: "disabled", nextRunAt: null };
   if (times.length === 0) return { due: false, reason: "no_times", nextRunAt: null };
 
-  const grace = args.graceMinutes ?? effectiveGraceMinutes(times);
   const parts = getZonedParts(now, config.timezone);
   const dateKey = dateKeyOf(parts);
   const nowMinutes = parts.hour * 60 + parts.minute;
@@ -396,10 +395,10 @@ export function computeDueBulletinSlot(args: {
 
   for (const time of times) {
     const minutes = timeToMinutes(time);
-    if (nowMinutes < minutes || nowMinutes >= minutes + grace) continue;
+    if (nowMinutes < minutes || (args.graceMinutes !== undefined && nowMinutes >= minutes + args.graceMinutes)) continue;
 
     const slotKey = `B${dateKey}T${time}`;
-    if (lastBulletinSlot === slotKey) {
+    if (lastBulletinSlot && lastBulletinSlot >= slotKey) {
       alreadyRan = true;
       continue;
     }

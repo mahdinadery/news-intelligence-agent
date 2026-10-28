@@ -146,11 +146,18 @@ export async function selectSendCandidates(
  */
 async function selectBulletinCandidates(config: AgentScheduleConfig): Promise<NewsRow[]> {
   const rule = scheduleToRule(config);
-  const ids = await selectSendCandidates({ ...config, maxSend: 50 });
-  if (ids.length === 0) return [];
-  const rows = await db.select().from(news).where(inArray(news.id, ids));
+  // Rank the whole eligible daily pool, not the first 50 newest IDs.
+  const rows = await db.select().from(news).where(and(
+    isNotNull(news.analyzedAt),
+    sql`coalesce(${news.publishedAt}, ${news.createdAt}) <= now()`,
+    sql`(coalesce(${news.publishedAt}, ${news.createdAt}) AT TIME ZONE ${config.timezone})::date = (now() AT TIME ZONE ${config.timezone})::date`,
+    sql`${news.status} NOT IN ('DUPLICATE', 'SKIPPED_OFFTOPIC')`,
+    notExists(db.select({ one: sql`1` }).from(deliveries).where(and(
+      eq(deliveries.newsId, news.id), eq(deliveries.status, "sent"), inArray(deliveries.destination, expandTargets(config.destination)),
+    ))),
+  ));
   const matching = rows.filter((row) => evaluateArticle(row, rule).matches);
-  return pickBulletinItems(matching, MAX_BULLETIN_ITEMS);
+  return pickBulletinItems(collapseEventGroups(matching), MAX_BULLETIN_ITEMS);
 }
 
 /** "both" mode: items already sent to the destination since the last bulletin. */
@@ -175,13 +182,17 @@ async function selectRecapItems(config: AgentScheduleConfig): Promise<NewsRow[]>
       ),
     )
     .orderBy(desc(deliveries.sentAt))
-    .limit(20);
+    .limit(1000);
 
-  const ids = [...new Set(sentRows.map((entry) => entry.id))].slice(0, 20);
+  const ids = [...new Set(sentRows.map((entry) => entry.id))];
   if (ids.length === 0) return [];
   const rows = await db.select().from(news).where(inArray(news.id, ids));
   // Same-event copies collapse to one digest entry.
-  return pickBulletinItems(collapseEventGroups(rows), MAX_BULLETIN_ITEMS);
+  const qualifying = rows.filter(row => {
+    const time = row.publishedAt ?? row.createdAt;
+    return time.getTime() <= Date.now() && new Intl.DateTimeFormat("en-CA", { timeZone: config.timezone }).format(time) === new Intl.DateTimeFormat("en-CA", { timeZone: config.timezone }).format(new Date()) && evaluateArticle(row, scheduleToRule(config)).matches;
+  });
+  return pickBulletinItems(collapseEventGroups(qualifying), MAX_BULLETIN_ITEMS);
 }
 
 /** Builds the digest (AI intro + minimal columns) and sends it as ONE message. */
@@ -285,20 +296,12 @@ async function runBulletinPhase(
     // back to never-delivered qualifying items so the digest still goes out —
     // silently skipping here is what made «بولتن» look broken in practice.
     const recaps = await selectRecapItems(config);
-    if (recaps.length > 0) {
-      return { summary: await sendBulletin(config, recaps, { recordRows: false, trigger }) };
-    }
     const fresh = await selectBulletinCandidates(config);
-    if (fresh.length === 0) {
-      return { summary: { attempted: true, sent: false, itemCount: 0, reason: "nothing_new" } };
+    const combined = pickBulletinItems(collapseEventGroups([...recaps, ...fresh]), MAX_BULLETIN_ITEMS);
+    if (combined.length > 0) {
+      return { summary: await sendBulletin(config, combined, { recordRows: true, recordIds: fresh.map(item => item.id), trigger }) };
     }
-    return {
-      summary: await sendBulletin(config, fresh, {
-        recordRows: true,
-        recordIds: fresh.map((item) => item.id),
-        trigger,
-      }),
-    };
+    return { summary: { attempted: true, sent: false, itemCount: 0, reason: "nothing_new" } };
   }
 
   // "bulletin" mode — or a manual digest run from any mode.
