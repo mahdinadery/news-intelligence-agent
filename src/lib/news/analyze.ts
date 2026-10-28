@@ -35,6 +35,7 @@ async function recordAnalysisHistory(input: {
   model: string;
   status: "success" | "failed";
   errorMessage?: string | null;
+  shadowEvaluation?: import("../ai/shadow-evaluation").ShadowEvaluation | null;
   usage?: AiTokenUsage | null;
   analysis?: {
     summary: string;
@@ -51,6 +52,7 @@ async function recordAnalysisHistory(input: {
 }): Promise<void> {
   try {
     await db.insert(aiAnalyses).values({
+      shadowEvaluation: input.shadowEvaluation ?? null,
       newsId: input.newsId,
       configurationId: input.configurationId,
       configurationVersion: input.configurationVersion,
@@ -229,6 +231,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       model: result.model ?? resolveEffectiveModel(config.model),
       status: "success",
       usage: combinedUsage,
+      shadowEvaluation: result.shadowEvaluation,
       analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, entities, shouldSend, reason },
     });
 

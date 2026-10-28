@@ -182,6 +182,7 @@ export const aiAnalyses = pgTable(
     promptTokens: integer("prompt_tokens"),
     completionTokens: integer("completion_tokens"),
     totalTokens: integer("total_tokens"),
+    shadowEvaluation: jsonb("shadow_evaluation").$type<import("../lib/ai/shadow-evaluation").ShadowEvaluation>(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (table) => [index("ai_analyses_news_created_idx").on(table.newsId, table.createdAt)],

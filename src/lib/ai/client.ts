@@ -12,6 +12,7 @@
  * prompt text.
  */
 
+import { evaluateShadow, SHADOW_INSTRUCTION, type ShadowEvaluation } from "./shadow-evaluation";
 import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { buildAIAnalysisPrompt, type ArticleInput } from "./prompt-builder";
 import { parseAiOutput, type ParsedAiOutput } from "./output-parser";
@@ -37,6 +38,7 @@ export type AiAnalysisResult =
       promptUsed: { systemPrompt: string; userPrompt: string };
       model: string;
       usage: AiTokenUsage | null;
+      shadowEvaluation?: ShadowEvaluation | null;
     }
   | { ok: false; kind: AiErrorKind; message: string; detail?: string | null };
 
@@ -75,8 +77,12 @@ export async function runAiAnalysis(
     baselineBlockedKeywords: BASELINE_BLOCKED_KEYWORDS,
   });
 
+  const shadowEnabled = process.env.AI_SHADOW_EVALUATION === "true";
+  const effectiveSystemPrompt = shadowEnabled
+    ? systemPrompt.replace("هیچ کلید یا متن اضافه‌ای اضافه نکن.", "") + "\n" + SHADOW_INSTRUCTION
+    : systemPrompt;
   const completion = await callAiChatCompletion({
-    systemPrompt,
+    systemPrompt: effectiveSystemPrompt,
     userPrompt,
     model: config.model,
     temperature: config.temperature,
@@ -89,10 +95,20 @@ export async function runAiAnalysis(
 
   try {
     const analysis = parseAiOutput(completion.rawText, config.outputSchema);
+    let shadowEvaluation: ShadowEvaluation | null = null;
+    if (shadowEnabled) {
+      try {
+        const raw = JSON.parse(completion.rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
+        shadowEvaluation = evaluateShadow(raw.shadow, [article.title, article.description].filter(Boolean).join("\n"), article.publishedAt, Date.now());
+      } catch {
+        shadowEvaluation = evaluateShadow(null, "", article.publishedAt, Date.now());
+      }
+    }
     return {
       ok: true,
       analysis,
-      promptUsed: { systemPrompt, userPrompt },
+      shadowEvaluation,
+      promptUsed: { systemPrompt: effectiveSystemPrompt, userPrompt },
       model: completion.model,
       usage: completion.usage,
     };
