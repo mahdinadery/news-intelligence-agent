@@ -152,3 +152,29 @@ test("bulletin validation rejects invalid limits, flags, text and containers", (
   }
   assert.deepEqual(validateBulletinSettings({maxItems:3, aiIntro:false, introMaxTokens:50}), []);
 });
+
+test('custom bulletin and repeated item templates shape actual rendered output', () => {
+  const output = buildBulletinMessage({intro:'مقدمه', generatedAt:new Date('2026-01-01T00:00:00Z'), timezone:'UTC',
+    items:[item({title:'اول'}),item({title:'دوم'})], settings:{template:'گزارش {title} ({count})\n{intro}\n{items}',itemTemplate:'{number} {title} | {importanceScore}\n{originalUrl}'}});
+  assert.ok(output.startsWith('گزارش بولتن خبری (2)'));
+  assert.ok(output.includes('1️⃣ اول | 80'));
+  assert.ok(output.includes('2️⃣ دوم | 80'));
+  assert.ok(!output.includes('خلاصه کوتاه خبر'));
+});
+
+test('custom templates honor visibility toggles, append omitted links and replace once only', () => {
+  const output = buildBulletinMessage({intro:'مقدمه مخفی',generatedAt:new Date('2026-01-01'),timezone:'UTC',items:[item({title:'{summary}'})],
+    settings:{aiIntro:false,showSummary:false,template:'{intro}\n{items}',itemTemplate:'{title}\n{summary}\n{whyBlock}'}});
+  assert.ok(output.includes('{summary}')); // source data cannot inject template substitutions
+  assert.ok(output.includes('https://example.com/news/1'));
+  assert.ok(!output.includes('مقدمه مخفی'));
+  assert.ok(!output.includes('خلاصه کوتاه خبر'));
+});
+
+test('bulletin templates validate unknown variables, type, length and required items', () => {
+  for (const value of [{template:'بدون خبر'}, {template:'{items} {unknown}'}, {itemTemplate:'{unknown}'}, {template:42}, {itemTemplate:'x'.repeat(8001)}]) {
+    assert.ok(validateBulletinSettings(value).length > 0);
+  }
+  assert.deepEqual(validateBulletinSettings({template:'{title}\n{items}',itemTemplate:'{title}\n{originalUrl}'}),[]);
+  assert.deepEqual(validateBulletinSettings({template:'',itemTemplate:''}),[]);
+});
