@@ -225,6 +225,7 @@ async function sendBulletin(
       title: item.title,
       oneLiner: item.summary,
       whyItMatters: item.whyItMatters,
+      hashtags: item.hashtags,
     })),
     { model: aiConfig.model, enabled: bulletin.aiIntro, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
   );
@@ -237,6 +238,7 @@ async function sendBulletin(
       title: item.title,
       oneLiner: item.summary,
       whyItMatters: item.whyItMatters,
+      hashtags: item.hashtags,
       url: item.url,
       importanceScore: item.importanceScore,
       publishedAt: item.publishedAt,

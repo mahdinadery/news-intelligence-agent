@@ -55,3 +55,13 @@ test('publishing template changes affect rendered output without an AI call', ()
   assert.equal(renderPublishingMessage('نسخه اول: {summary}', article), 'نسخه اول: خلاصه خبر');
   assert.equal(renderPublishingMessage('نسخه دوم: {importanceScore}', article), 'نسخه دوم: 70');
 });
+
+test('hashtags have an independent schema field and normalize escaped underscores', () => {
+  const hashtagSchema = [...schema, {name:'hashtags',enabled:true,required:false,type:'string'}];
+  const output = parseAiOutput(raw({hashtags:'#بازار\\_سهام #نقدینگی #نقدینگی'}), hashtagSchema);
+  assert.equal(output.hashtags, '#بازار_سهام #نقدینگی');
+  assert.equal(parseAiOutput(raw({hashtags:'#نقدینگی'}), schema).hashtags, null);
+  const rendered = renderPublishingMessage('{summary}\n{hashtags}', {title:'خبر',summary:'خلاصه',hashtags:output.hashtags});
+  assert.ok(rendered.includes('#بازار_سهام #نقدینگی'));
+  assert.ok(!rendered.includes('\\_'));
+});

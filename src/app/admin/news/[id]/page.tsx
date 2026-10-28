@@ -205,6 +205,7 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
                             </span>
                           ) : null}
                         </div>
+                        {analysis.hashtags ? <p className="mt-2 text-sm" dir="rtl">هشتگ‌ها: {analysis.hashtags}</p> : null}
                         {analysis.shadowEvaluation ? (
                           <div className="mt-2 rounded-lg border border-line-soft p-3" dir="rtl">
                             <strong>ارزیابی آزمایشی — بدون اثر بر ارسال</strong>

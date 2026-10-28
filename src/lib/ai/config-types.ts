@@ -21,6 +21,7 @@ export type AiFeatureKey =
   | "novelty"
   | "mainEvent"
   | "whyItMatters"
+  | "hashtags"
   | "entities"
   | "shouldSend"
   | "reason";
@@ -221,6 +222,7 @@ export const AI_FEATURE_ORDER: AiFeatureKey[] = [
   "novelty",
   "mainEvent",
   "whyItMatters",
+  "hashtags",
   "entities",
   "shouldSend",
   "reason",
@@ -234,6 +236,7 @@ export const AI_FEATURE_LABELS: Record<AiFeatureKey, string> = {
   novelty: "امتیاز تازگی",
   mainEvent: "رویداد اصلی",
   whyItMatters: "چرا مهم است",
+  hashtags: "هشتگ‌ها",
   entities: "نهادها و سازمان‌ها",
   shouldSend: "پیشنهاد ارسال",
   reason: "دلیل ارسال",
@@ -315,6 +318,7 @@ export const DEFAULT_FEATURES: AiFeaturesConfig = {
     enabled: true,
     instruction: WHY_IT_MATTERS_DEFAULT_INSTRUCTION,
   },
+  hashtags: { enabled: true, instruction: "سه تا پنج هشتگ مرتبط با خبر را در فیلد hashtags به صورت یک رشته با فاصله جدا کن؛ مثال: #بازار_سهام #نقدینگی. هشتگ را داخل خلاصه ننویس و بک‌اسلش اضافه نکن." },
   entities: {
     enabled: true,
     instruction:
@@ -350,6 +354,7 @@ export const DEFAULT_OUTPUT_SCHEMA: AiOutputSchema = [
   { name: "novelty", enabled: true, description: "امتیاز تازگی", required: true, type: "number", min: 0, max: 100 },
   { name: "mainEvent", enabled: true, description: "رویداد اصلی", required: false, type: "string" },
   { name: "whyItMatters", enabled: true, description: "چرا برای مخاطب مهم است", required: false, type: "string" },
+  { name: "hashtags", enabled: true, description: "هشتگ‌های مستقل؛ متن جداشده با فاصله، مانند #بازار_سهام #نقدینگی", required: false, type: "string" },
   { name: "entities", enabled: true, description: "نام بانک‌ها/شرکت‌ها/نهادهای مهم خبر (فارسی، آرایه‌ای)", required: false, type: "string" },
   { name: "shouldSend", enabled: true, description: "پیشنهاد ارسال", required: true, type: "boolean" },
   { name: "reason", enabled: true, description: "دلیل تصمیم ارسال", required: true, type: "string" },
@@ -374,7 +379,9 @@ export const DEFAULT_PUBLISHING_TEMPLATE = `📰 {category}
 
 اهمیت: {importanceScore} از ۱۰۰
 
-{originalUrl}`;
+{originalUrl}
+
+{hashtags}`;
 
 /**
  * Footer migration for stored publishing templates: the old default footer

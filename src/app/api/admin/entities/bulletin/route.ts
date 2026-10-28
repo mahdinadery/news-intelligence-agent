@@ -78,6 +78,7 @@ export async function POST(request: Request) {
         title: item.title,
         oneLiner: item.summary,
         whyItMatters: item.whyItMatters,
+      hashtags: item.hashtags,
         url: item.url,
         importanceScore: item.importanceScore,
         publishedAt: item.publishedAt,

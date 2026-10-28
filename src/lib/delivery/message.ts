@@ -18,7 +18,9 @@ const MAX_SUMMARY_LENGTH = 600;
  * pull runtime relative imports (bulletin.ts duplicates the same 8 lines).
  */
 export function escapeMd(text: string): string {
-  return text.replace(/([\\_*\[\]`])/g, "\\$1");
+  return text.split(/(#[\p{L}\p{N}_\\\u200c]+)/gu).map((part, index) =>
+    index % 2 ? part.replace(/\\_/g, "_").replace(/\\/g, "") : part.replace(/([\\_*\[\]`])/g, "\\$1")
+  ).join("");
 }
 
 export function mdLink(text: string, url: string): string {
@@ -128,5 +130,6 @@ export function buildNewsMessage(article: NewsRow, extras: MessageExtras = {}): 
     "اهمیت:",
     formatImportance(article.importanceScore),
     ...sourcesBlock,
+    ...(article.hashtags ? ["", escapeMd(article.hashtags)] : []),
   ].join("\n");
 }

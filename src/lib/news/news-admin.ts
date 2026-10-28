@@ -196,6 +196,7 @@ export type AdminNewsDetail = {
     errorMessage: string | null;
     promptTokens: number | null;
     completionTokens: number | null;
+    hashtags: string | null;
     totalTokens: number | null;
     shadowEvaluation: import("../ai/shadow-evaluation").ShadowEvaluation | null;
     createdAt: string;
@@ -269,6 +270,7 @@ export async function getAdminNewsDetail(id: string): Promise<AdminNewsDetail | 
       errorMessage: row.errorMessage,
       promptTokens: row.promptTokens ?? null,
       completionTokens: row.completionTokens ?? null,
+      hashtags: row.hashtags ?? null,
       totalTokens: row.totalTokens ?? null,
       shadowEvaluation: row.shadowEvaluation ?? null,
       createdAt: row.createdAt.toISOString(),

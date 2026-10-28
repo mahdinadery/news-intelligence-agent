@@ -193,6 +193,7 @@ export async function POST(request: Request) {
       source: article.source,
       url: "https://example.com/preview",
       publishedAt: article.publishedAt && Number.isFinite(Date.parse(article.publishedAt)) ? new Date(article.publishedAt) : null,
+      hashtags: validation.value.hashtags,
       summary: validation.value.summary,
       category: validation.value.category,
       importanceScore: validation.value.importance,

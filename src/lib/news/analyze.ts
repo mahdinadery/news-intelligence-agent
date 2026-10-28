@@ -45,6 +45,7 @@ async function recordAnalysisHistory(input: {
     novelty: number;
     mainEvent: string | null;
     whyItMatters: string | null;
+    hashtags: string | null;
     entities: string[] | null;
     shouldSend: boolean;
     reason: string;
@@ -68,6 +69,7 @@ async function recordAnalysisHistory(input: {
       relevance: input.analysis?.relevance ?? null,
       novelty: input.analysis?.novelty ?? null,
       whyItMatters: input.analysis?.whyItMatters ?? null,
+      hashtags: input.analysis?.hashtags ?? null,
       entities: input.analysis?.entities ?? null,
       mainEvent: input.analysis?.mainEvent ?? null,
       shouldSend: input.analysis?.shouldSend ?? null,
@@ -168,7 +170,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
     };
   }
 
-  const { summary, category, importance, relevance, novelty, mainEvent, whyItMatters, entities, shouldSend, reason } = result.analysis;
+  const { summary, category, importance, relevance, novelty, mainEvent, whyItMatters, hashtags, entities, shouldSend, reason } = result.analysis;
 
   // Phase 3 (#9): borderline relevance gets ONE cheap second opinion. The
   // grader can only veto ("rejected") — it never raises a score.
@@ -200,6 +202,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
         noveltyScore: novelty,
         mainEvent,
         whyItMatters,
+        hashtags,
         entityTags: entities,
         relevanceGrade,
         shouldSend,
@@ -232,7 +235,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       status: "success",
       usage: combinedUsage,
       shadowEvaluation: result.shadowEvaluation,
-      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, entities, shouldSend, reason },
+      analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, hashtags, entities, shouldSend, reason },
     });
 
     return { ok: true, newsItem: updated };
