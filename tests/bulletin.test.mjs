@@ -3,6 +3,9 @@ import test from "node:test";
 
 import {
   MAX_BULLETIN_ITEMS,
+  DEFAULT_BULLETIN_SETTINGS,
+  resolveBulletinSettings,
+  validateBulletinSettings,
   buildBulletinMessage,
   pickBulletinItems,
 } from "../src/lib/delivery/bulletin.ts";
@@ -122,4 +125,30 @@ test("buildBulletinMessage: corroborated without names still shows the badge", (
     timezone: "Asia/Tehran",
   });
   assert.ok(text.includes("تأییدشده توسط چند منبع ✓"));
+});
+
+
+test("bulletin settings preserve defaults for old configurations", () => {
+  assert.deepEqual(resolveBulletinSettings(), DEFAULT_BULLETIN_SETTINGS);
+  assert.deepEqual(validateBulletinSettings(undefined), []);
+  const args = {intro: "مقدمه نمونه", items: [item({})], generatedAt: new Date("2026-01-01T12:00:00Z"), timezone: "Asia/Tehran"};
+  assert.equal(buildBulletinMessage(args), buildBulletinMessage({...args, settings: DEFAULT_BULLETIN_SETTINGS}));
+});
+
+test("bulletin controls change title, count and optional sections, preserving source link", () => {
+  const output = buildBulletinMessage({
+    intro: "مقدمه نباید باشد", generatedAt: new Date("2026-01-01T12:00:00Z"), timezone: "Asia/Tehran",
+    items: [item({entityTags:["نهاد نمونه"], corroborated: true}), item({title:"خبر دوم"})],
+    settings: {title:"گزارش اختصاصی", maxItems:1, aiIntro:false, showSummary:false, showWhy:false, showEntities:false, showSources:false},
+  });
+  assert.ok(output.includes("گزارش اختصاصی"));
+  assert.ok(output.includes("https://example.com/news/1"));
+  for (const absent of ["خبر دوم", "مقدمه نباید باشد", "خلاصه کوتاه خبر", "چرا مهم است", "نهاد نمونه", "تأییدشده"]) assert.ok(!output.includes(absent));
+});
+
+test("bulletin validation rejects invalid limits, flags, text and containers", () => {
+  for (const value of [null, [], {maxItems:0}, {maxItems:6}, {maxItems:1.5}, {introMaxTokens:501}, {introMaxTokens:0}, {aiIntro:"false"}, {title:" "}, {introPrompt:""}]) {
+    assert.ok(validateBulletinSettings(value).length > 0);
+  }
+  assert.deepEqual(validateBulletinSettings({maxItems:3, aiIntro:false, introMaxTokens:50}), []);
 });

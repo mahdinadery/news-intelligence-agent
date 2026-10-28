@@ -20,6 +20,43 @@
 /** Upper bound of items packed into one digest (roadmap: 3–5). */
 export const MAX_BULLETIN_ITEMS = 5;
 
+export type BulletinSettings = {
+  title: string;
+  maxItems: number;
+  showSummary: boolean;
+  showWhy: boolean;
+  showEntities: boolean;
+  showSources: boolean;
+  aiIntro: boolean;
+  introPrompt: string;
+  introMaxTokens: number;
+};
+
+export const DEFAULT_BULLETIN_SETTINGS: BulletinSettings = {
+  title: "بولتن خبری", maxItems: 5, showSummary: true, showWhy: true,
+  showEntities: true, showSources: true, aiIntro: true,
+  introPrompt: "تو سردبیر یک بولتن خبری تخصصی اعتبارسنجی و رتبه‌بندی اعتباری هستی. یک جمع‌بندی فارسی ۲ تا ۴ جمله‌ای از خبرهای داده‌شده و اثر مستندشان بر ریسک اعتباری بنویس. ارتباط حدسی نساز. فقط متن جمع‌بندی، بدون عنوان یا فهرست یا Markdown.",
+  introMaxTokens: 400,
+};
+export function resolveBulletinSettings(value?: Partial<BulletinSettings>): BulletinSettings {
+  return { ...DEFAULT_BULLETIN_SETTINGS, ...value };
+}
+
+export function validateBulletinSettings(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ["تنظیمات بولتن نامعتبر است."];
+  const settings = value as Partial<BulletinSettings>;
+  const errors: string[] = [];
+  if (settings.title !== undefined && (typeof settings.title !== "string" || !settings.title.trim() || settings.title.length > 100)) errors.push("عنوان بولتن باید یک تا ۱۰۰ نویسه باشد.");
+  if (settings.maxItems !== undefined && (!Number.isInteger(settings.maxItems) || settings.maxItems < 1 || settings.maxItems > 5)) errors.push("تعداد خبر بولتن باید یک تا پنج باشد.");
+  if (settings.introMaxTokens !== undefined && (!Number.isInteger(settings.introMaxTokens) || settings.introMaxTokens < 50 || settings.introMaxTokens > 500)) errors.push("سقف توکن مقدمه باید ۵۰ تا ۵۰۰ باشد.");
+  if (settings.introPrompt !== undefined && (typeof settings.introPrompt !== "string" || !settings.introPrompt.trim() || settings.introPrompt.length > 4000)) errors.push("دستور مقدمه باید یک تا ۴۰۰۰ نویسه باشد.");
+  for (const key of ["showSummary", "showWhy", "showEntities", "showSources", "aiIntro"] as const) {
+    if (settings[key] !== undefined && typeof settings[key] !== "boolean") errors.push(`گزینه بولتن ${key} باید روشن یا خاموش باشد.`);
+  }
+  return errors;
+}
+
 export type BulletinItem = {
   id: string;
   title: string;
@@ -82,8 +119,11 @@ export function buildBulletinMessage(args: {
   generatedAt: Date;
   /** IANA timezone for the header date (e.g. "Asia/Tehran"). */
   timezone: string;
+  settings?: Partial<BulletinSettings>;
 }): string {
-  const { intro, items, generatedAt, timezone } = args;
+  const { intro, generatedAt, timezone } = args;
+  const settings = resolveBulletinSettings(args.settings);
+  const items = args.items.slice(0, settings.maxItems);
 
   let dateLabel = generatedAt.toISOString().slice(0, 10);
   try {
@@ -95,10 +135,10 @@ export function buildBulletinMessage(args: {
     // Invalid timezone => keep the ISO date.
   }
 
-  const lines: string[] = [`🗞️ بولتن خبری — ${dateLabel}`];
+  const lines: string[] = [`🗞️ ${escapeMd(settings.title)} — ${dateLabel}`];
 
   const introText = compact(intro, 600);
-  if (introText) {
+  if (settings.aiIntro && introText) {
     lines.push("", escapeMd(introText));
   }
 
@@ -106,17 +146,17 @@ export function buildBulletinMessage(args: {
     const marker = NUMBER_EMOJI[index] ?? `${index + 1}.`;
     lines.push("", `${marker} ${escapeMd(compact(item.title, 160))}`);
     const oneLiner = compact(item.oneLiner, 220);
-    if (oneLiner) lines.push(escapeMd(oneLiner));
+    if (settings.showSummary && oneLiner) lines.push(escapeMd(oneLiner));
     const why = compact(item.whyItMatters, 220);
-    if (why) lines.push(`چرا مهم است: ${escapeMd(why)}`);
+    if (settings.showWhy && why) lines.push(`چرا مهم است: ${escapeMd(why)}`);
     const entities = (item.entityTags ?? []).slice(0, 4).join("، ");
-    if (entities) lines.push(`نهادها: ${escapeMd(entities)}`);
+    if (settings.showEntities && entities) lines.push(`نهادها: ${escapeMd(entities)}`);
     const otherSources = (item.corroborationSources ?? []).slice(0, 3).map((name) => escapeMd(name));
-    if (otherSources.length > 0) {
+    if (settings.showSources && otherSources.length > 0) {
       lines.push(
         `تأییدشده توسط ${Math.max(2, otherSources.length + 1).toLocaleString("fa-IR")} منبع: ${otherSources.join("، ")}`,
       );
-    } else if (item.corroborated) {
+    } else if (settings.showSources && item.corroborated) {
       lines.push("تأییدشده توسط چند منبع ✓");
     }
     // Per-item link: the label «لینک اصلی خبر» IS the hyperlink (user spec).

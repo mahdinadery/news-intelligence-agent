@@ -7,6 +7,7 @@
  * transaction so exactly one configuration is ever active.
  */
 
+import { validateBulletinSettings } from "../delivery/bulletin";
 import { db } from "@/db";
 import { aiConfigurations, type AiConfigurationRow } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -320,6 +321,7 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
   if (!rules) {
     errors.push("قوانین تصمیم‌گیری تعریف نشده است.");
   } else {
+    errors.push(...validateBulletinSettings(rules.bulletin));
     if (rules.shadowMinImportance !== undefined && (!Number.isInteger(rules.shadowMinImportance) || rules.shadowMinImportance < 0 || rules.shadowMinImportance > 100)) errors.push("آستانه اهمیت آزمایشی باید عدد صحیح صفر تا صد باشد.");
     for (const key of ["freshHours", "recentHours"] as const) {
       if (rules[key] !== undefined && (!Number.isInteger(rules[key]) || rules[key]! < 1 || rules[key]! > 8760)) errors.push(`تنظیم ${key} باید عدد صحیح یک تا ۸۷۶۰ ساعت باشد.`);
