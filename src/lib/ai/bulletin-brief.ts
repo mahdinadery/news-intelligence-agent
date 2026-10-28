@@ -26,8 +26,9 @@ const BRIEF_SYSTEM_PROMPT = `تو سردبیر یک بولتن خبری تخصص
  */
 export async function synthesizeBulletinBrief(
   items: BulletinBriefInput[],
-  config: { model?: string | null; temperature?: number | null; maxTokens?: number | null },
+  config: { model?: string | null; temperature?: number | null; maxTokens?: number | null; introPrompt?: string; enabled?: boolean },
 ): Promise<string | null> {
+  if (config.enabled === false) return null;
   if (items.length === 0) return null;
   if (!process.env.AI_API_KEY?.trim()) return null;
 
@@ -43,7 +44,7 @@ export async function synthesizeBulletinBrief(
 
   try {
     const completion = await callAiChatCompletion({
-      systemPrompt: BRIEF_SYSTEM_PROMPT,
+      systemPrompt: config.introPrompt?.trim() || BRIEF_SYSTEM_PROMPT,
       userPrompt: `خبرهای این بولتن:\n${listing}`,
       model: config.model ?? undefined,
       temperature: config.temperature ?? 0.4,

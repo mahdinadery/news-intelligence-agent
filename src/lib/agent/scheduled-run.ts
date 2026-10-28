@@ -12,10 +12,10 @@
 
 import { db } from "@/db";
 import { agentSchedules, deliveries, news, type NewsRow } from "@/db/schema";
-import { readActiveOperationalSettings } from "@/lib/ai/config-service";
+import { getActiveAiConfig, readActiveOperationalSettings } from "@/lib/ai/config-service";
 import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
 import { sendBulletinDelivery } from "@/lib/delivery";
-import { buildBulletinMessage, MAX_BULLETIN_ITEMS, pickBulletinItems } from "@/lib/delivery/bulletin";
+import { buildBulletinMessage, resolveBulletinSettings, MAX_BULLETIN_ITEMS, pickBulletinItems } from "@/lib/delivery/bulletin";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { expandTargets } from "@/lib/delivery/types";
 import {
@@ -190,6 +190,9 @@ async function sendBulletin(
   items: NewsRow[],
   options: { recordRows: boolean; recordIds?: string[]; trigger: "schedule" | "manual" },
 ): Promise<ScheduleBulletinSummary> {
+  const aiConfig = await getActiveAiConfig();
+  const bulletin = resolveBulletinSettings(aiConfig.decisionRules.bulletin);
+  items = items.slice(0, bulletin.maxItems);
   // Batch lookup of other outlets carrying each corroborated item's event —
   // the digest lists them under the chosen story.
   const sourceNamesByKey = new Map<string, string[]>();
@@ -223,10 +226,11 @@ async function sendBulletin(
       oneLiner: item.summary,
       whyItMatters: item.whyItMatters,
     })),
-    {},
+    { model: aiConfig.model, enabled: bulletin.aiIntro, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
   );
 
   const text = buildBulletinMessage({
+    settings: bulletin,
     intro,
     items: items.map((item) => ({
       id: item.id,
@@ -250,7 +254,7 @@ async function sendBulletin(
     text,
     // Ledger rows only for the never-delivered subset (recap items already
     // carry their own rows from the per-item sends).
-    newsIds: options.recordIds ?? items.map((item) => item.id),
+    newsIds: options.recordIds ? options.recordIds.filter(id => items.some(item => item.id === id)) : items.map((item) => item.id),
     target: config.destination,
     trigger: options.trigger === "schedule" ? "auto" : "manual",
     recordRows: options.recordRows,

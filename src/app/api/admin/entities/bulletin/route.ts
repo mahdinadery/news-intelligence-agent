@@ -6,6 +6,7 @@
  * Manual only — the operator explicitly asks for it from the dossier page.
  */
 
+import { getActiveAiConfig } from "@/lib/ai/config-service";
 import { checkAdminAccess } from "@/lib/admin/access";
 import { dbErrorResponse } from "@/lib/admin/db-error-response";
 import { runWithSchemaRepair } from "@/lib/admin/schema-sync";
@@ -13,7 +14,7 @@ import { db } from "@/db";
 import { news } from "@/db/schema";
 import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
 import { sendBulletinDelivery } from "@/lib/delivery";
-import { buildBulletinMessage, pickBulletinItems } from "@/lib/delivery/bulletin";
+import { buildBulletinMessage, resolveBulletinSettings, pickBulletinItems } from "@/lib/delivery/bulletin";
 import { coerceScheduleConfig } from "@/lib/agent/schedule";
 import { evaluateArticle } from "@/lib/agent/rules";
 import { collapseEventGroups } from "@/lib/news/corroboration";
@@ -56,7 +57,9 @@ export async function POST(request: Request) {
     // Same-event copies collapse to one digest entry («یک خبر، چند منبع»).
     const collapsed = collapseEventGroups(matched);
     const qualifying = collapsed.filter((row) => evaluateArticle(row, rule).matches);
-    const items = pickBulletinItems(qualifying, 5);
+    const aiConfig = await getActiveAiConfig();
+    const bulletin = resolveBulletinSettings(aiConfig.decisionRules.bulletin);
+    const items = pickBulletinItems(qualifying, bulletin.maxItems);
 
     if (items.length === 0) {
       return { sent: false, itemCount: 0, reason: "no_qualifying_items" as const };
@@ -64,10 +67,11 @@ export async function POST(request: Request) {
 
     const intro = await synthesizeBulletinBrief(
       items.map((item) => ({ title: item.title, oneLiner: item.summary, whyItMatters: item.whyItMatters })),
-      {},
+      { model: aiConfig.model, enabled: bulletin.aiIntro, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
     );
 
     const text = buildBulletinMessage({
+      settings: bulletin,
       intro,
       items: items.map((item) => ({
         id: item.id,

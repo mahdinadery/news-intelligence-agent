@@ -21,6 +21,7 @@ import {
   type ActiveAiConfig,
 } from "@/lib/ai/config-types";
 import { DEFAULT_AUDIENCE_FOCUS } from "@/lib/ai/prompt-builder";
+import { BulletinConfigPanel } from "./bulletin-config-panel";
 import { KeywordListEditor } from "./keyword-list-editor";
 import { BASELINE_BLOCKED_KEYWORDS } from "@/lib/news/topic-filter";
 import { PUBLISHING_TEMPLATE_VARS, findUnknownTemplateVars } from "@/lib/delivery/template";
@@ -1068,6 +1069,8 @@ export function AiConfigConsole({ adminKey }: Props) {
         <p className="text-xs text-muted">بازه‌های زمانی و حداقل اهمیت بالا فقط پیشنهاد ارزیابی آزمایشی را تغییر می‌دهند؛ شرط ارسال واقعی نیستند. وزن اهمیت فعلاً ثابت است: شدت ۵۰٪، گستردگی ۳۰٪، فوریت ۲۰٪.</p>
         <p className="text-xs text-muted">تست، نیاز به داور دوم را نمایش می‌دهد اما درخواست داور را اجرا نمی‌کند. نتیجهٔ ارزیابی آزمایشی نیز در پیش‌نمایش دیده می‌شود.</p>
       </section>
+
+      <BulletinConfigPanel value={draft.decisionRules.bulletin} onChange={bulletin => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, bulletin } })} />
 
       {/* Test Configuration */}
       <AiConfigTestPanel adminKey={adminKey} draftConfig={draft} />
