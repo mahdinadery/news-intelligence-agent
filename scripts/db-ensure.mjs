@@ -272,6 +272,7 @@ const STEPS = [
   { name: "column ai_analyses.why_it_matters", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "why_it_matters" text` },
   { name: "column ai_analyses.prompt_tokens", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "prompt_tokens" integer` },
   { name: "column ai_analyses.completion_tokens", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "completion_tokens" integer` },
+  { name: "column ai_analyses.shadow_evaluation", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "shadow_evaluation" jsonb` },
   { name: "column ai_analyses.total_tokens", sql: `ALTER TABLE "ai_analyses" ADD COLUMN IF NOT EXISTS "total_tokens" integer` },
   { name: "column news_sources.last_item_count", sql: `ALTER TABLE "news_sources" ADD COLUMN IF NOT EXISTS "last_item_count" integer` },
   { name: "column news_sources.last_newest_published_at", sql: `ALTER TABLE "news_sources" ADD COLUMN IF NOT EXISTS "last_newest_published_at" timestamp with time zone` },

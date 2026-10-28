@@ -205,6 +205,16 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
                             </span>
                           ) : null}
                         </div>
+                        {analysis.shadowEvaluation ? (
+                          <div className="mt-2 rounded-lg border border-line-soft p-3" dir="rtl">
+                            <strong>ارزیابی آزمایشی — بدون اثر بر ارسال</strong>
+                            <p>ارتباط: {({ direct: "مستقیم", impact: "اثر مشخص", unrelated: "نامرتبط", uncertain: "مبهم" })[analysis.shadowEvaluation.relation]}</p>
+                            <p>شاهد: {analysis.shadowEvaluation.evidence ?? "شاهد معتبر موجود نیست"}</p>
+                            <p>اهمیت: {analysis.shadowEvaluation.importance} از ۱۰۰</p>
+                            <p>زمان: {({ fresh: "کمتر از ۲۴ ساعت", recent: "۱ تا ۳ روز", old: "قدیمی‌تر از ۳ روز", unknown: "نامشخص", future: "تاریخ آینده؛ بررسی لازم" })[analysis.shadowEvaluation.freshness]}</p>
+                            <p>پیشنهاد: {({ candidate: "نامزد ارسال", reject: "عدم ارسال", review: "نیازمند بررسی" })[analysis.shadowEvaluation.decision]}</p>
+                          </div>
+                        ) : null}
                         {analysis.status === "success" ? (
                           <p className="mt-1.5 text-muted">
                             {analysis.summary?.slice(0, 140)}… — اهمیت {analysis.importance}، ارسال {analysis.shouldSend ? "بله" : "خیر"}

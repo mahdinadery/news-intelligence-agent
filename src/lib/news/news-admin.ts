@@ -197,6 +197,7 @@ export type AdminNewsDetail = {
     promptTokens: number | null;
     completionTokens: number | null;
     totalTokens: number | null;
+    shadowEvaluation: import("../ai/shadow-evaluation").ShadowEvaluation | null;
     createdAt: string;
   }>;
   duplicateOf: { id: string; title: string } | null;
@@ -269,6 +270,7 @@ export async function getAdminNewsDetail(id: string): Promise<AdminNewsDetail | 
       promptTokens: row.promptTokens ?? null,
       completionTokens: row.completionTokens ?? null,
       totalTokens: row.totalTokens ?? null,
+      shadowEvaluation: row.shadowEvaluation ?? null,
       createdAt: row.createdAt.toISOString(),
     })),
   };
