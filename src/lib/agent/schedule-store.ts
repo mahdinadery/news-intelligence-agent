@@ -268,3 +268,10 @@ export async function recordRunResult(id: string | null, summary: AgentRunSummar
     console.error("[schedule] could not store run result:", String(error).slice(0, 200));
   }
 }
+
+/** No message was attempted: allow the next tick to retry when fresh news arrives. */
+export async function releaseEmptyBulletinSlot(id: string | null, slotKey: string): Promise<void> {
+  if (!id) return;
+  await db.update(agentSchedules).set({ lastBulletinSlot: null, updatedAt: new Date() })
+    .where(and(eq(agentSchedules.id, id), eq(agentSchedules.lastBulletinSlot, slotKey)));
+}
