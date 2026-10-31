@@ -327,7 +327,7 @@ export function validateAiConfigInput(input: AiConfigInput): ConfigValidationRes
       if (rules[key] !== undefined && (!Number.isInteger(rules[key]) || rules[key]! < 1 || rules[key]! > 8760)) errors.push(`تنظیم ${key} باید عدد صحیح یک تا ۸۷۶۰ ساعت باشد.`);
     }
     if ((rules.freshHours ?? 24) > (rules.recentHours ?? 72)) errors.push("بازه تازه نباید از بازه اخیر بیشتر باشد.");
-    for (const key of ["graderEnabled", "shadowEvaluationEnabled"] as const) {
+    for (const key of ["ragEnabled", "graderEnabled", "shadowEvaluationEnabled"] as const) {
       if (rules[key] !== undefined && typeof rules[key] !== "boolean") errors.push(`تنظیم ${key} باید روشن یا خاموش باشد.`);
     }
     for (const key of ["graderMin", "graderMax"] as const) {

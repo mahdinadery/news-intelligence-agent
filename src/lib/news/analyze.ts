@@ -11,6 +11,7 @@
  * reproduces the original Milestone 4 prompt behavior — is created automatically.
  */
 
+import { retrieveNewsMemory } from "./retrieve-memory";
 import { db } from "@/db";
 import { aiAnalyses, news, type NewsRow } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -36,6 +37,7 @@ async function recordAnalysisHistory(input: {
   status: "success" | "failed";
   errorMessage?: string | null;
   shadowEvaluation?: import("../ai/shadow-evaluation").ShadowEvaluation | null;
+  ragAudit?: import("../ai/rag-memory").RagAudit | null;
   usage?: AiTokenUsage | null;
   analysis?: {
     summary: string;
@@ -54,6 +56,7 @@ async function recordAnalysisHistory(input: {
   try {
     await db.insert(aiAnalyses).values({
       shadowEvaluation: input.shadowEvaluation ?? null,
+      ragAudit: input.ragAudit ?? null,
       newsId: input.newsId,
       configurationId: input.configurationId,
       configurationVersion: input.configurationVersion,
@@ -135,9 +138,12 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
     // Best effort; on a transient bookkeeping error the analysis will still proceed.
   }
 
+  const ragAudit = await retrieveNewsMemory({id, title:article.title,description:article.description,before:article.createdAt,publishedAt:article.publishedAt?.toISOString()}, config.decisionRules.ragEnabled === true);
+
   // AI Service call — prompt/model/thresholds/output schema all come from `config`.
   const result = await runAiAnalysis(
     {
+      ragMemory: ragAudit,
       title: article.title,
       description: article.description,
       source: article.source,
@@ -155,6 +161,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       configurationVersion: config.version,
       model: resolveEffectiveModel(config.model),
       status: "failed",
+      ragAudit,
       errorMessage: `${result.message}${result.detail ? ` — ${String(result.detail).slice(0, 300)}` : ""}`,
     });
     try {
@@ -235,6 +242,7 @@ export async function analyzeArticle(id: string): Promise<AnalyzeResult> {
       status: "success",
       usage: combinedUsage,
       shadowEvaluation: result.shadowEvaluation,
+      ragAudit: {...ragAudit, assessment:result.memoryAssessment},
       analysis: { summary, category, importance, relevance, novelty, mainEvent: mainEvent ?? null, whyItMatters, hashtags, entities, shouldSend, reason },
     });
 

@@ -1070,6 +1070,13 @@ export function AiConfigConsole({ adminKey }: Props) {
         <p className="text-xs text-muted">تست، نیاز به داور دوم را نمایش می‌دهد اما درخواست داور را اجرا نمی‌کند. نتیجهٔ ارزیابی آزمایشی نیز در پیش‌نمایش دیده می‌شود.</p>
       </section>
 
+      <section className="rounded-2xl border border-line bg-surface p-5 space-y-3" dir="rtl">
+        <h2 className="font-bold">حافظهٔ خبری RAG (آزمایشی)</h2>
+        <label className="block text-sm"><input type="checkbox" checked={draft.decisionRules.ragEnabled === true} onChange={event => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, ragEnabled: event.target.checked } })} /> مقایسه با سوابق آرشیو</label>
+        <p className="text-xs text-muted">جست‌وجوی متنی بین حداکثر ۲۰۰ خبر قبلی در ۳۰ روز؛ ارسال حداکثر ۳ سابقهٔ کوتاه در همان درخواست تحلیل. embedding یا درخواست AI جدا ندارد، اما ورودی/خروجی اضافه توکن مصرف می‌کند. نتیجه فقط برای بررسی است و خودکار خبر را حذف نمی‌کند.</p>
+        <p className="text-xs text-muted">تست پیکربندی، منابع بازیابی‌شده و نتیجهٔ مقایسه را نمایش می‌دهد؛ پس از ذخیره و فعال‌سازی در تحلیل خبرهای بعدی اعمال می‌شود.</p>
+      </section>
+
       <BulletinConfigPanel value={draft.decisionRules.bulletin} onChange={bulletin => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, bulletin } })} />
 
       {/* Test Configuration */}

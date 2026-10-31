@@ -198,6 +198,7 @@ export type AdminNewsDetail = {
     completionTokens: number | null;
     hashtags: string | null;
     totalTokens: number | null;
+    ragAudit: import("../ai/rag-memory").RagAudit | null;
     shadowEvaluation: import("../ai/shadow-evaluation").ShadowEvaluation | null;
     createdAt: string;
   }>;
@@ -272,6 +273,7 @@ export async function getAdminNewsDetail(id: string): Promise<AdminNewsDetail | 
       completionTokens: row.completionTokens ?? null,
       hashtags: row.hashtags ?? null,
       totalTokens: row.totalTokens ?? null,
+      ragAudit: row.ragAudit ?? null,
       shadowEvaluation: row.shadowEvaluation ?? null,
       createdAt: row.createdAt.toISOString(),
     })),

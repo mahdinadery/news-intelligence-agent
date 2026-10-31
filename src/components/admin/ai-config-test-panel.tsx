@@ -1,5 +1,6 @@
 "use client";
 
+import { RagAuditPanel } from "./rag-audit-panel";
 import { useEffect, useState } from "react";
 import type { AiConfigInput } from "@/lib/ai/config-types";
 
@@ -19,6 +20,7 @@ type TestResponse = {
   } | null;
   promptUsed?: { systemPrompt: string; userPrompt: string };
   operationalPreview?: { topicGate: { verdict: string; reason: string; blockedKeywords?: string[]; matchedTopics: string[] }; graderWouldRun: boolean; shadowEvaluation: import("@/lib/ai/shadow-evaluation").ShadowEvaluation | null };
+  ragAudit?: import("@/lib/ai/rag-memory").RagAudit;
   rawResponse?: string;
   publishingPreview?: string | null;
   validation?: {
@@ -237,6 +239,7 @@ export function AiConfigTestPanel({ draftConfig, adminKey }: Props) {
                 </pre>
               </div>
 
+              {result.ragAudit ? <RagAuditPanel audit={result.ragAudit} /> : null}
               {result.operationalPreview ? (
                 <div className="rounded-xl border border-line p-3 text-sm" dir="rtl">
                   <h4 className="font-bold">پیش‌نمایش قواعد اجرایی</h4>
