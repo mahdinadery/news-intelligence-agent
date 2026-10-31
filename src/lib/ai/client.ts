@@ -12,6 +12,7 @@
  * prompt text.
  */
 
+import { parseMemoryAssessment, type MemoryAssessment } from "./rag-memory";
 import { effectiveOutputSchema } from "./effective-schema";
 import { evaluateShadow, SHADOW_INSTRUCTION, type ShadowEvaluation } from "./shadow-evaluation";
 import { baselineKeywords } from "@/lib/news/topic-filter";
@@ -40,6 +41,7 @@ export type AiAnalysisResult =
       model: string;
       usage: AiTokenUsage | null;
       shadowEvaluation?: ShadowEvaluation | null;
+      memoryAssessment?: MemoryAssessment | null;
     }
   | { ok: false; kind: AiErrorKind; message: string; detail?: string | null };
 
@@ -110,6 +112,7 @@ export async function runAiAnalysis(
       ok: true,
       analysis,
       shadowEvaluation,
+      memoryAssessment: article.ragMemory?.documents.length ? parseMemoryAssessment(completion.rawText, article.ragMemory.documents) : null,
       promptUsed: { systemPrompt: effectiveSystemPrompt, userPrompt },
       model: completion.model,
       usage: completion.usage,

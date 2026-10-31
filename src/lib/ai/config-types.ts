@@ -45,6 +45,7 @@ export type AiFeaturesConfig = Record<AiFeatureKey, AiFeatureConfig>;
  * the AI *recommends* — it never sends anything (Milestone 5 scope).
  */
 export type AiDecisionRules = {
+  ragEnabled?: boolean;
   bulletin?: Partial<import("../delivery/bulletin").BulletinSettings>;
   /** Missing preserves the environment fallback; explicit false disables shadow. */
   shadowEvaluationEnabled?: boolean;

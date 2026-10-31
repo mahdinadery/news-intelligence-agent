@@ -1,3 +1,4 @@
+import { RagAuditPanel } from "@/components/admin/rag-audit-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -206,6 +207,7 @@ export default async function AdminNewsDetailPage({ params, searchParams }: Page
                           ) : null}
                         </div>
                         {analysis.hashtags ? <p className="mt-2 text-sm" dir="rtl">هشتگ‌ها: {analysis.hashtags}</p> : null}
+                        {analysis.ragAudit ? <RagAuditPanel audit={analysis.ragAudit} /> : null}
                         {analysis.shadowEvaluation ? (
                           <div className="mt-2 rounded-lg border border-line-soft p-3" dir="rtl">
                             <strong>ارزیابی آزمایشی — بدون اثر بر ارسال</strong>

@@ -184,6 +184,7 @@ export const aiAnalyses = pgTable(
     promptTokens: integer("prompt_tokens"),
     completionTokens: integer("completion_tokens"),
     totalTokens: integer("total_tokens"),
+    ragAudit: jsonb("rag_audit").$type<import("../lib/ai/rag-memory").RagAudit>(),
     shadowEvaluation: jsonb("shadow_evaluation").$type<import("../lib/ai/shadow-evaluation").ShadowEvaluation>(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },

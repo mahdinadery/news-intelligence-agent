@@ -1,3 +1,5 @@
+import { retrieveNewsMemory } from "@/lib/news/retrieve-memory";
+import { parseMemoryAssessment } from "@/lib/ai/rag-memory";
 import { SHADOW_INSTRUCTION, evaluateShadow } from "@/lib/ai/shadow-evaluation";
 import { isBorderlineRelevance } from "@/lib/ai/grade-rules";
 import { effectiveOutputSchema } from "@/lib/ai/effective-schema";
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
 
   // Resolve the article: an existing stored row (read-only) or a manual/pasted one.
   let article: ManualArticle;
+  let memoryBefore = new Date();
 
   if (body.articleId) {
     const [row] = await db
@@ -115,6 +118,7 @@ export async function POST(request: Request) {
         description: news.description,
         source: news.source,
         publishedAt: news.publishedAt,
+        createdAt: news.createdAt,
       })
       .from(news)
       .where(eq(news.id, body.articleId))
@@ -124,6 +128,7 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: "خبر انتخاب‌شده پیدا نشد." }, { status: 404 });
     }
 
+    memoryBefore = row.createdAt;
     article = {
       title: row.title,
       description: row.description,
@@ -144,7 +149,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(configForPrompt, article, {
+  const ragAudit = await retrieveNewsMemory({ ...article, id:body.articleId, before:memoryBefore }, configForPrompt.decisionRules.ragEnabled === true);
+  const { systemPrompt, userPrompt } = buildAIAnalysisPrompt(configForPrompt, {...article, ragMemory:ragAudit}, {
     baselineBlockedKeywords: baselineKeywords(configForPrompt.topicFilter),
   });
 
@@ -179,6 +185,7 @@ export async function POST(request: Request) {
   }
   return Response.json({
     success: true,
+    ragAudit: {...ragAudit, assessment: ragAudit.documents.length ? parseMemoryAssessment(completion.rawText, ragAudit.documents) : null},
     operationalPreview: {
       topicGate: evaluateTopicFilter(article, configForPrompt.topicFilter),
       graderWouldRun: validation.ok && isBorderlineRelevance(validation.value.relevance, configForPrompt.decisionRules),
