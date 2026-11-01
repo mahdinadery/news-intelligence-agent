@@ -16,7 +16,7 @@ import { synthesizeBulletinBrief } from "@/lib/ai/bulletin-brief";
 import { sendBulletinDelivery } from "@/lib/delivery";
 import { buildBulletinMessage, resolveBulletinSettings, pickBulletinItems } from "@/lib/delivery/bulletin";
 import { coerceScheduleConfig } from "@/lib/agent/schedule";
-import { evaluateArticle } from "@/lib/agent/rules";
+import { applyActiveSendFloors, evaluateArticle } from "@/lib/agent/rules";
 import { collapseEventGroups } from "@/lib/news/corroboration";
 import { scheduleToRule } from "@/lib/agent/scheduled-run";
 import { readScheduleRecord } from "@/lib/agent/schedule-store";
@@ -53,11 +53,11 @@ export async function POST(request: Request) {
     const matched = rows.filter((row) => (row.entityTags ?? []).some((entity) => entity.trim() === name));
 
     const record = await readScheduleRecord();
-    const rule = scheduleToRule(coerceScheduleConfig(record));
+    const aiConfig = await getActiveAiConfig();
+    const rule = applyActiveSendFloors(scheduleToRule(coerceScheduleConfig(record)), aiConfig);
     // Same-event copies collapse to one digest entry («یک خبر، چند منبع»).
     const collapsed = collapseEventGroups(matched);
     const qualifying = collapsed.filter((row) => evaluateArticle(row, rule).matches);
-    const aiConfig = await getActiveAiConfig();
     const bulletin = resolveBulletinSettings(aiConfig.decisionRules.bulletin);
     const items = pickBulletinItems(qualifying, bulletin.maxItems);
 

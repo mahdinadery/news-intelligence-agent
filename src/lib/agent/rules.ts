@@ -11,11 +11,7 @@
 
 import type { NewsRow } from "@/db/schema";
 
-// Mirrors CORROBORATION_BONUS in src/lib/news/corroboration.ts — kept inline on
-// purpose: this module is imported by the Node test runner, which cannot
-// resolve runtime `@/` imports (type-only imports are erased and fine).
-const CORROBORATION_BONUS = 10;
-import type { AiAutoSendPolicy } from "@/lib/ai/config-types";
+import type { AiAutoSendPolicy, AiDecisionRules } from "@/lib/ai/config-types";
 import type { DeliveryTarget } from "@/lib/delivery/types";
 
 export type AutoSendRule = {
@@ -114,6 +110,17 @@ export function policyToRule(policy: AiAutoSendPolicy): AutoSendRule {
   };
 }
 
+/** Active AI thresholds are hard lower bounds for every automatic path. */
+export function applyActiveSendFloors(rule: AutoSendRule, config: { decisionRules: AiDecisionRules; autoSendPolicy?: AiAutoSendPolicy }): AutoSendRule {
+  const custom = config.autoSendPolicy?.useCustom ? config.autoSendPolicy : null;
+  return {
+    ...rule,
+    minImportance: Math.max(rule.minImportance, config.decisionRules.minImportanceToSend, custom?.minImportance ?? 0),
+    minRelevance: Math.max(rule.minRelevance, config.decisionRules.minRelevanceToSend, custom?.minRelevance ?? 0),
+    minNovelty: Math.max(rule.minNovelty, config.decisionRules.minNoveltyToSend, custom?.minNovelty ?? 0),
+  };
+}
+
 export type RuleCheck = {
   matches: boolean;
   /** Machine-readable reasons, e.g. "importance_below_threshold". */
@@ -147,10 +154,8 @@ export function evaluateArticle(article: NewsRow, rule: AutoSendRule): RuleCheck
     return { matches: false, reasons };
   }
 
-  // Phase 3 (#10): multi-source confirmation gives a small importance bonus
-  // (relevance is NEVER touched — the AND rule stays strict).
-  const importance =
-    (article.importanceScore ?? 0) + ((article.corroborationCount ?? 0) >= 2 ? CORROBORATION_BONUS : 0);
+  // Compare stored raw scores: corroboration must never lift an 80 over a 90 floor.
+  const importance = article.importanceScore ?? 0;
   const relevance = article.relevanceScore ?? 0;
   const novelty = article.noveltyScore ?? 0;
 
