@@ -1,29 +1,13 @@
-/**
- * Auto-send rule resolution — the ONLY place that decides where the effective
- * policy comes from (SERVER-SIDE, does IO):
- *
- *   1. dashboard policy — the versioned `autoSendPolicy` on the active AI
- *      configuration, when its `useCustom` flag is on
- *   2. env AUTO_SEND_* rule (historical default, unchanged behavior)
- *
- * Kept out of src/lib/agent/rules.ts so that module stays pure/unit-testable.
- * Never throws: a DB read failure falls back to the env rule.
+/** Resolve the active send policy, with AI-config thresholds as hard floors.
+ * Configuration read errors propagate: never silently send using lower env values.
  */
-
-import { readActiveOperationalSettings } from "@/lib/ai/config-service";
-import { loadAutoSendRule, policyToRule, type AutoSendRule } from "./rules";
+import { getActiveAiConfig } from "@/lib/ai/config-service";
+import { applyActiveSendFloors, loadAutoSendRule, policyToRule, type AutoSendRule } from "./rules";
 
 export { policyToRule };
 
 export async function resolveAutoSendRule(): Promise<AutoSendRule> {
-  try {
-    const settings = await readActiveOperationalSettings();
-    const policy = settings?.autoSendPolicy;
-    if (policy?.useCustom) {
-      return policyToRule(policy);
-    }
-  } catch {
-    // fall through to env
-  }
-  return loadAutoSendRule();
+  const config = await getActiveAiConfig();
+  const base = config.autoSendPolicy?.useCustom ? policyToRule(config.autoSendPolicy) : loadAutoSendRule();
+  return applyActiveSendFloors(base, config);
 }

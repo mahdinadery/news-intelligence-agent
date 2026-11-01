@@ -1079,6 +1079,10 @@ export function AiConfigConsole({ adminKey }: Props) {
 
       <BulletinConfigPanel value={draft.decisionRules.bulletin} onChange={bulletin => setDraft({ ...draft, decisionRules: { ...draft.decisionRules, bulletin } })} />
 
+      <p className="rounded-xl border border-line p-3 text-sm" dir="rtl">
+        حداقل اهمیت و مرتبط‌بودنِ قوانین تصمیم، کف سخت ارسال خودکار هستند. ارسال خودکار و زمان‌بندی نمی‌توانند با آستانهٔ پایین‌تر از آن‌ها خبر بفرستند؛ هر دو امتیاز خام باید حداقل را داشته باشند و تأیید چندمنبعی جای امتیاز کمتر را نمی‌گیرد. پس از تغییر «ذخیره و فعال‌سازی» لازم است.
+      </p>
+
       {/* Test Configuration */}
       <AiConfigTestPanel adminKey={adminKey} draftConfig={draft} />
 

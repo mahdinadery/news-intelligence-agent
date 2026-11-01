@@ -11,13 +11,14 @@
  * (after fetch / after analysis) or when the user triggers it explicitly.
  */
 
+import { getActiveAiConfig } from "@/lib/ai/config-service";
 import { db } from "@/db";
 import { deliveries, news, type NewsRow } from "@/db/schema";
 import { sendNewsDelivery } from "@/lib/delivery";
 import { expandTargets } from "@/lib/delivery/types";
 import { and, desc, inArray, sql } from "drizzle-orm";
 import { resolveAutoSendRule } from "./resolve-rule";
-import { evaluateArticle, type AutoSendRule } from "./rules";
+import { applyActiveSendFloors, evaluateArticle, type AutoSendRule } from "./rules";
 
 export type AutoSendItem = {
   id: string;
@@ -101,7 +102,10 @@ export async function runAutoDeliveryPass(
   // The scheduled publisher passes its own rule so its configured time slots,
   // destination and thresholds stay independent from the "after analysis"
   // auto-send policy.
-  const rule = options.rule ?? (await resolveAutoSendRule());
+  // Supplied schedule rules must obey the same active floors as resolved rules.
+  const rule = options.rule
+    ? applyActiveSendFloors(options.rule, await getActiveAiConfig())
+    : await resolveAutoSendRule();
 
   if (!rule.enabled && !options.force) {
     return { ...NOT_MATCHED, destination: rule.destination };
@@ -150,7 +154,7 @@ export async function runAutoDeliveryPass(
       continue;
     }
 
-    const check = options.force ? { matches: true, reasons: [] as string[] } : evaluateArticle(article, rule);
+    const check = evaluateArticle(article, rule);
 
     if (!check.matches) {
       result.items.push({

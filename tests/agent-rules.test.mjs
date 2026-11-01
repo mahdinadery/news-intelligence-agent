@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  applyActiveSendFloors,
   describeRule,
   evaluateArticle,
   loadAutoSendRule,
@@ -167,4 +168,31 @@ test("describeRule renders policy summary", () => {
   assert.ok(lines.some((line) => line.includes("اقتصاد")));
   assert.ok(lines.some((line) => line.includes("shouldSend")));
   assert.ok(lines.some((line) => line.includes("AND")));
+});
+
+
+const config90 = {decisionRules:{minImportanceToSend:90,minRelevanceToSend:90,minNoveltyToSend:0}};
+test('active 90 floors reject 80 in either score even if AI recommends sending', () => {
+  const effective = applyActiveSendFloors(rule(),config90);
+  for (const scores of [{importanceScore:80,relevanceScore:95},{importanceScore:95,relevanceScore:80},{importanceScore:80,relevanceScore:80}]) {
+    assert.equal(evaluateArticle(article({...scores,shouldSend:true}),effective).matches,false);
+  }
+  assert.equal(evaluateArticle(article({importanceScore:90,relevanceScore:90}),effective).matches,true);
+});
+test('corroboration cannot turn raw 80 into eligible 90', () => {
+  const result = evaluateArticle(article({importanceScore:80,relevanceScore:95,corroborationCount:3}),applyActiveSendFloors(rule(),config90));
+  assert.ok(result.reasons.includes('importance_below_threshold'));
+});
+test('stricter schedule or custom thresholds are never lowered by active floors', () => {
+  assert.equal(applyActiveSendFloors(rule({minImportance:95}),config90).minImportance,95);
+  const active = {...config90,autoSendPolicy:{useCustom:true,minImportance:96,minRelevance:94,minNovelty:30}};
+  const effective = applyActiveSendFloors(rule(),active);
+  assert.equal(effective.minImportance,96);
+  assert.equal(effective.minRelevance,94);
+  assert.equal(effective.minNovelty,30);
+});
+test('inactive custom policy values do not impose hidden floors', () => {
+  const effective = applyActiveSendFloors(rule(),{...config90,autoSendPolicy:{useCustom:false,minImportance:100,minRelevance:100}});
+  assert.equal(effective.minImportance,90);
+  assert.equal(effective.minRelevance,90);
 });

@@ -30,7 +30,7 @@ import { fetchFeed, type NormalizedNews } from "@/lib/news/rss";
 import { ingestAllActiveSources, ingestSearchItems } from "@/lib/news/source-ingest";
 import { and, asc, desc, eq, gte, inArray, isNotNull, notExists, sql } from "drizzle-orm";
 import { runAutoDeliveryPass } from "./index";
-import { evaluateArticle, type AutoSendRule } from "./rules";
+import { applyActiveSendFloors, evaluateArticle, type AutoSendRule } from "./rules";
 import type {
   AgentRunSummary,
   AgentScheduleConfig,
@@ -479,6 +479,9 @@ async function executeScheduledPass(args: {
   slotKey?: string | null;
   passKind?: "regular" | "bulletin";
 }): Promise<AgentRunSummary> {
+  const activeConfig = await getActiveAiConfig();
+  const effectiveRule = applyActiveSendFloors(scheduleToRule(args.config), activeConfig);
+  args = {...args, config:{...args.config, minImportance:effectiveRule.minImportance, minRelevance:effectiveRule.minRelevance, minNovelty:effectiveRule.minNovelty}};
   const startedAt = new Date();
   const errors: string[] = [];
 
