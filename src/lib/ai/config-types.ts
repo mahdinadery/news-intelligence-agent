@@ -263,15 +263,18 @@ export const LEGACY_WHY_IT_MATTERS_INSTRUCTION =
  * audience, never a canned "doesn't matter" filler — including for indirect
  * macro channels.
  */
+/** Kept for exact-match upgrade of previously stored defaults. */
+export const PREVIOUS_WHY_IT_MATTERS_INSTRUCTION = "در یک جمله کوتاه و مشخص فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است و به کانال اثرگذاری آن اشاره کن (مثلاً نقدینگی و تأمین مالی بانک‌ها، ریسک اعتباری مشتریان، کیفیت دارایی، هزینهٔ سرمایه، رتبه‌بندی اعتباری یا شاخص‌های کلان اقتصادی). هرگز جمله‌های بی‌محتوا یا منفی مانند «برای مخاطب هدف اهمیت مشخصی ندارد» یا «مهم نیست» ننویس؛ حتی اگر پیوند مستقیم نمی‌بینی، زنجیرهٔ اثر غیرمستقیم (مثلاً اثر شاخص‌های کلان بر ترازنامهٔ بانک‌ها) را در همان یک جمله شرح بده.";
+
 export const WHY_IT_MATTERS_DEFAULT_INSTRUCTION =
-  "در یک جمله کوتاه و مشخص فارسی بگو این خبر چرا برای مخاطب هدف (طبق بخش «تعریف مخاطب و ملاک امتیاز مرتبط بودن») مهم است و به کانال اثرگذاری آن اشاره کن (مثلاً نقدینگی و تأمین مالی بانک‌ها، ریسک اعتباری مشتریان، کیفیت دارایی، هزینهٔ سرمایه، رتبه‌بندی اعتباری یا شاخص‌های کلان اقتصادی). هرگز جمله‌های بی‌محتوا یا منفی مانند «برای مخاطب هدف اهمیت مشخصی ندارد» یا «مهم نیست» ننویس؛ حتی اگر پیوند مستقیم نمی‌بینی، زنجیرهٔ اثر غیرمستقیم (مثلاً اثر شاخص‌های کلان بر ترازنامهٔ بانک‌ها) را در همان یک جمله شرح بده.";
+  "در یک جمله کوتاه، اثر مستند خبر بر مخاطب هدف را توضیح بده. جهت اثر را دقیق حفظ کن: هرگز چالش، محدودیت، هزینه یا افزایش ریسک را به بهبود یا کاهش ریسک تبدیل نکن. هدف یک ابزار را با نتیجهٔ تحقق‌یافته اشتباه نگیر. فقط بر اساس متن خبر بنویس؛ اگر اثر مشخص در متن نیست، رشتهٔ خالی بده. پیوند یا زنجیرهٔ اثر حدسی نساز.";
 
 /**
  * Rewrites ONLY an untouched legacy instruction to the fixed default; any
  * operator-customized text is preserved as-is.
  */
 export function upgradeLegacyWhyItMattersInstruction(instruction: string): string {
-  return instruction.trim() === LEGACY_WHY_IT_MATTERS_INSTRUCTION
+  return [LEGACY_WHY_IT_MATTERS_INSTRUCTION, PREVIOUS_WHY_IT_MATTERS_INSTRUCTION].includes(instruction.trim())
     ? WHY_IT_MATTERS_DEFAULT_INSTRUCTION
     : instruction;
 }

@@ -7,6 +7,8 @@
  * error message that leaves this module.
  */
 
+import { markdownToPlainText } from "./plain-text";
+
 const BALE_API_BASE_URL = "https://tapi.bale.ai/bot";
 
 /** Hard timeout so a stalled Bale request can never hang the Next.js server. */
@@ -190,7 +192,7 @@ export async function sendBaleMessage(
   if (!response.ok && options.parseMode && (response.kind === "api_rejected" || response.kind === "http_error")) {
     response = await callBaleApi<{ message_id?: unknown }>("sendMessage", {
       chat_id: chatId,
-      text: message,
+      text: options.parseMode === "Markdown" ? markdownToPlainText(message) : message,
     });
   }
 

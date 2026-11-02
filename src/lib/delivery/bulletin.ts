@@ -122,6 +122,17 @@ function compact(text: string | null | undefined, max: number): string {
   return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
 }
 
+/** Prefer complete sentences when a stored summary exceeds the display budget. */
+export function bulletinSummary(text: string | null | undefined, max = 600): string {
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const prefix = clean.slice(0, max);
+  const end = [...prefix.matchAll(/[.!؟?](?:\s|$)/g)].at(-1);
+  if (end && end.index >= 40) return prefix.slice(0, end.index + 1);
+  const wordEnd = prefix.lastIndexOf(" ");
+  return prefix.slice(0, wordEnd > 0 ? wordEnd : max - 1).trimEnd() + "…";
+}
+
 /**
  * Ranks candidates and takes the top `max`: highest importance first, newest
  * first on ties. Pure — the caller supplies already rule-approved items.
@@ -178,9 +189,9 @@ export function buildBulletinMessage(args: {
     const start = lines.length;
     const marker = NUMBER_EMOJI[index] ?? `${index + 1}.`;
     lines.push("", `${marker} ${escapeMd(compact(item.title, 160))}`);
-    const oneLiner = compact(item.oneLiner, 220);
+    const oneLiner = bulletinSummary(item.oneLiner);
     if (settings.showSummary && oneLiner) lines.push(escapeMd(oneLiner));
-    const why = compact(item.whyItMatters, 220);
+    const why = bulletinSummary(item.whyItMatters, 400);
     if (settings.showWhy && why) lines.push(`چرا مهم است: ${escapeMd(why)}`);
     const entities = (item.entityTags ?? []).slice(0, 4).join("، ");
     if (settings.showEntities && entities) lines.push(`نهادها: ${escapeMd(entities)}`);

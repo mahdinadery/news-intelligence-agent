@@ -7,6 +7,7 @@ import {
   resolveBulletinSettings,
   validateBulletinSettings,
   buildBulletinMessage,
+  bulletinSummary,
   pickBulletinItems,
 } from "../src/lib/delivery/bulletin.ts";
 
@@ -188,4 +189,17 @@ test('daily ranking prioritizes both relevance and importance, capped at five', 
   const result = pickBulletinItems(rows,5);
   assert.equal(result.length,5);
   assert.deepEqual(result.map(row=>row.id),['0','1','2','3','4']);
+});
+
+
+test('bulletin preserves a normal summary past the former 220-character cut', () => {
+  const summary = 'چالش‌های تامین مالی و محدودیت‌های ابزار اعتباری بررسی شد. '.repeat(5);
+  assert.ok(summary.length > 220 && summary.length < 600);
+  assert.equal(bulletinSummary(summary),summary.trim());
+});
+test('overlong summaries prefer complete sentences instead of mid-sentence ellipses', () => {
+  const sentence = 'این گزارش محدودیت‌های تامین مالی زنجیره تولید و هزینه تنزیل را بررسی می‌کند.';
+  const value = bulletinSummary(sentence+' '+ 'ادامه متن بدون پایان '.repeat(50));
+  assert.equal(value,sentence);
+  assert.ok(!value.endsWith('…'));
 });
