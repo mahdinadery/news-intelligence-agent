@@ -23,6 +23,7 @@ import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { canonicalizeUrl } from "./canonical-url";
 import { similarityKeyOf } from "./corroboration";
 import { normalizeContent, normalizeTitle } from "./normalize";
+import { fetchTelegramChannel } from "./telegram";
 import { fetchFeed, parseFeed, type NewsFetchResult, type NormalizedNews } from "./rss";
 import { evaluateTopicFilter, isTopicGateActive } from "./topic-filter";
 
@@ -342,15 +343,15 @@ async function partitionDuplicates(
 export async function ingestFromSource(source: NewsSourceRow): Promise<PipelineReport | PipelineFailure> {
   const startedAt = new Date();
 
-  if (source.type !== "rss") {
+  if (source.type !== "rss" && source.type !== "telegram") {
     return {
       ok: false,
       code: "type_not_supported",
-      message: `نوع منبع «${source.type}» هنوز برای دریافت خودکار پیاده‌سازی نشده است (فقط RSS فعال است).`,
+      message: `نوع منبع «${source.type}» هنوز برای دریافت خودکار پیاده‌سازی نشده است (RSS و کانال عمومی تلگرام فعال‌اند).`,
     };
   }
 
-  const fetched = await fetchFeed(source.url);
+  const fetched = source.type === "telegram" ? await fetchTelegramChannel(source.url) : await fetchFeed(source.url);
 
   if (!fetched.ok) {
     await recordRun(source.id, startedAt, "failed", { itemsFound: 0, created: 0, filtered: 0, duplicates: 0, skipped: 0 }, fetched.message, fetched.detail ?? null);
@@ -494,11 +495,11 @@ export async function ingestViaPipeline(): Promise<
 }
 
 /** Read-only feed probe for the admin "Test Source" action — stores NOTHING. */
-export async function testFeedWithoutStoring(url: string, maxItems = 5): Promise<
+export async function testFeedWithoutStoring(url: string, maxItems = 5, type: string = "rss"): Promise<
   | { ok: true; feedTitle: string; itemCount: number; sample: Array<{ title: string; url: string; publishedAt: string | null }>; skipped: number }
   | { ok: false; message: string; detail?: string }
 > {
-  const fetched: NewsFetchResult = await fetchFeed(url);
+  const fetched: NewsFetchResult = type === "telegram" ? await fetchTelegramChannel(url) : await fetchFeed(url);
 
   if (!fetched.ok) {
     return { ok: false, message: fetched.message, detail: fetched.detail };
@@ -578,7 +579,7 @@ export async function ingestAllActiveSources(): Promise<
   const activeSources = await db
     .select()
     .from(newsSources)
-    .where(and(eq(newsSources.active, true), eq(newsSources.type, "rss")));
+    .where(and(eq(newsSources.active, true), inArray(newsSources.type, ["rss", "telegram"])));
 
   if (activeSources.length === 0) {
     const legacy = await ingestViaPipeline();
@@ -764,7 +765,7 @@ export async function runDueSources(now = new Date()): Promise<{
   fetched: number;
   results: Array<{ sourceId: string; sourceName: string; status: "fetched" | "skipped" | "failed"; detail?: string }>;
 }> {
-  const activeSources = await db.select().from(newsSources).where(and(eq(newsSources.active, true), eq(newsSources.type, "rss"))).orderBy(desc(newsSources.priority));
+  const activeSources = await db.select().from(newsSources).where(and(eq(newsSources.active, true), inArray(newsSources.type, ["rss", "telegram"]))).orderBy(desc(newsSources.priority));
 
   const results: Array<{ sourceId: string; sourceName: string; status: "fetched" | "skipped" | "failed"; detail?: string }> = [];
   let fetched = 0;

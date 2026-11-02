@@ -91,7 +91,7 @@ type PackApplyResult = {
 type FormState = {
   id: string | null; // null = create
   name: string;
-  type: "rss" | "api";
+  type: "rss" | "api" | "telegram";
   url: string;
   description: string;
   category: string;
@@ -743,14 +743,16 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
               <label className="mb-1 block text-xs font-medium text-muted">نوع</label>
               <select
                 className="w-full rounded-lg border border-line px-3 py-2 text-sm"
-                onChange={(e) => setForm({ ...form, type: e.target.value === "api" ? "api" : "rss" })}
+                onChange={(e) => setForm({ ...form, type: e.target.value === "telegram" ? "telegram" : e.target.value === "api" ? "api" : "rss" })}
                 value={form.type}
               >
                 <option value="rss">RSS</option>
+                <option value="telegram">کانال عمومی تلگرام</option>
                 <option value="api">API (به‌زودی)</option>
               </select>
             </div>
-            <FieldInput label="آدرس فید (URL)" value={form.url} onChange={(v) => setForm({ ...form, url: v })} dir="ltr" />
+            {form.type === "telegram" ? <p className="text-xs text-muted">فقط پست متنی و کپشن قابل مشاهده در صفحهٔ عمومی دریافت می‌شود؛ بدون ربات یا ورود. آرشیو کامل و عکس/صوت پردازش نمی‌شود. پس از ذخیره، «تست» را بزنید.</p> : null}
+            <FieldInput label={form.type === "telegram" ? "شناسه یا لینک کانال عمومی (مثلاً @channelname)" : "آدرس فید (URL)"} value={form.url} onChange={(v) => setForm({ ...form, url: v })} dir="ltr" />
             <div>
               <label className="mb-1 block text-xs font-medium text-muted">اولویت (۱=بالاترین)</label>
               <select
@@ -875,7 +877,7 @@ export function NewsSourcesConsole({ adminKey }: { adminKey: string }) {
                           setForm({
                             id: source.id,
                             name: source.name,
-                            type: source.type === "api" ? "api" : "rss",
+                            type: source.type === "telegram" ? "telegram" : source.type === "api" ? "api" : "rss",
                             url: source.url,
                             description: source.description ?? "",
                             category: source.category ?? "",

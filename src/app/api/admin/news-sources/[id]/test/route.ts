@@ -25,19 +25,18 @@ export async function POST(request: Request, routeContext: RouteContext) {
     body = null;
   }
 
+  const resolved = "then" in routeContext.params ? await routeContext.params : routeContext.params;
+  const source = await getSourceById(resolved.id);
+  if (!source) return Response.json({success:false,message:"منبع مورد نظر پیدا نشد."},{status:404});
+
   let url = body?.url?.trim() ?? "";
 
   if (!url) {
-    const resolved = "then" in routeContext.params ? await routeContext.params : routeContext.params;
-    const source = await getSourceById(resolved.id);
-    if (!source) {
-      return Response.json({ success: false, message: "منبع مورد نظر پیدا نشد." }, { status: 404 });
-    }
     url = source.url;
   }
 
   const startedAt = Date.now();
-  const result = await testFeedWithoutStoring(url);
+  const result = await testFeedWithoutStoring(url, 5, source.type);
   const elapsedMs = Date.now() - startedAt;
 
   if (!result.ok) {
