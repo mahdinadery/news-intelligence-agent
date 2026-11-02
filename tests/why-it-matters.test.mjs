@@ -4,6 +4,7 @@ import test from "node:test";
 import { sanitizeWhyItMatters } from "../src/lib/ai/why-guard.ts";
 import {
   DEFAULT_FEATURES,
+  PREVIOUS_WHY_IT_MATTERS_INSTRUCTION,
   LEGACY_WHY_IT_MATTERS_INSTRUCTION,
   WHY_IT_MATTERS_DEFAULT_INSTRUCTION,
   upgradeLegacyWhyItMattersInstruction,
@@ -102,4 +103,11 @@ test("a real why still renders after the summary", () => {
   const text = buildNewsMessage(row({ whyItMatters: "فشار بر نقدینگی بانک‌ها را بیشتر می‌کند." }));
   assert.ok(text.includes("چرا مهم است:"));
   assert.ok(text.includes("فشار بر نقدینگی بانک‌ها را بیشتر می‌کند."));
+});
+
+
+test('previous default requiring invented indirect relevance is upgraded', () => {
+  assert.equal(upgradeLegacyWhyItMattersInstruction(PREVIOUS_WHY_IT_MATTERS_INSTRUCTION), WHY_IT_MATTERS_DEFAULT_INSTRUCTION);
+  assert.ok(WHY_IT_MATTERS_DEFAULT_INSTRUCTION.includes('رشتهٔ خالی'));
+  assert.ok(WHY_IT_MATTERS_DEFAULT_INSTRUCTION.includes('تحقق‌یافته'));
 });
