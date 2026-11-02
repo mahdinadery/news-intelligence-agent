@@ -34,7 +34,7 @@ export const newsSources = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
-    // "rss" (working) | "api" (data model prepared; ingestion not implemented)
+    // "rss" | "telegram" (public web preview) | "api" (not implemented)
     type: text("type").notNull().default("rss"),
     url: text("url").notNull(),
     description: text("description"),

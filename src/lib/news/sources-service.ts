@@ -6,6 +6,7 @@
  * errorCount) with simple, documented rules — no arbitrary scoring.
  */
 
+import { normalizeTelegramChannel } from "./telegram-channel";
 import { db } from "@/db";
 import { ingestionRuns, newsSources, type NewsSourceRow } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -13,7 +14,7 @@ import type { SourceHealth } from "./status";
 
 export type SourceInput = {
   name: string;
-  type: "rss" | "api";
+  type: "rss" | "api" | "telegram";
   url: string;
   description?: string | null;
   category?: string | null;
@@ -31,7 +32,11 @@ export function validateSourceInput(input: Partial<SourceInput>): SourceValidati
   const name = input.name?.trim() ?? "";
   if (!name) errors.push("نام منبع نمی‌تواند خالی باشد.");
 
-  const url = input.url?.trim() ?? "";
+  const type = input.type ?? "rss";
+  if (!["rss", "api", "telegram"].includes(type)) errors.push("نوع منبع معتبر نیست.");
+  const channel = type === "telegram" ? normalizeTelegramChannel(input.url ?? "") : null;
+  if (type === "telegram" && !channel) errors.push("شناسهٔ کانال عمومی را مانند @channelname یا https://t.me/channelname وارد کنید.");
+  const url = type === "telegram" && channel ? `https://t.me/s/${channel}` : input.url?.trim() ?? "";
   let parsedUrl: URL | null = null;
   try {
     parsedUrl = new URL(url);
@@ -42,7 +47,6 @@ export function validateSourceInput(input: Partial<SourceInput>): SourceValidati
     errors.push("آدرس منبع باید یک URL معتبر http(s) باشد.");
   }
 
-  const type = input.type === "api" ? "api" : "rss";
   const priority = Math.min(Math.max(Number.isFinite(input.priority as number) ? (input.priority as number) : 3, 1), 5);
   const fetchIntervalMinutes = Math.min(Math.max(Math.round(input.fetchIntervalMinutes ?? 30) || 30, 1), 7 * 24 * 60);
   const maxItemsPerFetch = Math.min(Math.max(Math.round(input.maxItemsPerFetch ?? 50) || 50, 1), 200);
