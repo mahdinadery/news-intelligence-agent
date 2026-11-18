@@ -1,3 +1,4 @@
+import { getActiveAiConfig } from "@/lib/ai/config-service";
 import { expandTargets, type DeliveryTarget } from "@/lib/delivery/types";
 import { runAutoDeliveryPass } from "./index";
 import { resolveAutoSendRule } from "./resolve-rule";
@@ -47,11 +48,13 @@ function disabled(destination = "", enabled = true): AutoSendSummary {
 async function holdsForBulletin(destination: DeliveryTarget): Promise<boolean> {
   try {
     const record = await readScheduleRecord();
+    const active = await getActiveAiConfig();
+    if (active.decisionRules.bulletin?.mainEventsOnly) return true;
     if (!record.enabled || record.publishMode !== "bulletin") return false;
     const held = new Set(expandTargets(record.destination));
     return expandTargets(destination).some((target) => held.has(target));
   } catch {
-    return false;
+    return true;
   }
 }
 

@@ -7,6 +7,7 @@ import {
   resolveBulletinSettings,
   validateBulletinSettings,
   buildBulletinMessage,
+  splitBulletinMessage,
   bulletinSummary,
   pickBulletinItems,
 } from "../src/lib/delivery/bulletin.ts";
@@ -202,4 +203,30 @@ test('overlong summaries prefer complete sentences instead of mid-sentence ellip
   const value = bulletinSummary(sentence+' '+ 'ادامه متن بدون پایان '.repeat(50));
   assert.equal(value,sentence);
   assert.ok(!value.endsWith('…'));
+});
+
+test('main-event mode includes all eligible supplied events, no five-item cap or fallback prose', () => {
+  const items = Array.from({length:12},(_,i)=>item({id:String(i),mainEvent:`رویداد اصلی ${i}`,title:'عنوان نباید دیده شود',oneLiner:'خلاصه نباید دیده شود'}));
+  const output = buildBulletinMessage({items:[...items,item({mainEvent:'  '})],intro:'مقدمه نباید دیده شود',generatedAt:new Date('2026-01-01'),timezone:'UTC',settings:{mainEventsOnly:true,maxItems:1}});
+  assert.ok(output.includes('12. رویداد اصلی 11'));
+  for (const forbidden of ['عنوان نباید','خلاصه نباید','مقدمه نباید','لینک اصلی خبر']) assert.ok(!output.includes(forbidden));
+});
+test('mainEvent placeholder is available to custom normal bulletin layouts', () => {
+  const output = buildBulletinMessage({items:[item({mainEvent:'رویداد واقعی'})],intro:null,generatedAt:new Date('2026-01-01'),timezone:'UTC',settings:{itemTemplate:'{mainEvent}'}});
+  assert.ok(output.includes('رویداد واقعی'));
+  assert.ok(validateBulletinSettings({itemTemplate:'{mainEvent}'}).length===0);
+});
+test('main event settings reject invalid clock times', () => {
+  for (const endOfDayTime of ['25:00','8:00','23:99']) assert.ok(validateBulletinSettings({endOfDayTime}).length>0);
+});
+
+test('long digests split into bounded numbered parts without losing the last event', () => {
+  const text = Array.from({length:100},(_,i)=>`${i+1}. رویداد ${"خبر ".repeat(30)}`).join("\n\n");
+  const parts = splitBulletinMessage(text);
+  assert.ok(parts.length>1);
+  assert.ok(parts.every(part=>part.length<=3500));
+  assert.ok(parts.at(-1).includes('100.'));
+});
+test('short messages preserve their exact content', () => {
+  assert.deepEqual(splitBulletinMessage('بولتن کوتاه'),['بولتن کوتاه']);
 });

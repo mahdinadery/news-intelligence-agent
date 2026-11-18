@@ -1,3 +1,4 @@
+import { splitBulletinMessage } from "./bulletin";
 /**
  * Delivery service (Milestone 5) — SERVER-SIDE ONLY.
  *
@@ -261,6 +262,7 @@ export type BulletinSendResult = {
  */
 export async function sendBulletinDelivery(params: {
   text: string;
+  splitLongMessage?: boolean;
   newsIds: string[];
   target: DeliveryTarget;
   trigger: SendTrigger;
@@ -278,12 +280,15 @@ export async function sendBulletinDelivery(params: {
   const recordedFor: string[] = [];
 
   for (const destination of destinations) {
-    let outcome: ProviderOutcome;
-    try {
-      outcome = await PROVIDERS[destination](text);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      outcome = { ok: false, providerMessageId: null, errorMessage: detail.slice(0, 200) };
+    let outcome: ProviderOutcome = {ok:true,providerMessageId:null,errorMessage:null};
+    const parts = params.splitLongMessage ? splitBulletinMessage(text) : [text];
+    for (let index=0; index<parts.length; index++) {
+      try { outcome = await PROVIDERS[destination](parts[index]); }
+      catch (error) { outcome = {ok:false,providerMessageId:null,errorMessage:String(error).slice(0,200)}; }
+      if (!outcome.ok) {
+        outcome.errorMessage = `بخش ${index+1}/${parts.length}: ${outcome.errorMessage ?? "خطای ارسال"}`;
+        break;
+      }
     }
 
     const status: DeliveryStatus = outcome.ok ? "sent" : "failed";

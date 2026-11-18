@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   DEFAULT_AGENT_SCHEDULE,
+  applyMainEventSchedule,
   coerceScheduleConfig,
   computeDueSlot,
   computeDueBulletinSlot,
@@ -251,4 +252,12 @@ test('bulletin catch-up does not run earlier slots after later slot claimed', ()
 test('bulletin does not backfill yesterday before first slot today', () => {
   const config = schedule({publishMode:'bulletin',bulletinTimes:['08:00']});
   assert.equal(computeDueBulletinSlot({now:new Date('2026-10-28T01:00:00Z'),config,lastBulletinSlot:'B2026-10-27T08:00'}).due,false);
+});
+
+test('main-event mode owns a single daily slot and holds singles without enabling a disabled scheduler', () => {
+  const result = applyMainEventSchedule({...DEFAULT_AGENT_SCHEDULE,publishMode:'both',bulletinTimes:['08:00','14:00']},{mainEventsOnly:true,endOfDayTime:'23:10'});
+  assert.equal(result.publishMode,'bulletin');
+  assert.deepEqual(result.bulletinTimes,['23:10']);
+  assert.equal(result.enabled,false);
+  assert.equal(applyMainEventSchedule(DEFAULT_AGENT_SCHEDULE),DEFAULT_AGENT_SCHEDULE);
 });

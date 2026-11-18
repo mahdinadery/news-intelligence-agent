@@ -1,7 +1,9 @@
+import { getActiveAiConfig } from "@/lib/ai/config-service";
 import { checkAdminAccess } from "@/lib/admin/access";
 import { diagnoseDbError } from "@/lib/admin/db-errors";
 import { getBaleConfigStatus } from "@/lib/bale/client";
 import {
+  applyMainEventSchedule,
   computeDueBulletinSlot,
   computeDueSlot,
   computeNextBulletinRun,
@@ -36,9 +38,11 @@ function nextRunInfo(config: AgentScheduleConfig) {
  */
 export async function GET() {
   const record = await readScheduleRecord();
+  const active = await getActiveAiConfig();
+  const effective = applyMainEventSchedule(record, active.decisionRules.bulletin);
   const bale = getBaleConfigStatus();
-  const due = computeDueSlot({ now: new Date(), config: record, lastRunSlot: record.lastRunSlot });
-  const next = nextRunInfo(record);
+  const due = computeDueSlot({ now: new Date(), config: effective, lastRunSlot: record.lastRunSlot });
+  const next = nextRunInfo(effective);
 
   return Response.json({
     success: true,
@@ -59,6 +63,8 @@ export async function GET() {
       bulletinTimes: record.bulletinTimes,
     },
     status: {
+      effectivePublishMode: effective.publishMode,
+      effectiveBulletinTimes: effective.bulletinTimes,
       persisted: Boolean(record.id),
       enabled: record.enabled,
       nextRunAt: next.nextRunAt,
@@ -72,7 +78,7 @@ export async function GET() {
       // No tick for 15+ minutes => the GitHub Actions cron is not firing.
       cronStale: !record.lastTickAt || Date.now() - record.lastTickAt.getTime() > 15 * 60 * 1000,
       nextBulletinAt: (() => {
-        const bulletinNext = computeNextBulletinRun({ now: new Date(), config: record });
+        const bulletinNext = computeNextBulletinRun({ now: new Date(), config: effective });
         return bulletinNext ? bulletinNext.at.toISOString() : null;
       })(),
       dueReason: due.due ? "due" : due.reason,
@@ -80,7 +86,7 @@ export async function GET() {
     },
     destinationsReady: { local: true, bale: bale.configured },
     baleMissing: bale.missing,
-    description: describeSchedule(record),
+    description: describeSchedule(effective),
   });
 }
 

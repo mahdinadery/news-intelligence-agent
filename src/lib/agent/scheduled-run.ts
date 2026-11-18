@@ -144,7 +144,7 @@ export async function selectSendCandidates(
  * Same strict AND rule as per-item sends — a bulletin can never smuggle in an
  * article that would fail the single-message path.
  */
-async function selectBulletinCandidates(config: AgentScheduleConfig): Promise<NewsRow[]> {
+async function selectBulletinCandidates(config: AgentScheduleConfig, allEvents = false): Promise<NewsRow[]> {
   const rule = scheduleToRule(config);
   // Rank the whole eligible daily pool, not the first 50 newest IDs.
   const rows = await db.select().from(news).where(and(
@@ -157,6 +157,7 @@ async function selectBulletinCandidates(config: AgentScheduleConfig): Promise<Ne
     ))),
   ));
   const matching = rows.filter((row) => evaluateArticle(row, rule).matches);
+  if (allEvents) return matching.filter(row => row.mainEvent?.trim()).sort((a,b) => (b.importanceScore ?? 0) - (a.importanceScore ?? 0) || a.id.localeCompare(b.id));
   return pickBulletinItems(collapseEventGroups(matching), MAX_BULLETIN_ITEMS);
 }
 
@@ -203,7 +204,7 @@ async function sendBulletin(
 ): Promise<ScheduleBulletinSummary> {
   const aiConfig = await getActiveAiConfig();
   const bulletin = resolveBulletinSettings(aiConfig.decisionRules.bulletin);
-  items = items.slice(0, bulletin.maxItems);
+  items = bulletin.mainEventsOnly ? items.filter(item => item.mainEvent?.trim()) : items.slice(0, bulletin.maxItems);
   // Batch lookup of other outlets carrying each corroborated item's event —
   // the digest lists them under the chosen story.
   const sourceNamesByKey = new Map<string, string[]>();
@@ -238,7 +239,7 @@ async function sendBulletin(
       whyItMatters: item.whyItMatters,
       hashtags: item.hashtags,
     })),
-    { model: aiConfig.model, enabled: bulletin.aiIntro, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
+    { model: aiConfig.model, enabled: bulletin.aiIntro && !bulletin.mainEventsOnly, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
   );
 
   const text = buildBulletinMessage({
@@ -246,6 +247,7 @@ async function sendBulletin(
     intro,
     items: items.map((item) => ({
       id: item.id,
+      mainEvent: item.mainEvent,
       title: item.title,
       oneLiner: item.summary,
       whyItMatters: item.whyItMatters,
@@ -265,6 +267,7 @@ async function sendBulletin(
 
   const result = await sendBulletinDelivery({
     text,
+    splitLongMessage: bulletin.mainEventsOnly,
     // Ledger rows only for the never-delivered subset (recap items already
     // carry their own rows from the per-item sends).
     newsIds: options.recordIds ? options.recordIds.filter(id => items.some(item => item.id === id)) : items.map((item) => item.id),
@@ -290,6 +293,12 @@ async function runBulletinPhase(
   config: AgentScheduleConfig,
   trigger: "schedule" | "manual",
 ): Promise<{ summary: ScheduleBulletinSummary; gapSearch?: ScheduleGapSummary | null }> {
+  const active = await getActiveAiConfig();
+  if (active.decisionRules.bulletin?.mainEventsOnly) {
+    const items = await selectBulletinCandidates(config, true);
+    if (!items.length) return {summary:{attempted:true,sent:false,itemCount:0,reason:"no_qualifying_items"}};
+    return {summary:await sendBulletin(config, items, {recordRows:true,trigger})};
+  }
   if (config.publishMode === "both") {
     // "both": the digest wraps up what the singles already sent. When the
     // recap window is empty (nothing single-sent since the last digest), fall
@@ -480,6 +489,7 @@ async function executeScheduledPass(args: {
   passKind?: "regular" | "bulletin";
 }): Promise<AgentRunSummary> {
   const activeConfig = await getActiveAiConfig();
+  if (activeConfig.decisionRules.bulletin?.mainEventsOnly) args = {...args, config:{...args.config,publishMode:"bulletin"}};
   const effectiveRule = applyActiveSendFloors(scheduleToRule(args.config), activeConfig);
   args = {...args, config:{...args.config, minImportance:effectiveRule.minImportance, minRelevance:effectiveRule.minRelevance, minNovelty:effectiveRule.minNovelty}};
   const startedAt = new Date();
