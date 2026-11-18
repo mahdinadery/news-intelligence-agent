@@ -102,9 +102,11 @@ export async function runAutoDeliveryPass(
   // The scheduled publisher passes its own rule so its configured time slots,
   // destination and thresholds stay independent from the "after analysis"
   // auto-send policy.
+  const activeConfig = await getActiveAiConfig();
+  if (activeConfig.decisionRules.bulletin?.mainEventsOnly) return {...NOT_MATCHED, destination:options.rule?.destination ?? ""};
   // Supplied schedule rules must obey the same active floors as resolved rules.
   const rule = options.rule
-    ? applyActiveSendFloors(options.rule, await getActiveAiConfig())
+    ? applyActiveSendFloors(options.rule, activeConfig)
     : await resolveAutoSendRule();
 
   if (!rule.enabled && !options.force) {

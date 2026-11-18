@@ -21,7 +21,7 @@
 export const MAX_BULLETIN_ITEMS = 5;
 
 export const BULLETIN_TEMPLATE_VARS = ["title", "date", "intro", "items", "count"] as const;
-export const BULLETIN_ITEM_TEMPLATE_VARS = ["number", "title", "summary", "whyItMatters", "whyBlock", "entities", "entitiesBlock", "sources", "originalUrl", "importanceScore", "hashtags"] as const;
+export const BULLETIN_ITEM_TEMPLATE_VARS = ["number", "title", "summary", "whyItMatters", "whyBlock", "entities", "entitiesBlock", "sources", "originalUrl", "importanceScore", "hashtags", "mainEvent"] as const;
 export const DEFAULT_BULLETIN_TEMPLATE = "🗞️ {title} — {date}\n\n{intro}\n\n{items}";
 export const DEFAULT_BULLETIN_ITEM_TEMPLATE = "{number} {title}\n{summary}\n{whyBlock}\n{entitiesBlock}\n{sources}\n{originalUrl}\n{hashtags}";
 
@@ -33,6 +33,8 @@ function renderTemplate(template: string, values: Record<string, string>): strin
 }
 
 export type BulletinSettings = {
+  mainEventsOnly: boolean;
+  endOfDayTime: string;
   template: string;
   itemTemplate: string;
   title: string;
@@ -47,6 +49,7 @@ export type BulletinSettings = {
 };
 
 export const DEFAULT_BULLETIN_SETTINGS: BulletinSettings = {
+  mainEventsOnly: false, endOfDayTime: "23:00",
   template: "", itemTemplate: "",
   title: "بولتن خبری", maxItems: 5, showSummary: true, showWhy: true,
   showEntities: true, showSources: true, aiIntro: true,
@@ -62,6 +65,8 @@ export function validateBulletinSettings(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return ["تنظیمات بولتن نامعتبر است."];
   const settings = value as Partial<BulletinSettings>;
   const errors: string[] = [];
+  if (settings.mainEventsOnly !== undefined && typeof settings.mainEventsOnly !== "boolean") errors.push("حالت رویداد اصلی باید روشن یا خاموش باشد.");
+  if (settings.endOfDayTime !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(settings.endOfDayTime)) errors.push("ساعت پایان روز معتبر نیست.");
   for (const [key, allowed] of [["template", BULLETIN_TEMPLATE_VARS], ["itemTemplate", BULLETIN_ITEM_TEMPLATE_VARS]] as const) {
     const template = settings[key];
     if (template === undefined) continue;
@@ -82,6 +87,7 @@ export function validateBulletinSettings(value: unknown): string[] {
 }
 
 export type BulletinItem = {
+  mainEvent?: string | null;
   hashtags?: string | null;
   id: string;
   title: string;
@@ -165,7 +171,7 @@ export function buildBulletinMessage(args: {
 }): string {
   const { intro, generatedAt, timezone } = args;
   const settings = resolveBulletinSettings(args.settings);
-  const items = args.items.slice(0, settings.maxItems);
+  const items = settings.mainEventsOnly ? args.items.filter(item => item.mainEvent?.trim()) : args.items.slice(0, settings.maxItems);
 
   let dateLabel = generatedAt.toISOString().slice(0, 10);
   try {
@@ -175,6 +181,10 @@ export function buildBulletinMessage(args: {
     });
   } catch {
     // Invalid timezone => keep the ISO date.
+  }
+
+  if (settings.mainEventsOnly) {
+    return [`🗞️ ${escapeMd(settings.title)} — ${dateLabel}`, ...items.map((item,index) => `${index+1}. ${escapeMd(item.mainEvent!.trim().replace(/\s+/g," "))}`)].join("\n\n");
   }
 
   const lines: string[] = [`🗞️ ${escapeMd(settings.title)} — ${dateLabel}`];
@@ -208,6 +218,7 @@ export function buildBulletinMessage(args: {
     if (item.hashtags) lines.push(escapeMd(item.hashtags));
     const defaultItem = lines.slice(start).join("\n").trim();
     let customItem = settings.itemTemplate.trim() ? renderTemplate(settings.itemTemplate, {
+      mainEvent: escapeMd(item.mainEvent ?? ""),
       number: marker, title: escapeMd(compact(item.title, 160)),
       summary: settings.showSummary ? escapeMd(oneLiner) : "",
       whyItMatters: settings.showWhy ? escapeMd(why) : "",
@@ -231,4 +242,26 @@ export function buildBulletinMessage(args: {
     intro: settings.aiIntro ? escapeMd(introText) : "",
     items: renderedItems.join("\n\n"), count: String(items.length),
   });
+}
+
+
+/** Reserve space for numbering; never split a UTF-16 surrogate pair. */
+export function splitBulletinMessage(text: string, limit = 3500): string[] {
+  if (text.length <= limit) return [text];
+  const budget = Math.max(100, limit - 60);
+  const chunks: string[] = [];
+  let current = "";
+  for (const line of text.split("\n")) {
+    if (current && current.length + line.length + 1 > budget) { chunks.push(current); current = ""; }
+    let rest = line;
+    while (rest.length > budget) {
+      let end = budget;
+      if (/[\uD800-\uDBFF]/.test(rest[end-1])) end--;
+      if (rest[end-1] === "\\") end--;
+      chunks.push(rest.slice(0,end)); rest = rest.slice(end);
+    }
+    current = current ? current + "\n" + rest : rest;
+  }
+  if (current) chunks.push(current);
+  return chunks.map((chunk,index) => `بخش ${index+1}/${chunks.length}\n\n${chunk}`);
 }

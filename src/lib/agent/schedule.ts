@@ -613,3 +613,8 @@ export function describeSchedule(config: AgentScheduleConfig): string[] {
     `حداقل اهمیت ${config.minImportance}٪ · مرتبط بودن ${config.minRelevance}٪`,
   ];
 }
+
+/** A configured main-event digest holds singles and owns one daily bulletin slot. */
+export function applyMainEventSchedule<T extends AgentScheduleConfig>(config: T, settings?: {mainEventsOnly?: boolean; endOfDayTime?: string}): T {
+  return settings?.mainEventsOnly ? {...config,publishMode:"bulletin",bulletinTimes:[settings.endOfDayTime ?? "23:00"]} : config;
+}

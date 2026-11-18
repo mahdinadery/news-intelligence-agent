@@ -1,5 +1,7 @@
+import { getActiveAiConfig } from "@/lib/ai/config-service";
 import { checkAdminAccess } from "@/lib/admin/access";
 import {
+  applyMainEventSchedule,
   computeDueBulletinSlot,
   computeDueSlot,
   computeNextBulletinRun,
@@ -49,7 +51,10 @@ export async function POST(request: Request) {
   await markTickSeen();
 
   const record = await readScheduleRecord();
-  const config = coerceScheduleConfig(record);
+  let config = coerceScheduleConfig(record);
+  const activeConfig = await getActiveAiConfig();
+  const bulletinSettings = activeConfig.decisionRules.bulletin;
+  config = applyMainEventSchedule(config, bulletinSettings);
   const now = new Date();
 
   const due = computeDueSlot({ now, config, lastRunSlot: record.lastRunSlot });

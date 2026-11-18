@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const collapsed = collapseEventGroups(matched);
     const qualifying = collapsed.filter((row) => evaluateArticle(row, rule).matches);
     const bulletin = resolveBulletinSettings(aiConfig.decisionRules.bulletin);
-    const items = pickBulletinItems(qualifying, bulletin.maxItems);
+    const items = bulletin.mainEventsOnly ? matched.filter(row => row.mainEvent?.trim() && evaluateArticle(row,rule).matches) : pickBulletinItems(qualifying, bulletin.maxItems);
 
     if (items.length === 0) {
       return { sent: false, itemCount: 0, reason: "no_qualifying_items" as const };
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
 
     const intro = await synthesizeBulletinBrief(
       items.map((item) => ({ title: item.title, oneLiner: item.summary, whyItMatters: item.whyItMatters })),
-      { model: aiConfig.model, enabled: bulletin.aiIntro, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
+      { model: aiConfig.model, enabled: bulletin.aiIntro && !bulletin.mainEventsOnly, introPrompt: bulletin.introPrompt, maxTokens: bulletin.introMaxTokens },
     );
 
     const text = buildBulletinMessage({
@@ -75,6 +75,7 @@ export async function POST(request: Request) {
       intro,
       items: items.map((item) => ({
         id: item.id,
+        mainEvent: item.mainEvent,
         title: item.title,
         oneLiner: item.summary,
         whyItMatters: item.whyItMatters,
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
 
     const result = await sendBulletinDelivery({
       text,
+      splitLongMessage: bulletin.mainEventsOnly,
       newsIds: items.map((item) => item.id),
       target: record.destination,
       trigger: "manual",
